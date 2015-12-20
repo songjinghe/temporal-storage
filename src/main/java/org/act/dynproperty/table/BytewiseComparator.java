@@ -31,7 +31,7 @@ public class BytewiseComparator
     @Override
     public int compare(Slice sliceA, Slice sliceB)
     {
-        return sliceA.compareTo(sliceB);
+        return sliceA.compareTo( sliceB );
     }
 
     @Override

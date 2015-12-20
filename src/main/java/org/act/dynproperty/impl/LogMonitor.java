@@ -17,30 +17,9 @@
  */
 package org.act.dynproperty.impl;
 
-import org.act.dynproperty.util.Slice;
-
-public class LookupKey
+public interface LogMonitor
 {
-    private final InternalKey key;
+    void corruption(long bytes, String reason);
 
-    public LookupKey(Slice id, int time)
-    {
-        key = new InternalKey(id, time, ValueType.VALUE);
-    }
-
-    public InternalKey getInternalKey()
-    {
-        return key;
-    }
-
-    public Slice getId()
-    {
-        return key.getId();
-    }
-
-    @Override
-    public String toString()
-    {
-        return key.toString();
-    }
+    void corruption(long bytes, Throwable reason);
 }

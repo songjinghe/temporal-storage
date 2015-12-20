@@ -59,7 +59,7 @@ public abstract class Table
         this.comparator = comparator;
 
         Footer footer = init();
-        indexBlock = readBlock(footer.getIndexBlockHandle());
+        indexBlock = readIndexBlock(footer.getIndexBlockHandle());
         metaindexBlockHandle = footer.getMetaindexBlockHandle();
     }
 
@@ -88,6 +88,9 @@ public abstract class Table
     protected static ByteBuffer uncompressedScratch = ByteBuffer.allocateDirect(4 * 1024 * 1024);
 
     protected abstract Block readBlock(BlockHandle blockHandle)
+            throws IOException;
+    
+    protected abstract IndexBlock readIndexBlock( BlockHandle blockHandle )
             throws IOException;
 
     protected int uncompressedLength(ByteBuffer data)

@@ -29,18 +29,28 @@ import org.act.dynproperty.util.InternalIterator;
 import org.act.dynproperty.util.Slice;
 
 import static org.act.dynproperty.util.SizeOf.SIZE_OF_LONG;
+import static org.act.dynproperty.util.SizeOf.SIZE_OF_INT;
 
 public class MemTable
         implements SeekingIterable<InternalKey, Slice>
 {
     private final ConcurrentSkipListMap<InternalKey, Slice> table;
     private final AtomicLong approximateMemoryUsage = new AtomicLong();
+    
+    //Start time of the MemTable
+    private int start;
 
-    public MemTable(InternalKeyComparator internalKeyComparator)
+    public MemTable(InternalKeyComparator internalKeyComparator, int startTime )
     {
         table = new ConcurrentSkipListMap<>(internalKeyComparator);
+        this.start = startTime;
     }
 
+    public int getStartTime()
+    {
+        return start;
+    }
+    
     public boolean isEmpty()
     {
         return table.isEmpty();
@@ -51,16 +61,16 @@ public class MemTable
         return approximateMemoryUsage.get();
     }
 
-    public void add(long sequenceNumber, ValueType valueType, Slice key, Slice value)
+    public void add( Slice id,  ValueType valueType, int startTime, Slice value )
     {
         Preconditions.checkNotNull(valueType, "valueType is null");
-        Preconditions.checkNotNull(key, "key is null");
+        Preconditions.checkNotNull(id, "key is null");
         Preconditions.checkNotNull(valueType, "valueType is null");
-
-        InternalKey internalKey = new InternalKey(key, sequenceNumber, valueType);
+        
+        InternalKey internalKey = new InternalKey(id, startTime, valueType);
         table.put(internalKey, value);
 
-        approximateMemoryUsage.addAndGet(key.length() + SIZE_OF_LONG + value.length());
+        approximateMemoryUsage.addAndGet( SIZE_OF_LONG + SIZE_OF_INT + SIZE_OF_LONG + value.length());
     }
 
     public LookupResult get(LookupKey key)
@@ -68,13 +78,14 @@ public class MemTable
         Preconditions.checkNotNull(key, "key is null");
 
         InternalKey internalKey = key.getInternalKey();
-        Entry<InternalKey, Slice> entry = table.ceilingEntry(internalKey);
+        //Entry<InternalKey, Slice> entry = table.ceilingEntry(internalKey);
+        Entry<InternalKey, Slice > entry = table.floorEntry( internalKey );
         if (entry == null) {
             return null;
         }
 
         InternalKey entryKey = entry.getKey();
-        if (entryKey.getUserKey().equals(key.getUserKey())) {
+        if (entryKey.getId().equals(key.getId())) {
             if (entryKey.getValueType() == ValueType.DELETION) {
                 return LookupResult.deleted(key);
             }

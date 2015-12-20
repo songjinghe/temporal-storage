@@ -28,18 +28,19 @@ import org.act.dynproperty.util.SliceInput;
 import org.act.dynproperty.util.SliceOutput;
 import org.act.dynproperty.util.Slices;
 import org.act.dynproperty.util.VariableLengthQuantity;
+import org.act.dynproperty.table.BlockEntry;
 
 import static org.act.dynproperty.util.SizeOf.SIZE_OF_INT;
 
 public class BlockIterator
         implements SeekingIterator<Slice, Slice>
 {
-    private final SliceInput data;
-    private final Slice restartPositions;
-    private final int restartCount;
-    private final Comparator<Slice> comparator;
+    protected final SliceInput data;
+    protected final Slice restartPositions;
+    protected final int restartCount;
+    protected final Comparator<Slice> comparator;
 
-    private BlockEntry nextEntry;
+    protected BlockEntry nextEntry;
 
     public BlockIterator(Slice data, Slice restartPositions, Comparator<Slice> comparator)
     {
@@ -142,12 +143,27 @@ public class BlockIterator
         }
 
         // linear search (within restart block) for first key greater than or equal to targetKey
-        for (seekToRestartPosition(left); nextEntry != null; next()) {
-            if (comparator.compare(peek().getKey(), targetKey) >= 0) {
+        // change to search for first key less than or equal to targetKey
+        seekToRestartPosition( left );
+        BlockEntry entry = peek();
+        int prePos = this.data.position();
+        BlockEntry preEntry = peek();
+        while( this.comparator.compare( entry.getKey(), targetKey ) <= 0)
+        {
+            prePos = this.data.position();
+            preEntry = entry;
+            next();
+            try
+            {
+                entry = peek();
+            }
+            catch( NoSuchElementException e )
+            {
                 break;
             }
         }
-
+        this.data.setPosition( prePos );
+        this.nextEntry = preEntry;
     }
 
     /**
@@ -155,7 +171,7 @@ public class BlockIterator
      * <p/>
      * After this method, nextEntry will contain the next entry to return, and the previousEntry will be null.
      */
-    private void seekToRestartPosition(int restartPosition)
+    protected void seekToRestartPosition(int restartPosition)
     {
         Preconditions.checkPositionIndex(restartPosition, restartCount, "restartPosition");
 
@@ -177,7 +193,7 @@ public class BlockIterator
      *
      * @return true if an entry was read
      */
-    private static BlockEntry readEntry(SliceInput data, BlockEntry previousEntry)
+    protected static BlockEntry readEntry(SliceInput data, BlockEntry previousEntry)
     {
         Preconditions.checkNotNull(data, "data is null");
 

@@ -120,7 +120,7 @@ public class TableCache
         private TableAndFile(File databaseDir, long fileNumber, UserComparator userComparator, boolean verifyChecksums)
                 throws IOException
         {
-            String tableFileName = Filename.tableFileName(fileNumber);
+            String tableFileName = Filename.stableFileName(fileNumber);
             File tableFile = new File(databaseDir, tableFileName);
             fileChannel = new FileInputStream(tableFile).getChannel();
             try {

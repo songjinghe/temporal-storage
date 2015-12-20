@@ -30,6 +30,9 @@ import java.nio.channels.ScatteringByteChannel;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 
+import org.act.dynproperty.impl.InternalKey;
+import org.act.dynproperty.impl.SequenceNumber;
+
 import static java.nio.ByteOrder.LITTLE_ENDIAN;
 import static org.act.dynproperty.util.SizeOf.SIZE_OF_BYTE;
 import static org.act.dynproperty.util.SizeOf.SIZE_OF_INT;
@@ -712,8 +715,16 @@ public final class Slice
 
     public String toString()
     {
-        return getClass().getSimpleName() + '(' +
-                "length=" + length() +
-                ')';
+        String toret = getClass().getSimpleName() + '(' +
+                "length=" + length();
+        String s = "";
+        if( this.length() == 20 )
+        {
+            long id = this.getLong( 0 );
+            int proid = this.getInt( 8 );
+            int time = (int)SequenceNumber.unpackSequenceNumber( this.getLong( 12 ) );
+            s = " Id = " + id + "," + "ProId = " + proid + "," + "Time = " + time + ",";
+        }
+        return toret + s + ")";
     }
 }

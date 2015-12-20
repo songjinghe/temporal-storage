@@ -25,21 +25,22 @@ import com.google.common.base.Preconditions;
 
 import static com.google.common.base.Charsets.UTF_8;
 import static org.act.dynproperty.util.SizeOf.SIZE_OF_LONG;
+import static org.act.dynproperty.util.SizeOf.SIZE_OF_INT;
 
 public class InternalKey
 {
-    private final Slice userKey;
-    private final long sequenceNumber;
+    private final Slice Id;
+    private final int startTime;
     private final ValueType valueType;
 
-    public InternalKey(Slice userKey, long sequenceNumber, ValueType valueType)
+    public InternalKey(Slice Id, int startTime, ValueType valueType)
     {
-        Preconditions.checkNotNull(userKey, "userKey is null");
-        Preconditions.checkArgument(sequenceNumber >= 0, "sequenceNumber is negative");
+        Preconditions.checkNotNull(Id, "userKey is null");
+        Preconditions.checkArgument(startTime >= 0, "sequenceNumber is negative");
         Preconditions.checkNotNull(valueType, "valueType is null");
 
-        this.userKey = userKey;
-        this.sequenceNumber = sequenceNumber;
+        this.Id = Id;
+        this.startTime = startTime;
         this.valueType = valueType;
     }
 
@@ -47,9 +48,9 @@ public class InternalKey
     {
         Preconditions.checkNotNull(data, "data is null");
         Preconditions.checkArgument(data.length() >= SIZE_OF_LONG, "data must be at least %s bytes", SIZE_OF_LONG);
-        this.userKey = getUserKey(data);
-        long packedSequenceAndType = data.getLong(data.length() - SIZE_OF_LONG);
-        this.sequenceNumber = SequenceNumber.unpackSequenceNumber(packedSequenceAndType);
+        this.Id = getId( data );
+        long packedSequenceAndType = data.getLong( data.length() - SIZE_OF_LONG );
+        this.startTime = (int)SequenceNumber.unpackSequenceNumber(packedSequenceAndType);
         this.valueType = SequenceNumber.unpackValueType(packedSequenceAndType);
     }
 
@@ -58,14 +59,14 @@ public class InternalKey
         this(Slices.wrappedBuffer(data));
     }
 
-    public Slice getUserKey()
+    public Slice getId()
     {
-        return userKey;
+        return Id;
     }
 
-    public long getSequenceNumber()
+    public long getStartTime()
     {
-        return sequenceNumber;
+        return (long)startTime;
     }
 
     public ValueType getValueType()
@@ -75,10 +76,10 @@ public class InternalKey
 
     public Slice encode()
     {
-        Slice slice = Slices.allocate(userKey.length() + SIZE_OF_LONG);
+        Slice slice = Slices.allocate(Id.length() + SIZE_OF_LONG );
         SliceOutput sliceOutput = slice.output();
-        sliceOutput.writeBytes(userKey);
-        sliceOutput.writeLong(SequenceNumber.packSequenceAndValueType(sequenceNumber, valueType));
+        sliceOutput.writeBytes(Id);
+        sliceOutput.writeLong(SequenceNumber.packSequenceAndValueType((long)startTime, valueType));
         return slice;
     }
 
@@ -94,10 +95,10 @@ public class InternalKey
 
         InternalKey that = (InternalKey) o;
 
-        if (sequenceNumber != that.sequenceNumber) {
+        if (startTime != that.startTime) {
             return false;
         }
-        if (userKey != null ? !userKey.equals(that.userKey) : that.userKey != null) {
+        if (Id != null ? !Id.equals(that.Id) : that.Id != null) {
             return false;
         }
         if (valueType != that.valueType) {
@@ -113,8 +114,8 @@ public class InternalKey
     public int hashCode()
     {
         if (hash == 0) {
-            int result = userKey != null ? userKey.hashCode() : 0;
-            result = 31 * result + (int) (sequenceNumber ^ (sequenceNumber >>> 32));
+            int result = Id != null ? Id.hashCode() : 0;
+            result = 31 * result + (int) (startTime ^ (startTime >>> 32));
             result = 31 * result + (valueType != null ? valueType.hashCode() : 0);
             if (result == 0) {
                 result = 1;
@@ -129,14 +130,14 @@ public class InternalKey
     {
         StringBuilder sb = new StringBuilder();
         sb.append("InternalKey");
-        sb.append("{key=").append(getUserKey().toString(UTF_8));      // todo don't print the real value
-        sb.append(", sequenceNumber=").append(getSequenceNumber());
+        sb.append("{key=").append(getId().toString(UTF_8));      // todo don't print the real value
+        sb.append(", sequenceNumber=").append(getStartTime());
         sb.append(", valueType=").append(getValueType());
         sb.append('}');
         return sb.toString();
     }
 
-    private static Slice getUserKey(Slice data)
+    private static Slice getId(Slice data)
     {
         return data.slice(0, data.length() - SIZE_OF_LONG);
     }

@@ -17,30 +17,20 @@
  */
 package org.act.dynproperty.impl;
 
-import org.act.dynproperty.util.Slice;
+import static org.act.dynproperty.util.SizeOf.SIZE_OF_BYTE;
+import static org.act.dynproperty.util.SizeOf.SIZE_OF_INT;
+import static org.act.dynproperty.util.SizeOf.SIZE_OF_SHORT;
 
-public class LookupKey
+public final class LogConstants
 {
-    private final InternalKey key;
+    // todo find new home for these
 
-    public LookupKey(Slice id, int time)
-    {
-        key = new InternalKey(id, time, ValueType.VALUE);
-    }
+    public static final int BLOCK_SIZE = 32768;
 
-    public InternalKey getInternalKey()
-    {
-        return key;
-    }
+    // Header is checksum (4 bytes), type (1 byte), length (2 bytes).
+    public static final int HEADER_SIZE = SIZE_OF_INT + SIZE_OF_BYTE + SIZE_OF_SHORT;
 
-    public Slice getId()
+    private LogConstants()
     {
-        return key.getId();
-    }
-
-    @Override
-    public String toString()
-    {
-        return key.toString();
     }
 }

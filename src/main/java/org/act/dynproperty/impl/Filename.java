@@ -34,9 +34,11 @@ public final class Filename
 
     public enum FileType
     {
+        
         LOG,
         DB_LOCK,
-        TABLE,
+        STABLEFILE,
+        UNSTABLEFILE,
         DESCRIPTOR,
         CURRENT,
         TEMP,
@@ -54,9 +56,14 @@ public final class Filename
     /**
      * Return the name of the sstable with the specified number.
      */
-    public static String tableFileName(long number)
+    public static String stableFileName(long number)
     {
-        return makeFileName(number, "sst");
+        return makeFileName(number, "st");
+    }
+    
+    public static String unStableFileName(long number)
+    {
+        return makeFileName( number, "un" );
     }
 
     /**
@@ -143,9 +150,14 @@ public final class Filename
             long fileNumber = Long.parseLong(removeSuffix(fileName, ".log"));
             return new FileInfo(FileType.LOG, fileNumber);
         }
-        else if (fileName.endsWith(".sst")) {
-            long fileNumber = Long.parseLong(removeSuffix(fileName, ".sst"));
-            return new FileInfo(FileType.TABLE, fileNumber);
+        else if (fileName.endsWith(".st")) {
+            long fileNumber = Long.parseLong(removeSuffix(fileName, ".st"));
+            return new FileInfo(FileType.STABLEFILE, fileNumber);
+        }
+        else if( fileName.endsWith( ".un" ) )
+        {
+            long fileNumber = Long.parseLong( removeSuffix( fileName, ".un" ) );
+            return new FileInfo( FileType.UNSTABLEFILE, fileNumber );
         }
         else if (fileName.endsWith(".dbtmp")) {
             long fileNumber = Long.parseLong(removeSuffix(fileName, ".dbtmp"));

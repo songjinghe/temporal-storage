@@ -27,11 +27,9 @@ public class Options
 
     private int blockRestartInterval = 16;
     private int blockSize = 4 * 1024;
-    private CompressionType compressionType = CompressionType.SNAPPY;
+    private CompressionType compressionType = CompressionType.NONE;
     private boolean verifyChecksums = true;
     private boolean paranoidChecks;
-    private DBComparator comparator;
-    private Logger logger;
     private long cacheSize;
 
     static void checkArgNotNull(Object value, String name)
@@ -141,27 +139,6 @@ public class Options
         return this;
     }
 
-    public DBComparator comparator()
-    {
-        return comparator;
-    }
-
-    public Options comparator(DBComparator comparator)
-    {
-        this.comparator = comparator;
-        return this;
-    }
-
-    public Logger logger()
-    {
-        return logger;
-    }
-
-    public Options logger(Logger logger)
-    {
-        this.logger = logger;
-        return this;
-    }
 
     public boolean paranoidChecks()
     {

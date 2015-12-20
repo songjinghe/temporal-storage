@@ -17,30 +17,26 @@
  */
 package org.act.dynproperty.impl;
 
+import java.io.File;
+import java.io.IOException;
+
 import org.act.dynproperty.util.Slice;
 
-public class LookupKey
+public interface LogWriter
 {
-    private final InternalKey key;
+    boolean isClosed();
 
-    public LookupKey(Slice id, int time)
-    {
-        key = new InternalKey(id, time, ValueType.VALUE);
-    }
+    void close()
+            throws IOException;
 
-    public InternalKey getInternalKey()
-    {
-        return key;
-    }
+    void delete()
+            throws IOException;
 
-    public Slice getId()
-    {
-        return key.getId();
-    }
+    File getFile();
 
-    @Override
-    public String toString()
-    {
-        return key.toString();
-    }
+    long getFileNumber();
+
+    // Writes a stream of chunks such that no chunk is split across a block boundary
+    void addRecord(Slice record, boolean force)
+            throws IOException;
 }

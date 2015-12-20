@@ -23,10 +23,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class FileMetaData
 {
-    public static final Function<FileMetaData, InternalKey> GET_LARGEST_USER_KEY = new Function<FileMetaData, InternalKey>()
+    public static final Function<FileMetaData, Integer> GET_LARGEST_USER_KEY = new Function<FileMetaData, Integer>()
     {
         @Override
-        public InternalKey apply(FileMetaData fileMetaData)
+        public Integer apply(FileMetaData fileMetaData)
         {
             return fileMetaData.getLargest();
         }
@@ -40,14 +40,14 @@ public class FileMetaData
     private final long fileSize;
 
     /**
-     * Smallest internal key served by table
+     * Smallest time key served by table
      */
-    private final InternalKey smallest;
+    private final int smallest;
 
     /**
      * Largest internal key served by table
      */
-    private final InternalKey largest;
+    private final int largest;
 
     /**
      * Seeks allowed until compaction
@@ -55,7 +55,7 @@ public class FileMetaData
     // todo this mutable state should be moved elsewhere
     private final AtomicInteger allowedSeeks = new AtomicInteger(1 << 30);
 
-    public FileMetaData(long number, long fileSize, InternalKey smallest, InternalKey largest)
+    public FileMetaData(long number, long fileSize, int smallest, int largest)
     {
         this.number = number;
         this.fileSize = fileSize;
@@ -73,12 +73,12 @@ public class FileMetaData
         return number;
     }
 
-    public InternalKey getSmallest()
+    public int getSmallest()
     {
         return smallest;
     }
 
-    public InternalKey getLargest()
+    public int getLargest()
     {
         return largest;
     }

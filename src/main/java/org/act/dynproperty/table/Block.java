@@ -64,11 +64,11 @@ import com.google.common.base.Preconditions;
 public class Block
         implements SeekingIterable<Slice, Slice>
 {
-    private final Slice block;
-    private final Comparator<Slice> comparator;
+    protected final Slice block;
+    protected final Comparator<Slice> comparator;
 
-    private final Slice data;
-    private final Slice restartPositions;
+    protected final Slice data;
+    protected final Slice restartPositions;
 
     public Block(Slice block, Comparator<Slice> comparator)
     {

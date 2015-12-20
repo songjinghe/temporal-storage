@@ -31,24 +31,24 @@ import org.act.dynproperty.impl.InternalKey;
 public final class MergingIterator
         extends AbstractSeekingIterator<InternalKey, Slice>
 {
-    private final List<? extends InternalIterator> levels;
+    private final List<? extends InternalIterator> files;
     private final PriorityQueue<ComparableIterator> priorityQueue;
     private final Comparator<InternalKey> comparator;
 
-    public MergingIterator(List<? extends InternalIterator> levels, Comparator<InternalKey> comparator)
+    public MergingIterator(List<? extends InternalIterator> files, Comparator<InternalKey> comparator)
     {
-        this.levels = levels;
+        this.files = files;
         this.comparator = comparator;
 
-        this.priorityQueue = new PriorityQueue<>(levels.size() + 1);
+        this.priorityQueue = new PriorityQueue<>(files.size() + 1);
         resetPriorityQueue(comparator);
     }
 
     @Override
     protected void seekToFirstInternal()
     {
-        for (InternalIterator level : levels) {
-            level.seekToFirst();
+        for (InternalIterator file : files) {
+            file.seekToFirst();
         }
         resetPriorityQueue(comparator);
     }
@@ -56,8 +56,8 @@ public final class MergingIterator
     @Override
     protected void seekInternal(InternalKey targetKey)
     {
-        for (InternalIterator level : levels) {
-            level.seek(targetKey);
+        for (InternalIterator file : files) {
+            file.seek(targetKey);
         }
         resetPriorityQueue(comparator);
     }
@@ -65,9 +65,9 @@ public final class MergingIterator
     private void resetPriorityQueue(Comparator<InternalKey> comparator)
     {
         int i = 1;
-        for (InternalIterator level : levels) {
-            if (level.hasNext()) {
-                priorityQueue.add(new ComparableIterator(level, comparator, i++, level.next()));
+        for (InternalIterator file : files) {
+            if (file.hasNext()) {
+                priorityQueue.add(new ComparableIterator(file, comparator, i++, file.next()));
             }
         }
     }
@@ -91,7 +91,7 @@ public final class MergingIterator
     {
         StringBuilder sb = new StringBuilder();
         sb.append("MergingIterator");
-        sb.append("{levels=").append(levels);
+        sb.append("{levels=").append(files);
         sb.append(", comparator=").append(comparator);
         sb.append('}');
         return sb.toString();

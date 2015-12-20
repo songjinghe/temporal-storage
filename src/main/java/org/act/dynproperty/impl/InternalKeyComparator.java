@@ -48,12 +48,12 @@ public class InternalKeyComparator
     @Override
     public int compare(InternalKey left, InternalKey right)
     {
-        int result = userComparator.compare(left.getUserKey(), right.getUserKey());
+        int result = userComparator.compare(left.getId(), right.getId());
         if (result != 0) {
             return result;
         }
 
-        return Longs.compare(right.getSequenceNumber(), left.getSequenceNumber()); // reverse sorted version numbers
+        return Longs.compare(left.getStartTime(), right.getStartTime());
     }
 
     /**
