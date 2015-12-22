@@ -83,4 +83,46 @@ public class Level1
     {
         return this.files.size();
     }
+
+    public Slice getRangeValue( long id, int proId, int startTime, int endTime, RangeQueryCallBack callback )
+    {
+        Slice idSlice = new Slice(12);
+        idSlice.setLong( 0, id );
+        idSlice.setInt( 8, proId );
+        for( int i = 0; i <this.files.size(); i++ )
+        {
+            FileMetaData metaData = this.files.get( i );
+            if( null != metaData )
+            {
+                if( startTime <= metaData.getSmallest() && endTime >= metaData.getLargest() )
+                {
+                    int start = Math.max( startTime, metaData.getSmallest() );
+                    int end = Math.min( endTime, metaData.getLargest() );
+                    String fileName = this.dbDir + "/" + Filename.unStableFileName( metaData.getNumber() );
+                    try( FileChannel channel = new FileInputStream( new File(fileName) ).getChannel() )
+                    {
+                        TableIterator iterator = new FileChannelTable( Filename.unStableFileName( metaData.getNumber() ), 
+                                channel, TableComparator.instence(), false ).iterator();
+                        iterator.seek( new InternalKey( idSlice, start, ValueType.VALUE ).encode() );
+                        while( iterator.hasNext() )
+                        {
+                            Entry<Slice,Slice> entry = iterator.next();
+                            InternalKey key = new InternalKey( entry.getKey() );
+                            Preconditions.checkArgument( key.getId().equals( idSlice ), "Get value faild because returned id is wrong in range query of level0" );
+                            if( key.getStartTime() <= end )
+                                callback.onCall( entry.getValue() );
+                            else
+                                break;
+                        }
+                    }
+                    catch ( IOException e )
+                    {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
+        return callback.onReturn();
+    }
 }

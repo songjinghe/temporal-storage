@@ -127,7 +127,8 @@ public class MemTable
         @Override
         public void seek(InternalKey targetKey)
         {
-            iterator = Iterators.peekingIterator(table.tailMap(targetKey).entrySet().iterator());
+            InternalKey fromkey = MemTable.this.table.floorKey( targetKey );
+            iterator = Iterators.peekingIterator(table.tailMap(fromkey).entrySet().iterator());
         }
 
         @Override
@@ -150,4 +151,5 @@ public class MemTable
             throw new UnsupportedOperationException();
         }
     }
+
 }

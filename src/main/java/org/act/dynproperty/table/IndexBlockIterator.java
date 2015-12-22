@@ -60,10 +60,20 @@ public class IndexBlockIterator extends BlockIterator
         }
 
         // linear search (within restart block) for first key greater than or equal to targetKey
-        for (seekToRestartPosition(left); nextEntry != null; next()) {
+        int prePos = this.data.position();
+        BlockEntry preEntry = nextEntry;
+        for (seekToRestartPosition(left); nextEntry != null;) {
             if (comparator.compare(peek().getKey(), targetKey) >= 0) {
                 break;
             }
+            prePos = this.data.position();
+            preEntry = nextEntry;
+            next();
+        }
+        if( null == nextEntry )
+        {
+            nextEntry = preEntry;
+            this.data.setPosition( prePos );
         }
     }
 

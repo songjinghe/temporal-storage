@@ -2,15 +2,18 @@ package org.act.dynproperty.impl;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.act.dynproperty.impl.MemTable.MemTableIterator;
 import org.act.dynproperty.table.FileChannelTable;
 import org.act.dynproperty.table.MemTableComparator;
 import org.act.dynproperty.table.Table;
@@ -99,7 +102,7 @@ public class Level0
                 Slice key = entry.getKey();
                 lock.unlock();
                 Slice rid = key.copySlice( 0, 12 );
-                Preconditions.checkArgument( id.equals( rid ), "Get value faild because returned id is wrong");
+                Preconditions.checkArgument( id.equals( rid ), "Get value faild because returned id is wrong in point query of level0");
                 return entry.getValue();
             }
             catch ( IOException e )
@@ -177,6 +180,15 @@ public class Level0
                 FileMetaData newMetaData = new FileMetaData( 0, file.length(), table.getStartTime(), endTime );
                 this.files.set( 0, newMetaData );
                 stream.close();
+                VersionEdit versionEdit = new VersionEdit();
+                versionEdit.setComparatorName( "TableComparator" );
+                versionEdit.setLastSequenceNumber( 0 );
+                versionEdit.setLogNumber( 0 );
+                versionEdit.setNextFileNumber( Level1.instence( dbDir ).getNextFileNum() );
+                versionEdit.setPreviousLogNumber( 0 );
+                versionEdit.addFile( 0, newMetaData );
+                Logs.createLogWriter( dbDir ).addRecord( versionEdit.encode(), true );
+                
             }
             catch( IOException e)
             {
@@ -196,6 +208,7 @@ public class Level0
         else
         {
             List<InternalIterator> files2merge = new ArrayList<InternalIterator>(level+1);
+            List<FileInputStream> stream2close = new ArrayList<FileInputStream>(level);
             files2merge.add( table.iterator() );
             int startTime = this.files.get( level-1 ).getSmallest();
             for( int i = 0; i<level; i++ )
@@ -205,6 +218,7 @@ public class Level0
                 try
                 {
                     FileInputStream stream = new FileInputStream( file );
+                    stream2close.add( stream );
                     Table tablefile = new FileChannelTable( file.getAbsolutePath(), stream.getChannel(), TableComparator.instence(), false );
                     files2merge.add( new InternalTableIterator( tablefile.iterator() ) );
                 }
@@ -231,13 +245,23 @@ public class Level0
                 stream.close();
                 //FIXME
                 FileMetaData metaData = new FileMetaData( level, result.length(), startTime, endTime );
+                VersionEdit versionEdit = new VersionEdit();
+                versionEdit.setComparatorName( "TableComparator" );
+                versionEdit.setLastSequenceNumber( 0 );
+                versionEdit.setLogNumber( 0 );
+                versionEdit.setNextFileNumber( Level1.instence( dbDir ).getNextFileNum() );
+                versionEdit.setPreviousLogNumber( 0 );
                 this.files.set( level, metaData );
+                versionEdit.addFile( 0, metaData );
                 for( int i = 0; i<level; i++ )
                 {
                     File delete = new File(this.dbDir + "/" + Filename.unStableFileName( i ));
+                    stream2close.get( i ).close();
                     delete.delete();
+                    versionEdit.deleteFile( 0, this.files.get( i ).getNumber() );
                     this.files.set( i, null );
                 }
+                Logs.createLogWriter( dbDir ).addRecord( versionEdit.encode(), true );
             }
             catch( IOException e )
             {
@@ -250,6 +274,7 @@ public class Level0
     private void merge2Stable( MemTable table, int endTime )
     {
         List<InternalIterator> files2merge = new ArrayList<InternalIterator>(6);
+        List<FileInputStream> stream2delete = new ArrayList<FileInputStream>(5); 
         files2merge.add( table.iterator() );
         int startTime = this.files.get( 4 ).getSmallest();
         for( int i = 0; i<5; i++ )
@@ -259,6 +284,7 @@ public class Level0
             try
             {
                 FileInputStream stream = new FileInputStream( file );
+                stream2delete.add( stream );
                 Table tablefile = new FileChannelTable( file.getAbsolutePath(), stream.getChannel(), TableComparator.instence(), false );
                 files2merge.add( new InternalTableIterator( tablefile.iterator() ) );
             }
@@ -286,18 +312,85 @@ public class Level0
             stream.close();
             //FIXME
             FileMetaData metaData = new FileMetaData( fileNum, result.length(), startTime, endTime );
+            VersionEdit versionEdit = new VersionEdit();
+            versionEdit.setComparatorName( "TableComparator" );
+            versionEdit.setLastSequenceNumber( 0 );
+            versionEdit.setLogNumber( 0 );
+            versionEdit.setNextFileNumber( Level1.instence( dbDir ).getNextFileNum() );
+            versionEdit.setPreviousLogNumber( 0 );
             for( int i = 0; i<5; i++ )
             {
                 File delete = new File(this.dbDir + "/" + Filename.unStableFileName( i ));
+                stream2delete.get( i ).close();
                 delete.delete();
+                versionEdit.deleteFile( 0, this.files.get( i ).getNumber() );
                 this.files.set( i, null );
             }
             Level1.instence( this.dbDir ).addFile( metaData );
+            versionEdit.addFile( 1, metaData );
+            Logs.createLogWriter( dbDir ).addRecord( versionEdit.encode(), true );
         }
         catch( IOException e )
         {
             //FIXME
             e.printStackTrace();
         }
+    }
+
+    public Slice getRangeValue( long id, int proId, int startTime, int endTime, RangeQueryCallBack callback )
+    {
+        Slice idSlice = new Slice(12);
+        idSlice.setLong( 0, id );
+        idSlice.setInt( 8, proId );
+        for( int i = 4; i >= 0; i-- )
+        {
+            FileMetaData metaData = this.files.get( i );
+            if( null != metaData )
+            {
+                if( startTime <= metaData.getSmallest() && endTime >= metaData.getLargest() )
+                {
+                    int start = Math.max( startTime, metaData.getSmallest() );
+                    int end = Math.min( endTime, metaData.getLargest() );
+                    String fileName = this.dbDir + "/" + Filename.unStableFileName( metaData.getNumber() );
+                    try( FileChannel channel = new FileInputStream( new File(fileName) ).getChannel() )
+                    {
+                        TableIterator iterator = new FileChannelTable( Filename.unStableFileName( metaData.getNumber() ), 
+                                channel, TableComparator.instence(), false ).iterator();
+                        iterator.seek( new InternalKey( idSlice, start, ValueType.VALUE ).encode() );
+                        while( iterator.hasNext() )
+                        {
+                            Entry<Slice,Slice> entry = iterator.next();
+                            InternalKey key = new InternalKey( entry.getKey() );
+                            Preconditions.checkArgument( key.getId().equals( idSlice ), "Get value faild because returned id is wrong in range query of level0" );
+                            if( key.getStartTime() <= end )
+                                callback.onCall( entry.getValue() );
+                            else
+                                break;
+                        }
+                    }
+                    catch ( IOException e )
+                    {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
+        if( endTime >= this.memTable.getStartTime() )
+        {
+            MemTableIterator iterator = this.memTable.iterator();
+            InternalKey startkey = new InternalKey( idSlice, this.memTable.getStartTime(), ValueType.VALUE );
+            iterator.seek( startkey );
+            while( iterator.hasNext() )
+            {
+                Entry<InternalKey,Slice> entry = iterator.next();
+                Preconditions.checkArgument( entry.getKey().getId().equals( idSlice ), "Get value faild because returned id is wrong in range query of level0 int memtable" );
+                if( entry.getKey().getStartTime() <= endTime )
+                    callback.onCall( entry.getValue() );
+                else
+                    break;
+            }
+        }
+        return callback.onReturn();
     }
 }

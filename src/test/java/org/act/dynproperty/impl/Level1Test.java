@@ -39,7 +39,7 @@ public class Level1Test
     }
     
     @Test
-    public void testFileSize()
+    public void testPointQuery()
     {
         
     }

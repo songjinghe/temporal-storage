@@ -136,7 +136,8 @@ public class TableBuilder
             Slice shortestSeparator = userComparator.findShortestSeparator(lastKey, key);
 
             Slice handleEncoding = BlockHandle.writeBlockHandle(pendingHandle);
-            indexBlockBuilder.add(shortestSeparator, handleEncoding);
+            //indexBlockBuilder.add(shortestSeparator, handleEncoding);
+            indexBlockBuilder.add( key, handleEncoding );
             pendingIndexEntry = false;
         }
 

@@ -39,6 +39,9 @@ public class Levels
     
     public Slice getPointValue( long id, int proId, int time )
     {
+        //FIXME
+        if( -1 == time )
+            time = Integer.MAX_VALUE;
         Slice idSlice = new Slice(12);
         idSlice.setLong( 0, id );
         idSlice.setInt( 8, proId );
@@ -46,5 +49,24 @@ public class Levels
             return level0.getPointValue( idSlice, time );
         else
             return level1.getPointValue( idSlice, time );
+    }
+    
+    public Slice getRangeValue( long id, int proId, int startTime, int endTime, RangeQueryCallBack callback )
+    {
+        //FIXME
+        if( -1 == endTime )
+            endTime = Integer.MAX_VALUE;
+        if( startTime>= boundary )
+            return level0.getRangeValue( id, proId, startTime, endTime, callback );
+        else if( endTime < boundary )
+            return level1.getRangeValue( id, proId, startTime, endTime, callback );
+        else
+        {
+            Slice ans1 = level1.getRangeValue( id, proId, startTime, boundary, callback );
+            Slice ans2 = level0.getRangeValue( id, proId, boundary, endTime, callback );
+            callback.onMap( ans1 );
+            callback.onMap( ans2 );
+            return callback.onReduce();
+        }
     }
 }

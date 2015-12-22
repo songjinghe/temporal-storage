@@ -36,7 +36,7 @@ public class Level0Test
     }
     
     @Test
-    public void testFileSize()
+    public void testPointQuery()
     {
         
     }

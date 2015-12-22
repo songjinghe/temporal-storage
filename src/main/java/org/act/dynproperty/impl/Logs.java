@@ -29,15 +29,23 @@ public final class Logs
     {
     }
 
-    public static LogWriter createLogWriter(File file, long fileNumber)
+    private static LogWriter instence;
+    
+    public static synchronized LogWriter createLogWriter( String dbDir )
             throws IOException
     {
-        if (false) {
-            return new MMapLogWriter(file, fileNumber);
+        if( null == instence )
+        {
+            String fileName = dbDir + "/" + Filename.logFileName( 0 );
+            File file = new File(fileName);
+            if (false) {
+                instence =  new MMapLogWriter(file, 0);
+            }
+            else {
+                instence = new FileChannelLogWriter(file, 0);
+            }
         }
-        else {
-            return new FileChannelLogWriter(file, fileNumber);
-        }
+        return instence;
     }
 
     public static int getChunkChecksum(int chunkTypeId, Slice slice)

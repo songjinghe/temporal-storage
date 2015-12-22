@@ -125,7 +125,7 @@ public class TableCache
             fileChannel = new FileInputStream(tableFile).getChannel();
             try {
                 //FIXME 
-                if ( true ) {
+                if ( false ) {
                     table = new MMapTable(tableFile.getAbsolutePath(), fileChannel, userComparator, verifyChecksums);
                 }
                 else {
