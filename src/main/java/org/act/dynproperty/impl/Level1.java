@@ -12,6 +12,7 @@ import java.util.Map.Entry;
 import org.act.dynproperty.table.FileChannelTable;
 import org.act.dynproperty.table.Table;
 import org.act.dynproperty.table.TableComparator;
+import org.act.dynproperty.util.InternalTableIterator;
 import org.act.dynproperty.util.Slice;
 import org.act.dynproperty.util.TableIterator;
 
@@ -20,7 +21,7 @@ import com.google.common.base.Preconditions;
 public class Level1
 {
     private List<FileMetaData> files = new ArrayList<FileMetaData>();
-    
+    private TableCache tableCache;
     private String dbDir;
     private int start;
     private int end;
@@ -29,6 +30,8 @@ public class Level1
     private Level1( String db)
     {
         this.dbDir = db;
+        File dbFile = new File(db);
+        tableCache = new TableCache( dbFile, 10, TableComparator.instence(), false, true );
     }
   
     public static synchronized Level1 instence( String db)
@@ -51,25 +54,32 @@ public class Level1
         }
         if( null == target )
             return null;
-        String filename = Filename.stableFileName( target.getNumber() );
-        try
-        {
-            FileChannel channel = new FileInputStream( new File( this.dbDir + "/" + filename ) ).getChannel();
-            Table table = new FileChannelTable( filename, channel, TableComparator.instence(), false );
-            TableIterator iterator = table.iterator();
-            iterator.seek( new InternalKey( id, time, ValueType.VALUE).encode() );
-            Entry<Slice,Slice> entry = iterator.next();
-            Slice key = entry.getKey();
-            Slice rid = key.copySlice( 0, 12 );
-            Preconditions.checkArgument( id.equals( rid ), "Get value faild because returned id is wrong");
-            return entry.getValue();
-        }
-        catch ( IOException e )
-        {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-        return null;
+//        String filename = Filename.stableFileName( target.getNumber() );
+//        try
+//        {
+//            FileChannel channel = new FileInputStream( new File( this.dbDir + "/" + filename ) ).getChannel();
+//            Table table = new FileChannelTable( filename, channel, TableComparator.instence(), false );
+//            TableIterator iterator = table.iterator();
+//            iterator.seek( new InternalKey( id, time, ValueType.VALUE).encode() );
+//            Entry<Slice,Slice> entry = iterator.next();
+//            Slice key = entry.getKey();
+//            Slice rid = key.copySlice( 0, 12 );
+//            Preconditions.checkArgument( id.equals( rid ), "Get value faild because returned id is wrong");
+//            return entry.getValue();
+//        }
+//        catch ( IOException e )
+//        {
+//            // TODO Auto-generated catch block
+//            e.printStackTrace();
+//        }
+//        return null;
+        InternalTableIterator iterator = tableCache.newIterator( target );
+        iterator.seekInternal( new InternalKey( id, time, ValueType.VALUE ));
+        Entry<InternalKey,Slice> entry = iterator.next();
+        InternalKey key = entry.getKey();
+        Slice rid = key.getId();
+        Preconditions.checkArgument( id.equals( rid ), "Get value faild because returned id is wrong in point query of level0");
+        return entry.getValue();
     }
     
     public void addFile( FileMetaData fileMeta )

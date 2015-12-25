@@ -42,12 +42,11 @@ import org.act.dynproperty.util.Slice;
 public class TableCache
 {
     private final LoadingCache<Long, TableAndFile> cache;
-    private final Finalizer<Table> finalizer = new Finalizer<>(1);
+    private final Finalizer<Table> finalizer = new Finalizer<>(1);;
 
-    public TableCache(final File databaseDir, int tableCacheSize, final UserComparator userComparator, final boolean verifyChecksums)
+    public TableCache(final File databaseDir, int tableCacheSize, final UserComparator userComparator, final boolean verifyChecksums, final boolean isStableFile)
     {
         Preconditions.checkNotNull(databaseDir, "databaseName is null");
-
         cache = CacheBuilder.newBuilder()
                 .maximumSize(tableCacheSize)
                 .removalListener(new RemovalListener<Long, TableAndFile>()
@@ -65,7 +64,7 @@ public class TableCache
                     public TableAndFile load(Long fileNumber)
                             throws IOException
                     {
-                        return new TableAndFile(databaseDir, fileNumber, userComparator, verifyChecksums);
+                        return new TableAndFile(databaseDir, fileNumber, userComparator, verifyChecksums, isStableFile);
                     }
                 });
     }
@@ -117,15 +116,19 @@ public class TableCache
         private final Table table;
         private final FileChannel fileChannel;
 
-        private TableAndFile(File databaseDir, long fileNumber, UserComparator userComparator, boolean verifyChecksums)
+        private TableAndFile(File databaseDir, long fileNumber, UserComparator userComparator, boolean verifyChecksums, boolean isStableFile)
                 throws IOException
         {
-            String tableFileName = Filename.stableFileName(fileNumber);
+            String tableFileName;
+            if( isStableFile )
+                tableFileName = Filename.stableFileName(fileNumber);
+            else
+                tableFileName = Filename.unStableFileName(fileNumber);
             File tableFile = new File(databaseDir, tableFileName);
             fileChannel = new FileInputStream(tableFile).getChannel();
             try {
                 //FIXME 
-                if ( false ) {
+                if ( true ) {
                     table = new MMapTable(tableFile.getAbsolutePath(), fileChannel, userComparator, verifyChecksums);
                 }
                 else {

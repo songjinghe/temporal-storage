@@ -30,6 +30,7 @@ import com.google.common.base.Preconditions;
 public class Level0
 {
     private List<FileMetaData> files = new ArrayList<FileMetaData>();
+    private TableCache tableCache;
     private MemTable memTable;
     private MemTable stableTable;
     private static Lock lock = new ReentrantLock();
@@ -45,6 +46,8 @@ public class Level0
         memTable = new MemTable( MemTableComparator.instence(), startTime );
         for(int i =0; i<5; i++ )
             files.add( null );
+        File dbFile = new File( dbDir );
+        this.tableCache = new TableCache( dbFile, 5, TableComparator.instence(), false, false );
     }
     
     public static Level0 newInstence( String dbDir, int startTime )
@@ -91,29 +94,36 @@ public class Level0
                     }
                 }
             }
-            String fileName = Filename.unStableFileName( target.getNumber() );
-            try( FileChannel channel = new FileInputStream( new File( this.dbDir + "/" + fileName ) ).getChannel() )
-            {
-                //FileChannel channel = new FileInputStream( new File( this.dbDir + "/" + fileName ) ).getChannel();
-                Table table = new FileChannelTable( fileName, channel, TableComparator.instence(), false );
-                TableIterator iterator = table.iterator();
-                iterator.seek( new InternalKey( id, time, ValueType.VALUE ).encode() );
-                Entry<Slice,Slice> entry = iterator.next();
-                Slice key = entry.getKey();
-                lock.unlock();
-                Slice rid = key.copySlice( 0, 12 );
-                Preconditions.checkArgument( id.equals( rid ), "Get value faild because returned id is wrong in point query of level0");
-                return entry.getValue();
-            }
-            catch ( IOException e )
-            {
-                //FIXME
-                e.printStackTrace();
-            }
-            
+//            String fileName = Filename.unStableFileName( target.getNumber() );
+//            try( FileChannel channel = new FileInputStream( new File( this.dbDir + "/" + fileName ) ).getChannel() )
+//            {
+//                //FileChannel channel = new FileInputStream( new File( this.dbDir + "/" + fileName ) ).getChannel();
+//                Table table = new FileChannelTable( fileName, channel, TableComparator.instence(), false );
+//                TableIterator iterator = table.iterator();
+//                iterator.seek( new InternalKey( id, time, ValueType.VALUE ).encode() );
+//                Entry<Slice,Slice> entry = iterator.next();
+//                Slice key = entry.getKey();
+//                lock.unlock();
+//                Slice rid = key.copySlice( 0, 12 );
+//                Preconditions.checkArgument( id.equals( rid ), "Get value faild because returned id is wrong in point query of level0");
+//                return entry.getValue();
+//            }
+//            catch ( IOException e )
+//            {
+//                //FIXME
+//                e.printStackTrace();
+//            }
+            InternalTableIterator iterator = tableCache.newIterator( target );
+            iterator.seekInternal( new InternalKey( id, time, ValueType.VALUE ));
+            Entry<InternalKey,Slice> entry = iterator.next();
+            InternalKey key = entry.getKey();
+            lock.unlock();
+            Slice rid = key.getId();
+            Preconditions.checkArgument( id.equals( rid ), "Get value faild because returned id is wrong in point query of level0");
+            return entry.getValue();
         }
-        lock.unlock();
-        return null;
+//        lock.unlock();
+//        return null;
     }
     
     public int getStart()
