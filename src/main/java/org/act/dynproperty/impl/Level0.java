@@ -23,6 +23,7 @@ import org.act.dynproperty.util.InternalIterator;
 import org.act.dynproperty.util.InternalTableIterator;
 import org.act.dynproperty.util.MergingIterator;
 import org.act.dynproperty.util.Slice;
+import org.act.dynproperty.util.SliceOutput;
 import org.act.dynproperty.util.TableIterator;
 
 import com.google.common.base.Preconditions;
@@ -39,36 +40,16 @@ public class Level0
     private int lastAddTime = 0;
     private int start;
     
-    private static Level0 instence = null;
-    private Level0( String dbDir, int startTime )
+    private Level1 level1;
+    
+    public Level0( String dbDir, Level1 level1 )
     {
         this.dbDir = dbDir;
-        memTable = new MemTable( MemTableComparator.instence(), startTime );
         for(int i =0; i<5; i++ )
             files.add( null );
         File dbFile = new File( dbDir );
         this.tableCache = new TableCache( dbFile, 5, TableComparator.instence(), false, false );
-    }
-    
-    public static Level0 newInstence( String dbDir, int startTime )
-    {
-        if( instence == null )
-        {
-            lock.lock();
-            if( instence != null )
-            {
-                lock.unlock();
-                return instence;
-            }
-            else
-            {
-                instence = new Level0( dbDir, startTime );
-                lock.unlock();
-                return instence;
-            }
-        }
-        else
-            return instence;
+        this.level1 = level1;
     }
     
     public Slice getPointValue( Slice id, int time )
@@ -87,7 +68,7 @@ public class Level0
             {
                 if( null != meta )
                 {
-                    if( time >= meta.getSmallest() && time < meta.getLargest() )
+                    if( time >= meta.getSmallest()&& time < meta.getLargest() )
                     {
                         target = meta;
                         break;
@@ -134,6 +115,8 @@ public class Level0
     public void add( Slice id,  ValueType valueType, int startTime, Slice value )
     {
         lock.lock();
+        if( null == this.memTable )
+            this.memTable = new MemTable( MemTableComparator.instence(), startTime );
         if( this.memTable.approximateMemoryUsage() >= 4*1024*1024 && lastAddTime < startTime )
         {
             newMemTable( startTime );
@@ -194,10 +177,12 @@ public class Level0
                 versionEdit.setComparatorName( "TableComparator" );
                 versionEdit.setLastSequenceNumber( 0 );
                 versionEdit.setLogNumber( 0 );
-                versionEdit.setNextFileNumber( Level1.instence( dbDir ).getNextFileNum() );
+                versionEdit.setNextFileNumber( this.level1.getNextFileNum() );
                 versionEdit.setPreviousLogNumber( 0 );
                 versionEdit.addFile( 0, newMetaData );
-                Logs.createLogWriter( dbDir ).addRecord( versionEdit.encode(), true );
+                LogWriter write = Logs.createLogWriter( dbDir );
+                write.addRecord( versionEdit.encode(), true );
+                //write.close();
                 
             }
             catch( IOException e)
@@ -220,7 +205,7 @@ public class Level0
             List<InternalIterator> files2merge = new ArrayList<InternalIterator>(level+1);
             List<FileInputStream> stream2close = new ArrayList<FileInputStream>(level);
             files2merge.add( table.iterator() );
-            int startTime = this.files.get( level-1 ).getSmallest();
+            int startTime = (int)this.files.get( level-1 ).getSmallest();
             for( int i = 0; i<level; i++ )
             {
                 FileMetaData meta = this.files.get( i );
@@ -259,7 +244,7 @@ public class Level0
                 versionEdit.setComparatorName( "TableComparator" );
                 versionEdit.setLastSequenceNumber( 0 );
                 versionEdit.setLogNumber( 0 );
-                versionEdit.setNextFileNumber( Level1.instence( dbDir ).getNextFileNum() );
+                versionEdit.setNextFileNumber( this.level1.getNextFileNum() );
                 versionEdit.setPreviousLogNumber( 0 );
                 this.files.set( level, metaData );
                 versionEdit.addFile( 0, metaData );
@@ -271,7 +256,9 @@ public class Level0
                     versionEdit.deleteFile( 0, this.files.get( i ).getNumber() );
                     this.files.set( i, null );
                 }
-                Logs.createLogWriter( dbDir ).addRecord( versionEdit.encode(), true );
+                LogWriter write = Logs.createLogWriter( dbDir );
+                write.addRecord( versionEdit.encode(), true );
+                //write.close();
             }
             catch( IOException e )
             {
@@ -286,7 +273,7 @@ public class Level0
         List<InternalIterator> files2merge = new ArrayList<InternalIterator>(6);
         List<FileInputStream> stream2delete = new ArrayList<FileInputStream>(5); 
         files2merge.add( table.iterator() );
-        int startTime = this.files.get( 4 ).getSmallest();
+        int startTime = (int)this.files.get( 4 ).getSmallest();
         for( int i = 0; i<5; i++ )
         {
             FileMetaData meta = this.files.get( i );
@@ -307,7 +294,7 @@ public class Level0
         MergingIterator mergingIterator = new MergingIterator( files2merge, MemTableComparator.instence() );
         try
         {
-            long fileNum = Level1.instence(this.dbDir).getNextFileNum();
+            long fileNum = this.level1.getNextFileNum();
             File result = new File( this.dbDir + "/" + Filename.stableFileName( fileNum ) );
             if( !result.exists() )
                 result.createNewFile();
@@ -326,7 +313,7 @@ public class Level0
             versionEdit.setComparatorName( "TableComparator" );
             versionEdit.setLastSequenceNumber( 0 );
             versionEdit.setLogNumber( 0 );
-            versionEdit.setNextFileNumber( Level1.instence( dbDir ).getNextFileNum() );
+            versionEdit.setNextFileNumber( this.level1.getNextFileNum() );
             versionEdit.setPreviousLogNumber( 0 );
             for( int i = 0; i<5; i++ )
             {
@@ -336,9 +323,11 @@ public class Level0
                 versionEdit.deleteFile( 0, this.files.get( i ).getNumber() );
                 this.files.set( i, null );
             }
-            Level1.instence( this.dbDir ).addFile( metaData );
+            this.level1.addFile( metaData );
             versionEdit.addFile( 1, metaData );
-            Logs.createLogWriter( dbDir ).addRecord( versionEdit.encode(), true );
+            LogWriter write = Logs.createLogWriter( dbDir );
+            write.addRecord( versionEdit.encode(), true );
+            //write.close();
         }
         catch( IOException e )
         {
@@ -357,31 +346,43 @@ public class Level0
             FileMetaData metaData = this.files.get( i );
             if( null != metaData )
             {
-                if( startTime <= metaData.getSmallest() && endTime >= metaData.getLargest() )
+                if( startTime <= metaData.getSmallest()&& endTime >= metaData.getLargest() )
                 {
-                    int start = Math.max( startTime, metaData.getSmallest() );
-                    int end = Math.min( endTime, metaData.getLargest() );
-                    String fileName = this.dbDir + "/" + Filename.unStableFileName( metaData.getNumber() );
-                    try( FileChannel channel = new FileInputStream( new File(fileName) ).getChannel() )
+                    int start = Math.max( startTime, (int)metaData.getSmallest() );
+                    int end = Math.min( endTime,(int)metaData.getLargest() );
+//                    String fileName = this.dbDir + "/" + Filename.unStableFileName( metaData.getNumber() );
+//                    try( FileChannel channel = new FileInputStream( new File(fileName) ).getChannel() )
+//                    {
+//                        TableIterator iterator = new FileChannelTable( Filename.unStableFileName( metaData.getNumber() ), 
+//                                channel, TableComparator.instence(), false ).iterator();
+//                        iterator.seek( new InternalKey( idSlice, start, ValueType.VALUE ).encode() );
+//                        while( iterator.hasNext() )
+//                        {
+//                            Entry<Slice,Slice> entry = iterator.next();
+//                            InternalKey key = new InternalKey( entry.getKey() );
+//                            Preconditions.checkArgument( key.getId().equals( idSlice ), "Get value faild because returned id is wrong in range query of level0" );
+//                            if( key.getStartTime() <= end )
+//                                callback.onCall( entry.getValue() );
+//                            else
+//                                break;
+//                        }
+//                    }
+//                    catch ( IOException e )
+//                    {
+//                        // TODO Auto-generated catch block
+//                        e.printStackTrace();
+//                    }
+                    InternalTableIterator iterator = this.tableCache.newIterator( metaData );
+                    iterator.seek( new InternalKey( idSlice, start, ValueType.VALUE ) );
+                    while( iterator.hasNext() )
                     {
-                        TableIterator iterator = new FileChannelTable( Filename.unStableFileName( metaData.getNumber() ), 
-                                channel, TableComparator.instence(), false ).iterator();
-                        iterator.seek( new InternalKey( idSlice, start, ValueType.VALUE ).encode() );
-                        while( iterator.hasNext() )
-                        {
-                            Entry<Slice,Slice> entry = iterator.next();
-                            InternalKey key = new InternalKey( entry.getKey() );
-                            Preconditions.checkArgument( key.getId().equals( idSlice ), "Get value faild because returned id is wrong in range query of level0" );
-                            if( key.getStartTime() <= end )
-                                callback.onCall( entry.getValue() );
-                            else
-                                break;
-                        }
-                    }
-                    catch ( IOException e )
-                    {
-                        // TODO Auto-generated catch block
-                        e.printStackTrace();
+                        Entry<InternalKey,Slice> entry = iterator.next();
+                        InternalKey key = entry.getKey();
+                        Preconditions.checkArgument( key.getId().equals( idSlice ), "Get value faild because returned id is wrong in range query of level0" );
+                        if( key.getStartTime() <= end )
+                            callback.onCall( entry.getValue() );
+                        else
+                            break;
                     }
                 }
             }
@@ -402,5 +403,47 @@ public class Level0
             }
         }
         return callback.onReturn();
+    }
+
+    public int getPropertyLatestTime( long id, int propertyKeyId )
+    {
+        Slice idSlice = new Slice(12);
+        idSlice.setLong( 0, id );
+        idSlice.setInt( 8, propertyKeyId );
+        InternalKey searchKey = new InternalKey( idSlice, Integer.MAX_VALUE, ValueType.VALUE );
+        MemTableIterator iterator = this.memTable.iterator();
+        iterator.seek( searchKey );
+        if( iterator.hasNext() )
+        {
+            InternalEntry targetKey = iterator.next();
+            if( targetKey.getKey().getId().equals( searchKey.getId() ) )
+                return (int)targetKey.getKey().getStartTime();
+        }
+        for( int i = 0; i<5; i++ )
+        {
+            FileMetaData metaData = this.files.get( i );
+            if( null == metaData )
+            {
+                InternalTableIterator tableIterator = this.tableCache.newIterator( metaData );
+                tableIterator.seek( searchKey );
+                if( tableIterator.hasNext() )
+                {
+                    InternalKey targetKey = tableIterator.next().getKey();
+                    if( targetKey.getId().equals( searchKey.getId() ) )
+                        return (int)targetKey.getStartTime();
+                }
+            }
+        }
+        return -1;
+    }
+
+    public void setFiles( List<FileMetaData> level0s )
+    {
+        this.files = new ArrayList<FileMetaData>( level0s );
+    }
+
+    public void setStart( int start )
+    {
+        this.start = start;
     }
 }

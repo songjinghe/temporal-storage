@@ -6,6 +6,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map.Entry;
 
@@ -20,26 +21,15 @@ import com.google.common.base.Preconditions;
 
 public class Level1
 {
-    private List<FileMetaData> files = new ArrayList<FileMetaData>();
+    private List<FileMetaData> files = new LinkedList<FileMetaData>();
     private TableCache tableCache;
-    private String dbDir;
     private int start;
-    private int end;
-    
-    private static Level1 instence;
-    private Level1( String db)
+    public Level1( String db)
     {
-        this.dbDir = db;
         File dbFile = new File(db);
         tableCache = new TableCache( dbFile, 10, TableComparator.instence(), false, true );
     }
   
-    public static synchronized Level1 instence( String db)
-    {
-        if(null==instence)
-            instence = new Level1(db);
-        return instence;
-    }
     
     public Slice getPointValue(Slice id , int time )
     {
@@ -78,14 +68,14 @@ public class Level1
         Entry<InternalKey,Slice> entry = iterator.next();
         InternalKey key = entry.getKey();
         Slice rid = key.getId();
-        Preconditions.checkArgument( id.equals( rid ), "Get value faild because returned id is wrong in point query of level0");
+        Preconditions.checkArgument( id.equals( rid ), "Get value faild because returned id is wrong in point query of level1");
         return entry.getValue();
     }
     
     public void addFile( FileMetaData fileMeta )
     {
         files.add( fileMeta );
-        end = fileMeta.getLargest();
+        fileMeta.getLargest();
         start = Math.min( start, fileMeta.getSmallest() );
     }
     
@@ -108,31 +98,74 @@ public class Level1
                 {
                     int start = Math.max( startTime, metaData.getSmallest() );
                     int end = Math.min( endTime, metaData.getLargest() );
-                    String fileName = this.dbDir + "/" + Filename.unStableFileName( metaData.getNumber() );
-                    try( FileChannel channel = new FileInputStream( new File(fileName) ).getChannel() )
+//                    String fileName = this.dbDir + "/" + Filename.unStableFileName( metaData.getNumber() );
+//                    try( FileChannel channel = new FileInputStream( new File(fileName) ).getChannel() )
+//                    {
+//                        TableIterator iterator = new FileChannelTable( Filename.unStableFileName( metaData.getNumber() ), 
+//                                channel, TableComparator.instence(), false ).iterator();
+//                        iterator.seek( new InternalKey( idSlice, start, ValueType.VALUE ).encode() );
+//                        while( iterator.hasNext() )
+//                        {
+//                            Entry<Slice,Slice> entry = iterator.next();
+//                            InternalKey key = new InternalKey( entry.getKey() );
+//                            Preconditions.checkArgument( key.getId().equals( idSlice ), "Get value faild because returned id is wrong in range query of level0" );
+//                            if( key.getStartTime() <= end )
+//                                callback.onCall( entry.getValue() );
+//                            else
+//                                break;
+//                        }
+//                    }
+//                    catch ( IOException e )
+//                    {
+//                        // TODO Auto-generated catch block
+//                        e.printStackTrace();
+//                    }
+                    InternalTableIterator iterator = this.tableCache.newIterator( metaData );
+                    iterator.seek( new InternalKey( idSlice, start, ValueType.VALUE ));
+                    while( iterator.hasNext() )
                     {
-                        TableIterator iterator = new FileChannelTable( Filename.unStableFileName( metaData.getNumber() ), 
-                                channel, TableComparator.instence(), false ).iterator();
-                        iterator.seek( new InternalKey( idSlice, start, ValueType.VALUE ).encode() );
-                        while( iterator.hasNext() )
-                        {
-                            Entry<Slice,Slice> entry = iterator.next();
-                            InternalKey key = new InternalKey( entry.getKey() );
-                            Preconditions.checkArgument( key.getId().equals( idSlice ), "Get value faild because returned id is wrong in range query of level0" );
-                            if( key.getStartTime() <= end )
-                                callback.onCall( entry.getValue() );
-                            else
-                                break;
-                        }
-                    }
-                    catch ( IOException e )
-                    {
-                        // TODO Auto-generated catch block
-                        e.printStackTrace();
+                        Entry<InternalKey,Slice> entry = iterator.next();
+                        InternalKey key = entry.getKey();
+                        Preconditions.checkArgument( key.getId().equals( idSlice ), "Get value faild because returned id is wrong in range query of level0" );
+                        if( key.getStartTime() <= end )
+                            callback.onCall( entry.getValue() );
+                        else
+                            break;
                     }
                 }
             }
         }
         return callback.onReturn();
+    }
+
+
+    public int getPropertyLatestTime( long id, int propertyKeyId )
+    {
+        Slice idSlice = new Slice(12);
+        idSlice.setLong( 0, id );
+        idSlice.setInt( 8, propertyKeyId );
+        InternalKey searchKey = new InternalKey( idSlice, Integer.MAX_VALUE, ValueType.VALUE );
+        for( int i = 0; i<5; i++ )
+        {
+            FileMetaData metaData = this.files.get( i );
+            if( null == metaData )
+            {
+                InternalTableIterator tableIterator = this.tableCache.newIterator( metaData );
+                tableIterator.seek( searchKey );
+                if( tableIterator.hasNext() )
+                {
+                    InternalKey targetKey = tableIterator.next().getKey();
+                    if( targetKey.getId().equals( searchKey.getId() ) )
+                        return (int)targetKey.getStartTime();
+                }
+            }
+        }
+        return -1;
+    }
+
+
+    public void setFiles( List<FileMetaData> level1s )
+    {
+        this.files = new LinkedList<FileMetaData>( level1s );
     }
 }

@@ -107,7 +107,7 @@ public class BlockBuilder
         Preconditions.checkState(!finished, "block is finished");
         Preconditions.checkPositionIndex(restartBlockEntryCount, blockRestartInterval);
 
-        Preconditions.checkArgument(lastKey == null || comparator.compare(key, lastKey) > 0, "key must be greater than last key");
+        Preconditions.checkArgument(lastKey == null || comparator.compare(key, lastKey) > 0, "key %s must be greater than last key %s",key,lastKey);
 
         int sharedKeyBytes = 0;
         if (restartBlockEntryCount < blockRestartInterval) {

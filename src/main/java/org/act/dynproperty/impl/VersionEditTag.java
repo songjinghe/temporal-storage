@@ -206,11 +206,11 @@ public enum VersionEditTag
 
                     // smallest key
                     //FIXME
-                    int smallestKey = VariableLengthQuantity.readVariableLengthInt(sliceInput);
+                    int smallestKey = readLengthPrefixedBytes(sliceInput).getInt( 0 );
 
                     // largest key
                     //FIXME
-                    int largestKey = VariableLengthQuantity.readVariableLengthInt(sliceInput);
+                    int largestKey = readLengthPrefixedBytes(sliceInput).getInt( 0 );
 
                     versionEdit.addFile(level, fileNumber, fileSize, smallestKey, largestKey);
                 }

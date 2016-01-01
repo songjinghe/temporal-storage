@@ -22,7 +22,7 @@ public class Level1Test
             FileUtils.deleteDirectoryContents( dir );
         }
         dir.mkdirs();
-        level = Level0.newInstence( dbDir,0 );
+        level = new Level0( dbDir,new Level1( dbDir ) );
         long starttime = System.currentTimeMillis();
         for( int t = 0; t<TIMENUM; t++ )
         {

@@ -131,7 +131,7 @@ public class InternalKey
         StringBuilder sb = new StringBuilder();
         sb.append("InternalKey");
         sb.append("{key=").append(getId().toString(UTF_8));      // todo don't print the real value
-        sb.append(", sequenceNumber=").append(getStartTime());
+        sb.append(", time=").append(getStartTime());
         sb.append(", valueType=").append(getValueType());
         sb.append('}');
         return sb.toString();

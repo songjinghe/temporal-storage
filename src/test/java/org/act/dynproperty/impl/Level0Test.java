@@ -21,7 +21,7 @@ public class Level0Test
             FileUtils.deleteDirectoryContents( dir );
         }
         dir.mkdirs();
-        level = Level0.newInstence( dbDir,0 );
+        level = new Level0( dbDir,new Level1( dbDir ) );
         for( int t = 0; t<TIMENUM; t++ )
         {
             for( long i = 0; i<IDNUM; i++ )

@@ -38,7 +38,7 @@ public class FileWriteReadTest
             FileUtils.deleteDirectoryContents( dir );
         }
         dir.mkdirs();
-        level = Level0.newInstence( dbDir,0 );
+        level = new Level0( dbDir,new Level1( dbDir ) );
         for( long i = 0; i < NUM; i++ )
         {
             ids.add( i );

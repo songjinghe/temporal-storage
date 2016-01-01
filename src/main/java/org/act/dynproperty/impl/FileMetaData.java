@@ -21,6 +21,8 @@ import com.google.common.base.Function;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.act.dynproperty.util.Slice;
+
 public class FileMetaData
 {
     public static final Function<FileMetaData, Integer> GET_LARGEST_USER_KEY = new Function<FileMetaData, Integer>()

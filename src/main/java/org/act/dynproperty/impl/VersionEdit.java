@@ -47,11 +47,17 @@ public class VersionEdit
 
     public VersionEdit(Slice slice)
     {
-        SliceInput sliceInput = slice.input();
-        while (sliceInput.isReadable()) {
-            int i = VariableLengthQuantity.readVariableLengthInt(sliceInput);
-            VersionEditTag tag = VersionEditTag.getValueTypeByPersistentId(i);
-            tag.readValue(sliceInput, this);
+        try
+        {
+            SliceInput sliceInput = slice.input();
+            while (sliceInput.isReadable()) {
+                int i = VariableLengthQuantity.readVariableLengthInt(sliceInput);
+                VersionEditTag tag = VersionEditTag.getValueTypeByPersistentId(i);
+                tag.readValue(sliceInput, this);
+            }
+        }
+        catch (Throwable e) {
+            
         }
     }
 

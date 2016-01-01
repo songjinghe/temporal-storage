@@ -6,6 +6,4 @@ public interface RangeQueryCallBack
 {
     public void onCall( Slice value );
     public Slice onReturn();
-    public void onMap( Slice mapValue );
-    public Slice onReduce();
 }
