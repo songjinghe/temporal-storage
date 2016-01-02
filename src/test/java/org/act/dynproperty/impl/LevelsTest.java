@@ -81,7 +81,7 @@ public class LevelsTest
             {
                 for( int p = 0; p<PRONUM; p++ )
                 {
-                    Slice value = level.getPointValue( i, p, t*10);
+                    Slice value = level.getPointValue( i, p, t*10).getValue();
                     long id = value.getLong( 0 );
                     int proid = value.getInt( 8 );
                     int time = value.getInt( 12 );
