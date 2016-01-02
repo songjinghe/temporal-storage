@@ -18,6 +18,8 @@
 package org.act.dynproperty.table;
 
 import java.util.Comparator;
+import java.util.NoSuchElementException;
+
 import org.act.dynproperty.util.Slice;
 
 public class IndexBlockIterator extends BlockIterator
@@ -28,6 +30,26 @@ public class IndexBlockIterator extends BlockIterator
         super( data, restartPositions, comparator );
     }
 
+    @Override
+    public BlockEntry next()
+    {
+        if (!hasNext()) {
+            return null;
+        }
+
+        BlockEntry entry = nextEntry;
+
+        if (!data.isReadable()) {
+            nextEntry = null;
+        }
+        else {
+            // read entry at current data position
+            nextEntry = readEntry(data, nextEntry);
+        }
+
+        return entry;
+    }
+    
     /**
      * Repositions the iterator so the key of the next BlockElement returned greater than or equal to the specified targetKey.
      */

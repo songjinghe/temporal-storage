@@ -20,6 +20,8 @@ package org.act.dynproperty.util;
 import java.util.Map.Entry;
 
 import org.act.dynproperty.table.Block;
+import org.act.dynproperty.table.BlockEntry;
+import org.act.dynproperty.table.BlockHandle;
 import org.act.dynproperty.table.BlockIterator;
 import org.act.dynproperty.table.Table;
 
@@ -54,12 +56,27 @@ public final class TableIterator
         // if indexIterator does not have a next, it mean the key does not exist in this iterator
         if (blockIterator.hasNext()) {
             // seek the current iterator to the key
+            BlockEntry pre = null;
+            if( blockIterator.peek().getKey().equals( targetKey ) )
+            {
+                pre = blockIterator.peek();
+                blockIterator.next();
+            }
             current = getNextBlock();
+            if( null == current )
+                current = getBlockByBlockEntry( pre );
             current.seek(targetKey);
         }
         else {
             current = null;
         }
+    }
+
+    private BlockIterator getBlockByBlockEntry( BlockEntry entry )
+    {
+        Slice blockHandle = entry.getValue();
+        Block dataBlock = table.openBlock(blockHandle);
+        return dataBlock.iterator();
     }
 
     @Override
@@ -98,7 +115,10 @@ public final class TableIterator
 
     private BlockIterator getNextBlock()
     {
-        Slice blockHandle = blockIterator.next().getValue();
+        BlockEntry entry = blockIterator.next();
+        if( null == entry )
+            return null;
+        Slice blockHandle = entry.getValue();
         Block dataBlock = table.openBlock(blockHandle);
         return dataBlock.iterator();
     }

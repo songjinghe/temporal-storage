@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.act</groupId>
   <artifactId>temporal-graph</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
+  <version>0.0.2-SNAPSHOT</version>
   
   <dependencies>
   	  <dependency>
@@ -32,6 +32,6 @@
 		<target>1.7</target>
 		<encoding>${project.build.sourceEncoding}</encoding>
 	</configuration>
-</plugin>
+   </plugin>
   
 </project>

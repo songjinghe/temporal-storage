@@ -78,6 +78,20 @@ public class Levels
         }
     }
 
+    public void delete( long id, int proId, int time )
+    {
+        if( null == level0 )
+        {
+            level0 = new Level0( dbDir, level1 );
+        }
+        Slice idSlice = new Slice( 12 );
+        idSlice.setLong( 0, id );
+        idSlice.setInt( 8, proId );
+        level0.add( idSlice, ValueType.DELETION, time, new Slice(0) );
+        if( level0.getStart() > boundary )
+            boundary = level0.getStart();
+    }
+    
     public void add( long id, int proId, int startTime, Slice value )
     {
         if( null == level0 )
@@ -92,9 +106,8 @@ public class Levels
             boundary = level0.getStart();
     }
     
-    public Slice getPointValue( long id, int proId, int time )
+    public ReturnValue getPointValue( long id, int proId, int time )
     {
-        //FIXME
         if( -1 == time )
             time = Integer.MAX_VALUE;
         Slice idSlice = new Slice(12);
@@ -108,13 +121,19 @@ public class Levels
     
     public Slice getRangeValue( long id, int proId, int startTime, int endTime, RangeQueryCallBack callback )
     {
-        //FIXME
+        
         if( -1 == endTime )
             endTime = Integer.MAX_VALUE;
         if( startTime>= boundary )
-            return level0.getRangeValue( id, proId, startTime, endTime, callback );
+        {
+            level0.getRangeValue( id, proId, startTime, endTime, callback );
+            return callback.onReturn();
+        }
         else if( endTime < boundary )
-            return level1.getRangeValue( id, proId, startTime, endTime, callback );
+        {
+            level1.getRangeValue( id, proId, startTime, endTime, callback );
+            return callback.onReturn();
+        }
         else
         {
             level1.getRangeValue( id, proId, startTime, boundary, callback );

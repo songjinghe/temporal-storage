@@ -1,23 +1,14 @@
 package org.act.dynproperty.impl;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.nio.channels.FileChannel;
-import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map.Entry;
 
-import org.act.dynproperty.table.FileChannelTable;
-import org.act.dynproperty.table.Table;
 import org.act.dynproperty.table.TableComparator;
 import org.act.dynproperty.util.InternalTableIterator;
 import org.act.dynproperty.util.Slice;
-import org.act.dynproperty.util.TableIterator;
-
-import com.google.common.base.Preconditions;
+import org.act.dynproperty.util.TimeIntervalUtil;
 
 public class Level1
 {
@@ -31,7 +22,7 @@ public class Level1
     }
   
     
-    public Slice getPointValue(Slice id , int time )
+    public ReturnValue getPointValue(Slice id , int time )
     {
         FileMetaData target = null;
         for( FileMetaData meta : this.files )
@@ -68,8 +59,13 @@ public class Level1
         Entry<InternalKey,Slice> entry = iterator.next();
         InternalKey key = entry.getKey();
         Slice rid = key.getId();
-        Preconditions.checkArgument( id.equals( rid ), "Get value faild because returned id is wrong in point query of level1");
-        return entry.getValue();
+        if( !rid.equals( id ) )
+        {
+            //FIXME query the current file
+            return new ReturnValue( false );
+        }
+        else
+            return new ReturnValue( entry.getValue() );
     }
     
     public void addFile( FileMetaData fileMeta )
@@ -84,7 +80,7 @@ public class Level1
         return this.files.size();
     }
 
-    public Slice getRangeValue( long id, int proId, int startTime, int endTime, RangeQueryCallBack callback )
+    public void getRangeValue( long id, int proId, int startTime, int endTime, RangeQueryCallBack callback )
     {
         Slice idSlice = new Slice(12);
         idSlice.setLong( 0, id );
@@ -94,7 +90,7 @@ public class Level1
             FileMetaData metaData = this.files.get( i );
             if( null != metaData )
             {
-                if( startTime <= metaData.getSmallest() && endTime >= metaData.getLargest() )
+                if( TimeIntervalUtil.Union( startTime, endTime, metaData.getSmallest(), metaData.getLargest() ) )
                 {
                     int start = Math.max( startTime, metaData.getSmallest() );
                     int end = Math.min( endTime, metaData.getLargest() );
@@ -126,7 +122,10 @@ public class Level1
                     {
                         Entry<InternalKey,Slice> entry = iterator.next();
                         InternalKey key = entry.getKey();
-                        Preconditions.checkArgument( key.getId().equals( idSlice ), "Get value faild because returned id is wrong in range query of level0" );
+                        if( !idSlice.equals( key.getId() ) )
+                            break;
+                        if( key.getValueType().getPersistentId() == ValueType.DELETION.getPersistentId() )
+                            return;
                         if( key.getStartTime() <= end )
                             callback.onCall( entry.getValue() );
                         else
@@ -135,7 +134,7 @@ public class Level1
                 }
             }
         }
-        return callback.onReturn();
+        return;
     }
 
 

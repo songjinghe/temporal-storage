@@ -118,6 +118,13 @@ public class BlockIterator
     public void seek(Slice targetKey)
     {
         if (restartCount == 0) {
+            data.setPosition(0);
+
+            // clear the entries to assure key is not prefixed
+            nextEntry = null;
+
+            // read the entry
+            nextEntry = readEntry(data, null);
             return;
         }
 

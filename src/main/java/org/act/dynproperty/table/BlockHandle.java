@@ -30,7 +30,7 @@ public class BlockHandle
     private final long offset;
     private final int dataSize;
 
-    BlockHandle(long offset, int dataSize)
+    public BlockHandle(long offset, int dataSize)
     {
         this.offset = offset;
         this.dataSize = dataSize;

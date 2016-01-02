@@ -2,12 +2,9 @@ package org.act.dynproperty.impl;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.channels.FileChannel;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.concurrent.locks.Lock;
@@ -23,10 +20,7 @@ import org.act.dynproperty.util.InternalIterator;
 import org.act.dynproperty.util.InternalTableIterator;
 import org.act.dynproperty.util.MergingIterator;
 import org.act.dynproperty.util.Slice;
-import org.act.dynproperty.util.SliceOutput;
-import org.act.dynproperty.util.TableIterator;
-
-import com.google.common.base.Preconditions;
+import org.act.dynproperty.util.TimeIntervalUtil;
 
 public class Level0
 {
@@ -51,15 +45,19 @@ public class Level0
         this.tableCache = new TableCache( dbFile, 5, TableComparator.instence(), false, false );
         this.level1 = level1;
     }
-    
-    public Slice getPointValue( Slice id, int time )
+
+    public ReturnValue getPointValue( Slice id, int time )
     {
         lock.lock();
         if( time >= this.memTable.getStartTime() )
         {
             LookupKey lookupKey = new LookupKey( id, time );
             lock.unlock();
-            return this.memTable.get( lookupKey ).getValue();
+            LookupResult result = this.memTable.get( lookupKey );
+            if( !result.getKey().getId().equals( id ) )
+                return new ReturnValue( false );
+            else
+                return new ReturnValue( result.getValue() );
         }
         else
         {
@@ -91,20 +89,22 @@ public class Level0
 //            }
 //            catch ( IOException e )
 //            {
-//                //FIXME
 //                e.printStackTrace();
 //            }
             InternalTableIterator iterator = tableCache.newIterator( target );
             iterator.seekInternal( new InternalKey( id, time, ValueType.VALUE ));
             Entry<InternalKey,Slice> entry = iterator.next();
-            InternalKey key = entry.getKey();
             lock.unlock();
+            InternalKey key = entry.getKey();
             Slice rid = key.getId();
-            Preconditions.checkArgument( id.equals( rid ), "Get value faild because returned id is wrong in point query of level0");
-            return entry.getValue();
+            if( !rid.equals( id ) )
+            {
+                //FIXME query the current file
+                return new ReturnValue( false );
+            }
+            else
+                return new ReturnValue( entry.getValue() );
         }
-//        lock.unlock();
-//        return null;
     }
     
     public int getStart()
@@ -114,11 +114,11 @@ public class Level0
     
     public void add( Slice id,  ValueType valueType, int startTime, Slice value )
     {
-        lock.lock();
         if( null == this.memTable )
             this.memTable = new MemTable( MemTableComparator.instence(), startTime );
         if( this.memTable.approximateMemoryUsage() >= 4*1024*1024 && lastAddTime < startTime )
         {
+            lock.lock();
             newMemTable( startTime );
             this.memTable.add( id, valueType, startTime, value );
             boolean noFiles = true;
@@ -134,13 +134,14 @@ public class Level0
             {
                 this.start = startTime;
             }
+            lastAddTime = startTime;
+            lock.unlock();
         }
         else
         {
             this.memTable.add( id, valueType, startTime, value );
         }
         lastAddTime = startTime;
-        lock.unlock();
     }
     
     private void newMemTable( int newStartTime )
@@ -336,7 +337,7 @@ public class Level0
         }
     }
 
-    public Slice getRangeValue( long id, int proId, int startTime, int endTime, RangeQueryCallBack callback )
+    public void getRangeValue( long id, int proId, int startTime, int endTime, RangeQueryCallBack callback )
     {
         Slice idSlice = new Slice(12);
         idSlice.setLong( 0, id );
@@ -346,7 +347,7 @@ public class Level0
             FileMetaData metaData = this.files.get( i );
             if( null != metaData )
             {
-                if( startTime <= metaData.getSmallest()&& endTime >= metaData.getLargest() )
+                if( TimeIntervalUtil.Union( startTime, endTime, metaData.getSmallest(), metaData.getLargest() ) )
                 {
                     int start = Math.max( startTime, (int)metaData.getSmallest() );
                     int end = Math.min( endTime,(int)metaData.getLargest() );
@@ -369,7 +370,6 @@ public class Level0
 //                    }
 //                    catch ( IOException e )
 //                    {
-//                        // TODO Auto-generated catch block
 //                        e.printStackTrace();
 //                    }
                     InternalTableIterator iterator = this.tableCache.newIterator( metaData );
@@ -378,7 +378,10 @@ public class Level0
                     {
                         Entry<InternalKey,Slice> entry = iterator.next();
                         InternalKey key = entry.getKey();
-                        Preconditions.checkArgument( key.getId().equals( idSlice ), "Get value faild because returned id is wrong in range query of level0" );
+                        if( !idSlice.equals( key.getId() ) )
+                            break;
+                        if( key.getValueType().getPersistentId() == ValueType.DELETION.getPersistentId() )
+                            return;
                         if( key.getStartTime() <= end )
                             callback.onCall( entry.getValue() );
                         else
@@ -395,14 +398,17 @@ public class Level0
             while( iterator.hasNext() )
             {
                 Entry<InternalKey,Slice> entry = iterator.next();
-                Preconditions.checkArgument( entry.getKey().getId().equals( idSlice ), "Get value faild because returned id is wrong in range query of level0 int memtable" );
+                if( !idSlice.equals( entry.getKey().getId() ) )
+                    break;
+                if( startkey.getValueType().getPersistentId() == ValueType.DELETION.getPersistentId() )
+                    return;
                 if( entry.getKey().getStartTime() <= endTime )
                     callback.onCall( entry.getValue() );
                 else
                     break;
             }
         }
-        return callback.onReturn();
+        return ;
     }
 
     public int getPropertyLatestTime( long id, int propertyKeyId )

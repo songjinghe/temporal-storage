@@ -24,8 +24,12 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
+import javax.jws.soap.SOAPBinding.Use;
+
 import org.act.dynproperty.impl.CompressionType;
+import org.act.dynproperty.impl.InternalKey;
 import org.act.dynproperty.impl.Options;
+import org.act.dynproperty.impl.ValueType;
 import org.act.dynproperty.util.PureJavaCrc32C;
 import org.act.dynproperty.util.Slice;
 import org.act.dynproperty.util.Slices;
@@ -67,6 +71,7 @@ public class TableBuilder
     // blocks.
     private boolean pendingIndexEntry;
     private BlockHandle pendingHandle;  // Handle to add to index block
+    private BlockHandle preHandle;
 
     private Slice compressedOutput;
 
@@ -132,8 +137,6 @@ public class TableBuilder
         // If we just wrote a block, we can now add the handle to index block
         if (pendingIndexEntry) {
             Preconditions.checkState(dataBlockBuilder.isEmpty(), "Internal error: Table has a pending index entry but data block builder is empty");
-
-            Slice shortestSeparator = userComparator.findShortestSeparator(lastKey, key);
 
             Slice handleEncoding = BlockHandle.writeBlockHandle(pendingHandle);
             //indexBlockBuilder.add(shortestSeparator, handleEncoding);
@@ -249,10 +252,9 @@ public class TableBuilder
 
         // add last handle to index block
         if (pendingIndexEntry) {
-            Slice shortSuccessor = userComparator.findShortSuccessor(lastKey);
 
             Slice handleEncoding = BlockHandle.writeBlockHandle(pendingHandle);
-            indexBlockBuilder.add(shortSuccessor, handleEncoding);
+            indexBlockBuilder.add(lastKey, handleEncoding);
             pendingIndexEntry = false;
         }
 
