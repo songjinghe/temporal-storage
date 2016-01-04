@@ -167,4 +167,10 @@ public class Level1
     {
         this.files = new LinkedList<FileMetaData>( level1s );
     }
+
+
+    int getLargestTime()
+    {
+        return this.files.get( files.size()-1 ).getLargest();
+    }
 }

@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map.Entry;
@@ -20,11 +21,13 @@ import org.act.dynproperty.util.InternalIterator;
 import org.act.dynproperty.util.InternalTableIterator;
 import org.act.dynproperty.util.MergingIterator;
 import org.act.dynproperty.util.Slice;
+import org.act.dynproperty.util.TableIterator;
 import org.act.dynproperty.util.TimeIntervalUtil;
 
 public class Level0
 {
     private List<FileMetaData> files = new ArrayList<FileMetaData>();
+    private FileMetaData tempMemTable;
     private TableCache tableCache;
     private MemTable memTable;
     private MemTable stableTable;
@@ -36,6 +39,36 @@ public class Level0
     
     private Level1 level1;
     
+    
+    private class ShutDownThread extends Thread
+    {
+        @Override
+        public void run()
+        {
+            try
+            {
+                lock.lock();
+                String fileName = Filename.tempFileName( 0 );
+                File file = new File( dbDir + "/" + fileName );
+                if( !file.exists() )
+                    file.createNewFile();
+                FileChannel channel = new FileOutputStream( file ).getChannel();
+                TableBuilder builder = new TableBuilder( new Options(), channel, TableComparator.instence() );
+                MemTableIterator memTableIterator = memTable.iterator();
+                while( memTableIterator.hasNext() )
+                {
+                    Entry<InternalKey,Slice> entry = memTableIterator.next();
+                    builder.add( entry.getKey().encode(), entry.getValue() );
+                }
+                builder.finish();
+                channel.close();
+            }
+            catch( IOException e )
+            {}
+        }
+    }
+    
+    
     public Level0( String dbDir, Level1 level1 )
     {
         this.dbDir = dbDir;
@@ -44,6 +77,47 @@ public class Level0
         File dbFile = new File( dbDir );
         this.tableCache = new TableCache( dbFile, 5, TableComparator.instence(), false, false );
         this.level1 = level1;
+        Runtime.getRuntime().addShutdownHook( new ShutDownThread() );
+    }
+
+    void restoreMemTable()
+    {
+        try
+        {
+            String fileName = Filename.tempFileName( 0 );
+            File file = new File( dbDir + "/" + fileName );
+            if( !file.exists() )
+                return;
+            FileChannel channel = new FileInputStream( file ).getChannel();
+            Table table = new FileChannelTable( fileName, channel, TableComparator.instence(), false );
+            TableIterator iterator = table.iterator();
+            Entry<Slice,Slice> entry;
+            FileMetaData lastMeta = null;
+            for( FileMetaData meta : files )
+            {
+                if( meta != null )
+                {
+                    lastMeta = meta;
+                    break;
+                }
+            }
+            int memStartTime = lastMeta != null ? lastMeta.getLargest() : level1.getLargestTime();
+            while( iterator.hasNext() )
+            {
+                entry = iterator.next();
+                InternalKey key = new InternalKey( entry.getKey() );
+                if( null == memTable )
+                {
+                    memTable = new MemTable( MemTableComparator.instence(), memStartTime );
+                }
+                memTable.add( key.getId(), key.getValueType(),(int)key.getStartTime(), entry.getValue() );
+            }
+            channel.close();
+            file.delete();
+        }
+        catch( IOException e )
+        {}
+        
     }
 
     public ReturnValue getPointValue( Slice id, int time )

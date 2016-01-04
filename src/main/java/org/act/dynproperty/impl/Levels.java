@@ -68,6 +68,7 @@ public class Levels
                 this.level0 = new Level0( dbDir, this.level1 );
                 this.level0.setFiles( level0s );
                 this.level0.setStart(level0s.get( index ).getSmallest());
+                this.level0.restoreMemTable();
                 this.boundary = this.level0.getStart();
             }
         }

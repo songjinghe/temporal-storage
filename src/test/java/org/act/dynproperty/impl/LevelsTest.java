@@ -27,26 +27,26 @@ public class LevelsTest
             //FileUtils.deleteDirectoryContents( dir );
         }
         else {
-            FileUtils.deleteDirectoryContents( dir );
+//            FileUtils.deleteDirectoryContents( dir );
         }
         if( null != level )
             return;
         level = new Levels( dbDir );
         long startTime = System.currentTimeMillis();
-        for( int t = 0; t<TIMENUM; t++ )
-        {
-            for( long i = 0; i<IDNUM; i++ )
-            {
-                for( int p = 0; p<PRONUM; p++ )
-                {
-                    Slice value = new Slice(16);
-                    value.setLong( 0, i );
-                    value.setInt( 8, p );
-                    value.setInt( 12, t );
-                    level.add( i, p, t*10, value );
-                }
-            }
-        }
+//        for( int t = 0; t<TIMENUM; t++ )
+//        {
+//            for( long i = 0; i<IDNUM; i++ )
+//            {
+//                for( int p = 0; p<PRONUM; p++ )
+//                {
+//                    Slice value = new Slice(16);
+//                    value.setLong( 0, i );
+//                    value.setInt( 8, p );
+//                    value.setInt( 12, t );
+//                    level.add( i, p, t*10, value );
+//                }
+//            }
+//        }
         System.out.println( (float)IDNUM*(float)PRONUM*(float)TIMENUM/1024.0/1024.0*28.0 + "M data write use time : " + (System.currentTimeMillis() - startTime) + "MillSecond!" );
     }
     
