@@ -138,6 +138,13 @@ public class Level1
     }
 
 
+    FileMetaData getLatestFile()
+    {
+        if( this.files.size() == 0 )
+            return null;
+        return this.files.get( files.size()-1 );
+    }
+    
     public int getPropertyLatestTime( long id, int propertyKeyId )
     {
         Slice idSlice = new Slice(12);

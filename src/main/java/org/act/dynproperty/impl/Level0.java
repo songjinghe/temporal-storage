@@ -173,8 +173,7 @@ public class Level0
             Slice rid = key.getId();
             if( !rid.equals( id ) )
             {
-                //FIXME query the current file
-                return new ReturnValue( false );
+                return this.level1.getPointValue( id, time );
             }
             else
                 return new ReturnValue( entry.getValue() );
@@ -352,6 +351,23 @@ public class Level0
         for( int i = 0; i<5; i++ )
         {
             FileMetaData meta = this.files.get( i );
+            File file = new File( this.dbDir + "/" + Filename.unStableFileName( meta.getNumber() ) );
+            try
+            {
+                FileInputStream stream = new FileInputStream( file );
+                stream2delete.add( stream );
+                Table tablefile = new FileChannelTable( file.getAbsolutePath(), stream.getChannel(), TableComparator.instence(), false );
+                files2merge.add( new InternalTableIterator( tablefile.iterator() ) );
+            }
+            catch ( IOException e )
+            {
+                //FIXME
+                e.printStackTrace();
+            }
+        }
+        FileMetaData meta = this.level1.getLatestFile();
+        if( null != meta )
+        {
             File file = new File( this.dbDir + "/" + Filename.unStableFileName( meta.getNumber() ) );
             try
             {

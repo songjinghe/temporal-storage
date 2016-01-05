@@ -20,6 +20,7 @@ package org.act.dynproperty.table;
 import java.util.Comparator;
 
 import org.act.dynproperty.impl.SeekingIterable;
+import org.act.dynproperty.util.BlockLatestValueIterator;
 import org.act.dynproperty.util.Slice;
 import org.act.dynproperty.util.Slices;
 
@@ -111,5 +112,10 @@ public class Block
     public BlockIterator iterator()
     {
         return new BlockIterator(data, restartPositions, comparator);
+    }
+
+    public BlockLatestValueIterator latestValueIterator()
+    {
+        return new BlockLatestValueIterator( data, restartPositions, comparator );
     }
 }

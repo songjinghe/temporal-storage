@@ -680,7 +680,7 @@ public final class Slice
             return 0;
         }
 
-        int minLength = Math.min(this.length, that.length);
+        int minLength = Math.min( this.length, that.length );
         for (int i = 0; i < minLength; i++) {
             int thisByte = 0xFF & this.data[this.offset + i];
             int thatByte = 0xFF & that.data[that.offset + i];

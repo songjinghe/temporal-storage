@@ -31,6 +31,7 @@ import org.act.dynproperty.impl.SeekingIterable;
 import org.act.dynproperty.util.Closeables;
 import org.act.dynproperty.util.Slice;
 import org.act.dynproperty.util.TableIterator;
+import org.act.dynproperty.util.TableLatestValueIterator;
 import org.act.dynproperty.util.VariableLengthQuantity;
 
 public abstract class Table
@@ -70,6 +71,11 @@ public abstract class Table
     public TableIterator iterator()
     {
         return new TableIterator(this, indexBlock.iterator());
+    }
+    
+    public TableLatestValueIterator lastestValueIterator()
+    {
+        return new TableLatestValueIterator( this, indexBlock.iterator() );
     }
 
     public Block openBlock(Slice blockEntry)

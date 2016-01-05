@@ -130,7 +130,8 @@ public class InternalKey
     {
         StringBuilder sb = new StringBuilder();
         sb.append("InternalKey");
-        sb.append("{key=").append(getId().toString(UTF_8));      // todo don't print the real value
+        sb.append("{id=").append(getId().getLong( 0 ));
+        sb.append( " proId=" ).append( getId().getInt( 8 ) );
         sb.append(", time=").append(getStartTime());
         sb.append(", valueType=").append(getValueType());
         sb.append('}');
