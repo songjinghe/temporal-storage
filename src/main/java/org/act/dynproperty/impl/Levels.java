@@ -29,7 +29,10 @@ public class Levels
     {
         File manifast = new File( dbDir + "/" + Filename.logFileName( 0 ) );
         if(!manifast.exists())
+        {
+            this.level0 = new Level0( dbDir, this.level1 );
             return;
+        }
         try( FileChannel channel = new FileInputStream( manifast ).getChannel() )
         {
             LogReader reader = new LogReader( channel, null , false, 0 );
@@ -55,6 +58,7 @@ public class Levels
                 }
             }
             this.level1.setFiles( level1s );
+            this.level0 = new Level0( dbDir, this.level1 );
             int index = -1;
             for( FileMetaData meta : level0s )
             {
@@ -65,7 +69,6 @@ public class Levels
             }
             if( index > -1 )
             {
-                this.level0 = new Level0( dbDir, this.level1 );
                 this.level0.setFiles( level0s );
                 this.level0.setStart(level0s.get( index ).getSmallest());
                 this.level0.restoreMemTable();
@@ -81,10 +84,6 @@ public class Levels
 
     public void delete( long id, int proId, int time )
     {
-        if( null == level0 )
-        {
-            level0 = new Level0( dbDir, level1 );
-        }
         Slice idSlice = new Slice( 12 );
         idSlice.setLong( 0, id );
         idSlice.setInt( 8, proId );
@@ -95,10 +94,6 @@ public class Levels
     
     public void add( long id, int proId, int startTime, Slice value )
     {
-        if( null == level0 )
-        {
-            level0 = new Level0( dbDir, level1 );
-        }
         Slice idSlice = new Slice( 12 );
         idSlice.setLong( 0, id );
         idSlice.setInt( 8, proId );

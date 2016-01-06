@@ -16,7 +16,7 @@ public class LevelsTest
     private static final int PRONUM = 512;
     private static final int TIMENUM = 512;
     private static Levels level;
-    private static final String dbDir = "./testDB";
+    private static final String dbDir = "./target/testDB";
     @BeforeClass
     public static void setUp()
     {

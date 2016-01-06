@@ -11,7 +11,7 @@ public class Level0Test
     private final int IDNUM = 31*128;
     private final int TIMENUM = 1024;
     private Level0 level;
-    private final String dbDir = "./testDB";
+    private final String dbDir = "./target/testDB";
     @Before
     public void setUp()
     {

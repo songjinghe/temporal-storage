@@ -48,6 +48,8 @@ public class Level0
             try
             {
                 lock.lock();
+                if( null == memTable )
+                    return;
                 String fileName = Filename.tempFileName( 0 );
                 File file = new File( dbDir + "/" + fileName );
                 if( !file.exists() )
@@ -65,6 +67,10 @@ public class Level0
             }
             catch( IOException e )
             {}
+            finally
+            {
+                lock.unlock();
+            }
         }
     }
     
@@ -123,6 +129,11 @@ public class Level0
     public ReturnValue getPointValue( Slice id, int time )
     {
         lock.lock();
+        if( null == this.memTable )
+        {
+            lock.unlock();
+            return new ReturnValue( false );
+        }
         if( time >= this.memTable.getStartTime() )
         {
             LookupKey lookupKey = new LookupKey( id, time );

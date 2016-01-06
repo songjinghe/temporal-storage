@@ -19,7 +19,7 @@ public class InternalTableLatestValueIteratorTest
     private static final int IDNUM = 30;
     private static final int PRONUM = 512;
     private static final int TIMENUM = 512;
-    private static final String dbDir = "./testDB";
+    private static final String dbDir = "./target/testDB";
     
     
     @Test
