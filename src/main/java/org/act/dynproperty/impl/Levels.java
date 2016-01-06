@@ -31,6 +31,7 @@ public class Levels
         if(!manifast.exists())
         {
             this.level0 = new Level0( dbDir, this.level1 );
+            this.level0.restoreMemTable();
             return;
         }
         try( FileChannel channel = new FileInputStream( manifast ).getChannel() )
