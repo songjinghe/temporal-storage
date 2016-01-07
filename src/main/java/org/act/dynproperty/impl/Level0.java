@@ -139,7 +139,7 @@ public class Level0
             LookupKey lookupKey = new LookupKey( id, time );
             lock.unlock();
             LookupResult result = this.memTable.get( lookupKey );
-            if( !result.getKey().getId().equals( id ) )
+            if( null == result || !result.getKey().getId().equals( id ) )
                 return new ReturnValue( false );
             else
                 return new ReturnValue( result.getValue() );

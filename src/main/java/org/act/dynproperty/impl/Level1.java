@@ -178,6 +178,8 @@ public class Level1
 
     int getLargestTime()
     {
+        if( this.files.size() == 0 )
+            return 0;
         return this.files.get( files.size()-1 ).getLargest();
     }
 }
