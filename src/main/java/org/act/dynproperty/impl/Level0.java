@@ -19,6 +19,7 @@ import org.act.dynproperty.table.TableBuilder;
 import org.act.dynproperty.table.TableComparator;
 import org.act.dynproperty.util.InternalIterator;
 import org.act.dynproperty.util.InternalTableIterator;
+import org.act.dynproperty.util.InternalTableLatestValueIterator;
 import org.act.dynproperty.util.MergingIterator;
 import org.act.dynproperty.util.Slice;
 import org.act.dynproperty.util.TableIterator;
@@ -379,13 +380,12 @@ public class Level0
         FileMetaData meta = this.level1.getLatestFile();
         if( null != meta )
         {
-            File file = new File( this.dbDir + "/" + Filename.unStableFileName( meta.getNumber() ) );
+            File file = new File( this.dbDir + "/" + Filename.stableFileName( meta.getNumber() ) );
             try
             {
                 FileInputStream stream = new FileInputStream( file );
-                stream2delete.add( stream );
                 Table tablefile = new FileChannelTable( file.getAbsolutePath(), stream.getChannel(), TableComparator.instence(), false );
-                files2merge.add( new InternalTableIterator( tablefile.iterator() ) );
+                files2merge.add( new InternalTableLatestValueIterator( tablefile.lastestValueIterator() ) );
             }
             catch ( IOException e )
             {

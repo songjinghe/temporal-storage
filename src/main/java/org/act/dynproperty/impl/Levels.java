@@ -60,15 +60,17 @@ public class Levels
             }
             this.level1.setFiles( level1s );
             this.level0 = new Level0( dbDir, this.level1 );
-            int index = -1;
-            for( FileMetaData meta : level0s )
+            int index;
+            boolean found = false;
+            for( index = level0s.size()-1; index>=0 ; index-- )
             {
-                if( meta != null )
+                if( level0s.get( index ) != null )
                 {
-                    index++;
+                    found = true;
+                    break;
                 }
             }
-            if( index > -1 )
+            if( found )
             {
                 this.level0.setFiles( level0s );
                 this.level0.setStart(level0s.get( index ).getSmallest());
