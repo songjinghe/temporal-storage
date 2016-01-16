@@ -11,7 +11,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 /**
- * ²âÊÔµÄÊı¾İÎª¶à¸öid£¬Ã¿¸öidÓĞ¶à¸öÊ±¼ä£¬Ê±¼äÒÔ10Îª¼ä¸ô¡£
+ * æµ‹è¯•çš„æ•°æ®ä¸ºå¤šä¸ªidï¼Œæ¯ä¸ªidæœ‰å¤šä¸ªæ—¶é—´ï¼Œæ—¶é—´ä»¥10ä¸ºé—´éš”ã€‚
  *
  *
  * @author huanghx( huanghx@act.buaa.edu.cn )
