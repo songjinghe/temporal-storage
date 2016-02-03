@@ -27,6 +27,7 @@ import com.google.common.cache.RemovalNotification;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.ExecutionException;
 
@@ -49,15 +50,15 @@ public class TableCache
         Preconditions.checkNotNull(databaseDir, "databaseName is null");
         cache = CacheBuilder.newBuilder()
                 .maximumSize(tableCacheSize)
-                .removalListener(new RemovalListener<Long, TableAndFile>()
-                {
-                    @Override
-                    public void onRemoval(RemovalNotification<Long, TableAndFile> notification)
-                    {
-                        Table table = notification.getValue().getTable();
-                        finalizer.addCleanup(table, table.closer());
-                    }
-                })
+//                .removalListener(new RemovalListener<Long, TableAndFile>()
+//                {
+//                    @Override
+//                    public void onRemoval(RemovalNotification<Long, TableAndFile> notification)
+//                    {
+//                        Table table = notification.getValue().getTable();
+//                        finalizer.addCleanup(table, table.closer());
+//                    }
+//                })
                 .build(new CacheLoader<Long, TableAndFile>()
                 {
                     @Override
@@ -69,14 +70,19 @@ public class TableCache
                 });
     }
 
-    public InternalTableIterator newIterator(FileMetaData file)
+    public SeekingIterator<Slice,Slice> newIterator(FileMetaData file)
     {
         return newIterator(file.getNumber());
     }
 
-    public InternalTableIterator newIterator(long number)
+    public SeekingIterator<Slice,Slice> newIterator(long number)
     {
-        return new InternalTableIterator(getTable(number).iterator());
+        return getTable(number).iterator();
+    }
+    
+    public Table newTable( long number )
+    {
+        return getTable( number );
     }
 
     public long getApproximateOffsetOf(FileMetaData file, Slice key)
@@ -125,7 +131,7 @@ public class TableCache
             else
                 tableFileName = Filename.unStableFileName(fileNumber);
             File tableFile = new File(databaseDir, tableFileName);
-            fileChannel = new FileInputStream(tableFile).getChannel();
+            fileChannel = new RandomAccessFile(tableFile,"rw").getChannel();
             try {
                 //FIXME 
                 if ( true ) {

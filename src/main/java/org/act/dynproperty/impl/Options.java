@@ -31,6 +31,7 @@ public class Options
     private boolean verifyChecksums = true;
     private boolean paranoidChecks;
     private long cacheSize;
+    private float blockEmptyRatio = 1.0f;
 
     static void checkArgNotNull(Object value, String name)
     {
@@ -39,6 +40,11 @@ public class Options
         }
     }
 
+    public float blockEmptyRatio()
+    {
+        return blockEmptyRatio;
+    }
+    
     public boolean createIfMissing()
     {
         return createIfMissing;

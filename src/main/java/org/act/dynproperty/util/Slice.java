@@ -681,7 +681,7 @@ public final class Slice
         }
 
         int minLength = Math.min( this.length, that.length );
-        for (int i = 0; i < minLength; i++) {
+        for (int i = minLength-1; i >=0; i--) {
             int thisByte = 0xFF & this.data[this.offset + i];
             int thatByte = 0xFF & that.data[that.offset + i];
             if (thisByte != thatByte) {
@@ -722,7 +722,7 @@ public final class Slice
         {
             long id = this.getLong( 0 );
             int proid = this.getInt( 8 );
-            int time = (int)SequenceNumber.unpackSequenceNumber( this.getLong( 12 ) );
+            int time = (int)SequenceNumber.unpackTime( this.getLong( 12 ) );
             s = " Id = " + id + "," + "ProId = " + proid + "," + "Time = " + time + ",";
         }
         return toret + s + ")";

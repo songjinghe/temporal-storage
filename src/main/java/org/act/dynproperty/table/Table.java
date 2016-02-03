@@ -30,18 +30,17 @@ import java.util.concurrent.Callable;
 import org.act.dynproperty.impl.SeekingIterable;
 import org.act.dynproperty.util.Closeables;
 import org.act.dynproperty.util.Slice;
-import org.act.dynproperty.util.TableIterator;
 import org.act.dynproperty.util.TableLatestValueIterator;
 import org.act.dynproperty.util.VariableLengthQuantity;
 
 public abstract class Table
-        implements SeekingIterable<Slice, Slice>
+        implements SeekingIterable<Slice, Slice>, Closeable
 {
     protected final String name;
     protected final FileChannel fileChannel;
     protected final Comparator<Slice> comparator;
     protected final boolean verifyChecksums;
-    protected final Block indexBlock;
+    protected final IndexBlock indexBlock;
     protected final BlockHandle metaindexBlockHandle;
 
     public Table(String name, FileChannel fileChannel, Comparator<Slice> comparator, boolean verifyChecksums)
@@ -161,6 +160,22 @@ public abstract class Table
         {
             Closeables.closeQuietly(closeable);
             return null;
+        }
+    }
+
+    public boolean update( long position, TableUpdateResult result )
+    {
+        try
+        {
+            position += result.getInBlockOffset();
+            this.fileChannel.position( position );
+            this.fileChannel.write( result.dataAsByteBuffer() );
+            //this.fileChannel.force( true );
+            return true;
+        }
+        catch( IOException e )
+        {
+            return false;
         }
     }
 }

@@ -20,15 +20,19 @@ package org.act.dynproperty.impl;
 public enum ValueType
 {
     DELETION(0x01),
-    VALUE(0x00);
+    VALUE(0x00),
+    INVALID(0x02);
 
     public static ValueType getValueTypeByPersistentId(int persistentId)
     {
+        persistentId = persistentId & 3;
         switch (persistentId) {
             case 1:
                 return DELETION;
             case 0:
                 return VALUE;
+            case 2:
+                return INVALID;
             default:
                 throw new IllegalArgumentException("Unknown persistentId " + persistentId);
         }

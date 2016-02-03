@@ -218,4 +218,10 @@ public class BasicSliceOutput
     {
         return slice.toString(0, size, charset);
     }
+
+    @Override
+    public Slice slice( int time )
+    {
+        throw new RuntimeException( "UNSUPPORTED METHOD" );
+    }
 }

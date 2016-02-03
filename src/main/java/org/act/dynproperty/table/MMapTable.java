@@ -62,7 +62,20 @@ public class MMapTable
     {
         return new Closer(name, fileChannel, data);
     }
-
+    
+    @Override
+    public void close()
+    {
+        ByteBufferSupport.unmap(data);
+        try
+        {
+            fileChannel.close();
+        }
+        catch ( IOException e )
+        {
+            e.printStackTrace();
+        }
+    }
     private static class Closer
             implements Callable<Void>
     {
@@ -176,4 +189,5 @@ public class MMapTable
 
         return new IndexBlock(uncompressedData, comparator);
     }
+
 }

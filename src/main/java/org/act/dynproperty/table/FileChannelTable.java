@@ -141,4 +141,17 @@ public class FileChannelTable
 
         return new IndexBlock(uncompressedData, comparator);
     }
+
+    @Override
+    public void close()
+    {
+        try
+        {
+            fileChannel.close();
+        }
+        catch ( IOException e )
+        {
+            e.printStackTrace();
+        }
+    }
 }

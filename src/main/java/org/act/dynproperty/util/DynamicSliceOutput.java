@@ -24,6 +24,10 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.ScatteringByteChannel;
 import java.nio.charset.Charset;
 
+import org.act.dynproperty.impl.Options;
+
+import static org.act.dynproperty.util.SizeOf.SIZE_OF_INT;
+
 public class DynamicSliceOutput
         extends SliceOutput
 {
@@ -205,9 +209,15 @@ public class DynamicSliceOutput
     }
 
     @Override
-    public Slice slice()
+    public Slice slice( int size )
     {
-        return slice.slice(0, size);
+        if( new Options().blockEmptyRatio() == 1.0f )
+        {
+            this.slice.setInt( size, size );
+            return slice.slice( 0, size+4 );
+        }
+        this.slice.setInt( slice.length() - SIZE_OF_INT, size );
+        return slice;
     }
 
     @Override
@@ -229,5 +239,11 @@ public class DynamicSliceOutput
     public String toString(Charset charset)
     {
         return slice.toString(0, size, charset);
+    }
+
+    @Override
+    public Slice slice()
+    {
+        return this.slice.slice( 0, size );
     }
 }

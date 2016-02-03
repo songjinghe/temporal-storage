@@ -15,8 +15,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.act.dynproperty.util;
+package org.act.dynproperty.table;
 
+import java.util.Comparator;
 import java.util.Map.Entry;
 
 import org.act.dynproperty.table.Block;
@@ -24,6 +25,8 @@ import org.act.dynproperty.table.BlockEntry;
 import org.act.dynproperty.table.BlockHandle;
 import org.act.dynproperty.table.BlockIterator;
 import org.act.dynproperty.table.Table;
+import org.act.dynproperty.util.AbstractSeekingIterator;
+import org.act.dynproperty.util.Slice;
 
 public final class TableIterator
         extends AbstractSeekingIterator<Slice, Slice>
@@ -31,12 +34,14 @@ public final class TableIterator
     private final Table table;
     private final BlockIterator blockIterator;
     private BlockIterator current;
+    private Comparator<Slice> comparator; 
 
     public TableIterator(Table table, BlockIterator blockIterator)
     {
         this.table = table;
         this.blockIterator = blockIterator;
         current = null;
+        this.comparator = table.comparator;
     }
 
     @Override
@@ -57,7 +62,7 @@ public final class TableIterator
         if (blockIterator.hasNext()) {
             // seek the current iterator to the key
             BlockEntry pre = null;
-            if( blockIterator.peek().getKey().equals( targetKey ) )
+            if( this.comparator.compare( blockIterator.peek().getKey(), targetKey) == 0 )
             {
                 pre = blockIterator.peek();
                 blockIterator.next();

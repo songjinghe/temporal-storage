@@ -27,21 +27,30 @@ import static com.google.common.base.Charsets.UTF_8;
 import static org.act.dynproperty.util.SizeOf.SIZE_OF_LONG;
 import static org.act.dynproperty.util.SizeOf.SIZE_OF_INT;
 
+/**
+ * InternalKey contains the id and proId of the property(12bytes) , time(4bytes), value length (4bytes), deletion bit , valid bit
+ *
+ *
+ * @author huanghx( huanghx@act.buaa.edu.cn )
+ */
 public class InternalKey
 {
     private final Slice Id;
     private final int startTime;
+    private final int valueLength;
     private final ValueType valueType;
 
-    public InternalKey(Slice Id, int startTime, ValueType valueType)
+    public InternalKey(Slice Id, int startTime, int valueLength, ValueType valueType)
     {
         Preconditions.checkNotNull(Id, "userKey is null");
         Preconditions.checkArgument(startTime >= 0, "sequenceNumber is negative");
         Preconditions.checkNotNull(valueType, "valueType is null");
+        Preconditions.checkArgument( valueLength >= 0 , "valueLength is nagative" );
 
         this.Id = Id;
         this.startTime = startTime;
         this.valueType = valueType;
+        this.valueLength = valueLength;
     }
 
     public InternalKey(Slice data)
@@ -50,8 +59,9 @@ public class InternalKey
         Preconditions.checkArgument(data.length() >= SIZE_OF_LONG, "data must be at least %s bytes", SIZE_OF_LONG);
         this.Id = getId( data );
         long packedSequenceAndType = data.getLong( data.length() - SIZE_OF_LONG );
-        this.startTime = (int)SequenceNumber.unpackSequenceNumber(packedSequenceAndType);
+        this.startTime = (int)SequenceNumber.unpackTime(packedSequenceAndType);
         this.valueType = SequenceNumber.unpackValueType(packedSequenceAndType);
+        this.valueLength = SequenceNumber.unpackValueLength( packedSequenceAndType );
     }
 
     public InternalKey(byte[] data)
@@ -64,9 +74,14 @@ public class InternalKey
         return Id;
     }
 
-    public long getStartTime()
+    public int getValueLength()
     {
-        return (long)startTime;
+        return valueLength;
+    }
+    
+    public int getStartTime()
+    {
+        return startTime;
     }
 
     public ValueType getValueType()
@@ -79,7 +94,7 @@ public class InternalKey
         Slice slice = Slices.allocate(Id.length() + SIZE_OF_LONG );
         SliceOutput sliceOutput = slice.output();
         sliceOutput.writeBytes(Id);
-        sliceOutput.writeLong(SequenceNumber.packSequenceAndValueType((long)startTime, valueType));
+        sliceOutput.writeLong(SequenceNumber.packSequenceAndValueType(startTime, valueLength, valueType));
         return slice;
     }
 
@@ -140,6 +155,6 @@ public class InternalKey
 
     private static Slice getId(Slice data)
     {
-        return data.slice(0, data.length() - SIZE_OF_LONG);
+        return data.slice(0, 12);
     }
 }

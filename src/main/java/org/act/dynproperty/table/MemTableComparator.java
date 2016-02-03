@@ -14,6 +14,6 @@ public final class MemTableComparator extends InternalKeyComparator
     }
     private MemTableComparator()
     {
-       super( new BytewiseComparator() );
+       super( new FixedIdComparator() );
     }
 }

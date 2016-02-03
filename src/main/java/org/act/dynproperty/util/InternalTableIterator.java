@@ -22,6 +22,7 @@ import com.google.common.collect.Maps;
 import java.util.Map.Entry;
 
 import org.act.dynproperty.impl.InternalKey;
+import org.act.dynproperty.table.TableIterator;
 
 public class InternalTableIterator
         extends AbstractSeekingIterator<InternalKey, Slice>

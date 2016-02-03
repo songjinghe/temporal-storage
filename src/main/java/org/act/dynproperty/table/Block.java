@@ -81,17 +81,24 @@ public class Block
         this.block = block;
         this.comparator = comparator;
 
+        int datalength = block.getInt( block.length() - SIZE_OF_INT );
+
+        
         // Keys are prefix compressed.  Every once in a while the prefix compression is restarted and the full key is written.
         // These "restart" locations are written at the end of the file, so you can seek to key without having to read the
         // entire file sequentially.
 
         // key restart count is the last int of the block
-        int restartCount = block.getInt(block.length() - SIZE_OF_INT);
+        int restartCount = block.getInt(datalength - SIZE_OF_INT);
 
         if (restartCount > 0) {
             // restarts are written at the end of the block
-            int restartOffset = block.length() - (1 + restartCount) * SIZE_OF_INT;
-            Preconditions.checkArgument(restartOffset < block.length() - SIZE_OF_INT, "Block is corrupt: restart offset count is greater than block size");
+            int restartOffset = datalength - (1 + restartCount) * SIZE_OF_INT;
+            Preconditions.checkArgument(restartOffset < datalength - SIZE_OF_INT, "Block is corrupt: restart offset count is greater than block size");
+            if( restartOffset < 0 )
+            {
+                restartOffset++;
+            }
             restartPositions = block.slice(restartOffset, restartCount * SIZE_OF_INT);
 
             // data starts at 0 and extends to the restart index

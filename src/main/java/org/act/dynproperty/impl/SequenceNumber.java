@@ -19,22 +19,34 @@ package org.act.dynproperty.impl;
 
 import com.google.common.base.Preconditions;
 
+
+/**
+ * |value length|time|ValueType|
+ *      30        32     2
+ *
+ * @author huanghx( huanghx@act.buaa.edu.cn )
+ */
 public final class SequenceNumber
 {
-    // We leave eight bits empty at the bottom so a type and sequence#
-    // can be packed together into 64-bits.
-    public static final long MAX_SEQUENCE_NUMBER = ((0x1L << 56) - 1);
+    
+    public static final int MAX_VALUE_LENGTH = 1073741823;
 
     private SequenceNumber()
     {
     }
 
-    public static long packSequenceAndValueType(long sequence, ValueType valueType)
+    public static long packSequenceAndValueType(int time, int valueLength, ValueType valueType)
     {
-        Preconditions.checkArgument(sequence <= MAX_SEQUENCE_NUMBER, "Sequence number is greater than MAX_SEQUENCE_NUMBER");
+        Preconditions.checkArgument( valueLength <= MAX_VALUE_LENGTH, "valueLength lager than the max length" );
         Preconditions.checkNotNull(valueType, "valueType is null");
 
-        return (sequence << 8) | valueType.getPersistentId();
+        long toret = 0L;
+        toret = toret | valueLength;
+        toret = toret << 32;
+        toret = toret | time;
+        toret = toret << 2;
+        toret = toret | valueType.getPersistentId();
+        return toret;
     }
 
     public static ValueType unpackValueType(long num)
@@ -42,8 +54,13 @@ public final class SequenceNumber
         return ValueType.getValueTypeByPersistentId((byte) num);
     }
 
-    public static long unpackSequenceNumber(long num)
+    public static int unpackValueLength( long num )
     {
-        return num >>> 8;
+        return (int)(num >>> 34);
+    }
+    
+    public static int unpackTime( long num )
+    {
+        return (int)( (num >> 2) & (4294967295L) );
     }
 }

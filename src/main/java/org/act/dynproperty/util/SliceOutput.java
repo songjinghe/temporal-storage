@@ -243,6 +243,8 @@ public abstract class SliceOutput
      * this buffer.
      */
     public abstract Slice slice();
+    
+    public abstract Slice slice( int time );
 
     /**
      * Converts this buffer's readable bytes into a NIO buffer.  The returned

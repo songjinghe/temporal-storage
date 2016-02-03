@@ -34,6 +34,8 @@ import org.act.dynproperty.util.PureJavaCrc32C;
 import org.act.dynproperty.util.Slice;
 import org.act.dynproperty.util.Slices;
 import org.act.dynproperty.util.Snappy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class TableBuilder
@@ -43,12 +45,16 @@ public class TableBuilder
      * echo http://code.google.com/p/leveldb/ | sha1sum
      * and taking the leading 64 bits.
      */
+    
+    private static Logger log = LoggerFactory.getLogger( TableBuilder.class );
+    
     public static final long TABLE_MAGIC_NUMBER = 0xdb4775248b80fb57L;
     
     private static final int TARGET_FILE_SIZE = 2097152;
 
     private final int blockRestartInterval;
     private final int blockSize;
+    private final int blockDataSize;
     private final CompressionType compressionType;
 
     private final FileChannel fileChannel;
@@ -72,10 +78,12 @@ public class TableBuilder
     private boolean pendingIndexEntry;
     private BlockHandle pendingHandle;  // Handle to add to index block
     private BlockHandle preHandle;
-
+    
     private Slice compressedOutput;
 
     private long position;
+    
+    private float blankratio;
 
     public TableBuilder(Options options, FileChannel fileChannel, UserComparator userComparator)
     {
@@ -93,13 +101,15 @@ public class TableBuilder
 
         blockRestartInterval = options.blockRestartInterval();
         blockSize = options.blockSize();
+        this.blankratio = options.blockEmptyRatio();
+        blockDataSize = (int)(blockSize*options.blockEmptyRatio());
         compressionType = options.compressionType();
 
-        dataBlockBuilder = new BlockBuilder((int) Math.min(blockSize * 1.1, TARGET_FILE_SIZE), blockRestartInterval, userComparator);
+        dataBlockBuilder = new BlockBuilder((int) Math.min((int)(blockSize*1.1) , TARGET_FILE_SIZE), blockRestartInterval, userComparator);
 
-        // with expected 50% compression
-        int expectedNumberOfBlocks = 1024;
-        indexBlockBuilder = new BlockBuilder(BlockHandle.MAX_ENCODED_LENGTH * expectedNumberOfBlocks, 1, userComparator);
+//        // with expected 50% compression
+//        int expectedNumberOfBlocks = 1024;
+        indexBlockBuilder = new BlockBuilder(blockSize, 1, userComparator);
 
         lastKey = Slices.EMPTY_SLICE;
     }
@@ -149,7 +159,7 @@ public class TableBuilder
         dataBlockBuilder.add(key, value);
 
         int estimatedBlockSize = dataBlockBuilder.currentSizeEstimate();
-        if (estimatedBlockSize >= blockSize) {
+        if (estimatedBlockSize >= blockDataSize) {
             flush();
         }
     }
@@ -173,6 +183,10 @@ public class TableBuilder
     {
         // close the block
         Slice raw = blockBuilder.finish();
+        
+        log.debug( "block raw length: " + raw.length() + " block data length: " + blockBuilder.currentSizeEstimate() );
+        //Preconditions.checkArgument( raw.length() >= blockSize, "datablock not equal to blocksize" );
+        //Preconditions.checkArgument( blockBuilder.currentSizeEstimate() <= raw.length(),"datablock's data size shold smaller than block size" );
 
         // attempt to compress the block
         Slice blockContents = raw;
@@ -202,7 +216,7 @@ public class TableBuilder
 
         // write data and trailer
         position += fileChannel.write(new ByteBuffer[] {blockContents.toByteBuffer(), trailer.toByteBuffer()});
-
+        //this.fileChannel.force( false );
         // clean up state
         blockBuilder.reset();
 
@@ -245,8 +259,8 @@ public class TableBuilder
         // mark table as closed
         closed = true;
 
-        // write (empty) meta index block
-        BlockBuilder metaIndexBlockBuilder = new BlockBuilder(256, blockRestartInterval, new BytewiseComparator());
+        //FIXME write (empty) meta index block
+        BlockBuilder metaIndexBlockBuilder = new BlockBuilder(blockSize, blockRestartInterval, new BytewiseComparator());
         // TODO(postrelease): Add stats and other meta blocks
         BlockHandle metaindexBlockHandle = writeBlock(metaIndexBlockBuilder);
 
@@ -265,6 +279,7 @@ public class TableBuilder
         Footer footer = new Footer(metaindexBlockHandle, indexBlockHandle);
         Slice footerEncoding = Footer.writeFooter(footer);
         position += fileChannel.write(footerEncoding.toByteBuffer());
+        this.fileChannel.force( true );
     }
 
     public void abandon()

@@ -34,7 +34,8 @@ public final class Filename
 
     public enum FileType
     {
-        
+        STBUFFER,
+        BUFFER,
         LOG,
         DB_LOCK,
         STABLEFILE,
@@ -45,6 +46,16 @@ public final class Filename
         INFO_LOG  // Either the current one, or an old one
     }
 
+    public static String stbufferFileName( long number )
+    {
+        return makeFileName( number, "stbuf" );
+    }
+    
+    public static String bufferFileName(long number)
+    {
+        return makeFileName( number, "buf" );
+    }
+    
     /**
      * Return the name of the log file with the specified number.
      */
@@ -162,6 +173,15 @@ public final class Filename
         else if (fileName.endsWith(".dbtmp")) {
             long fileNumber = Long.parseLong(removeSuffix(fileName, ".dbtmp"));
             return new FileInfo(FileType.TEMP, fileNumber);
+        }
+        else if(fileName.endsWith( ".buf" ))
+        {
+            long fileNumber = Long.parseLong(removeSuffix(fileName, ".buf"));
+            return new FileInfo(FileType.BUFFER, fileNumber);
+        }else if(fileName.endsWith( ".stbuf" ))
+        {
+            long fileNumber = Long.parseLong(removeSuffix(fileName, ".stbuf"));
+            return new FileInfo(FileType.STBUFFER, fileNumber);
         }
         return null;
     }

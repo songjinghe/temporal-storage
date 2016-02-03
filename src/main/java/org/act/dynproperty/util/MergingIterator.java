@@ -27,15 +27,16 @@ import java.util.NoSuchElementException;
 import java.util.PriorityQueue;
 
 import org.act.dynproperty.impl.InternalKey;
+import org.act.dynproperty.impl.SeekingIterator;
 
 public final class MergingIterator
-        extends AbstractSeekingIterator<InternalKey, Slice>
+        extends AbstractSeekingIterator<Slice, Slice>
 {
-    private final List<? extends InternalIterator> files;
+    private final List<? extends SeekingIterator<Slice,Slice>> files;
     private final PriorityQueue<ComparableIterator> priorityQueue;
-    private final Comparator<InternalKey> comparator;
+    private final Comparator<Slice> comparator;
 
-    public MergingIterator(List<? extends InternalIterator> files, Comparator<InternalKey> comparator)
+    public MergingIterator(List<? extends SeekingIterator<Slice,Slice>> files, Comparator<Slice> comparator)
     {
         this.files = files;
         this.comparator = comparator;
@@ -47,25 +48,25 @@ public final class MergingIterator
     @Override
     protected void seekToFirstInternal()
     {
-        for (InternalIterator file : files) {
+        for (SeekingIterator<Slice,Slice> file : files) {
             file.seekToFirst();
         }
         resetPriorityQueue(comparator);
     }
 
     @Override
-    protected void seekInternal(InternalKey targetKey)
+    protected void seekInternal(Slice targetKey)
     {
-        for (InternalIterator file : files) {
+        for (SeekingIterator<Slice,Slice> file : files) {
             file.seek(targetKey);
         }
         resetPriorityQueue(comparator);
     }
 
-    private void resetPriorityQueue(Comparator<InternalKey> comparator)
+    private void resetPriorityQueue(Comparator<Slice> comparator)
     {
         int i = 1;
-        for (InternalIterator file : files) {
+        for (SeekingIterator<Slice,Slice> file : files) {
             if (file.hasNext()) {
                 priorityQueue.add(new ComparableIterator(file, comparator, i++, file.next()));
             }
@@ -73,9 +74,9 @@ public final class MergingIterator
     }
 
     @Override
-    protected Entry<InternalKey, Slice> getNextElement()
+    protected Entry<Slice, Slice> getNextElement()
     {
-        Entry<InternalKey, Slice> result = null;
+        Entry<Slice, Slice> result = null;
         ComparableIterator nextIterator = priorityQueue.poll();
         if (nextIterator != null) {
             result = nextIterator.next();
@@ -98,14 +99,14 @@ public final class MergingIterator
     }
 
     private static class ComparableIterator
-            implements Iterator<Entry<InternalKey, Slice>>, Comparable<ComparableIterator>
+            implements Iterator<Entry<Slice, Slice>>, Comparable<ComparableIterator>
     {
-        private final InternalIterator iterator;
-        private final Comparator<InternalKey> comparator;
+        private final SeekingIterator<Slice,Slice> iterator;
+        private final Comparator<Slice> comparator;
         private final int ordinal;
-        private Entry<InternalKey, Slice> nextElement;
+        private Entry<Slice, Slice> nextElement;
 
-        private ComparableIterator(InternalIterator iterator, Comparator<InternalKey> comparator, int ordinal, Entry<InternalKey, Slice> nextElement)
+        private ComparableIterator(SeekingIterator<Slice,Slice> iterator, Comparator<Slice> comparator, int ordinal, Entry<Slice, Slice> nextElement)
         {
             this.iterator = iterator;
             this.comparator = comparator;
@@ -120,13 +121,13 @@ public final class MergingIterator
         }
 
         @Override
-        public Entry<InternalKey, Slice> next()
+        public Entry<Slice, Slice> next()
         {
             if (nextElement == null) {
                 throw new NoSuchElementException();
             }
 
-            Entry<InternalKey, Slice> result = nextElement;
+            Entry<Slice, Slice> result = nextElement;
             if (iterator.hasNext()) {
                 nextElement = iterator.next();
             }

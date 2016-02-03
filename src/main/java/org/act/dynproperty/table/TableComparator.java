@@ -20,7 +20,7 @@ public class TableComparator implements UserComparator
     {
         if( null == instence )
         {
-            instence = new TableComparator( new BytewiseComparator() );
+            instence = new TableComparator( new FixedIdComparator() );
         }
         return instence;
     }

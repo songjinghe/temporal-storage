@@ -25,30 +25,32 @@ import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.act.dynproperty.util.InternalIterator;
+import org.act.dynproperty.table.UserComparator;
 import org.act.dynproperty.util.Slice;
 
-import static org.act.dynproperty.util.SizeOf.SIZE_OF_LONG;
-import static org.act.dynproperty.util.SizeOf.SIZE_OF_INT;
-
 public class MemTable
-        implements SeekingIterable<InternalKey, Slice>
+        implements SeekingIterable<Slice, Slice>
 {
-    private final ConcurrentSkipListMap<InternalKey, Slice> table;
+    private final ConcurrentSkipListMap<Slice, MemEntry> table;
     private final AtomicLong approximateMemoryUsage = new AtomicLong();
     
     //Start time of the MemTable
-    private int start;
+    private int start = Integer.MAX_VALUE;
+    private int end = -1;
 
-    public MemTable(InternalKeyComparator internalKeyComparator, int startTime )
+    public MemTable(UserComparator internalKeyComparator )
     {
         table = new ConcurrentSkipListMap<>(internalKeyComparator);
-        this.start = startTime;
     }
 
     public int getStartTime()
     {
         return start;
+    }
+    
+    public int getEndTime()
+    {
+        return end;
     }
     
     public boolean isEmpty()
@@ -61,39 +63,36 @@ public class MemTable
         return approximateMemoryUsage.get();
     }
 
-    public void add( Slice id,  ValueType valueType, int startTime, Slice value )
+    public void add( Slice key, Slice value )
     {
-        Preconditions.checkNotNull(valueType, "valueType is null");
-        Preconditions.checkNotNull(id, "key is null");
-        Preconditions.checkNotNull(valueType, "valueType is null");
-        
-        InternalKey internalKey = new InternalKey(id, startTime, valueType);
-        table.put(internalKey, value);
+        Preconditions.checkArgument( key.length() == 20, "key should all be 20 bytes" );
+        InternalKey internalKey = new InternalKey( key );
+        int startTime = internalKey.getStartTime();
+        if( startTime < this.start )
+            this.start = startTime;
+        if( startTime > this.end )
+            this.end = startTime;
+        table.put(key, new MemEntry( key, value ));
 
-        approximateMemoryUsage.addAndGet( SIZE_OF_LONG + SIZE_OF_INT + SIZE_OF_LONG + value.length());
+        approximateMemoryUsage.addAndGet( key.length() + value.length());
     }
 
-    public LookupResult get(LookupKey key)
+    public Slice get(Slice key)
     {
         Preconditions.checkNotNull(key, "key is null");
 
-        InternalKey internalKey = key.getInternalKey();
         //Entry<InternalKey, Slice> entry = table.ceilingEntry(internalKey);
-        Entry<InternalKey, Slice > entry = table.floorEntry( internalKey );
+        Entry<Slice, MemEntry > entry = table.floorEntry( key );
         if (entry == null) {
             return null;
         }
 
-        InternalKey entryKey = entry.getKey();
-        if (entryKey.getId().equals(key.getId())) {
-            if (entryKey.getValueType() == ValueType.DELETION) {
-                return LookupResult.deleted(key);
-            }
-            else {
-                return LookupResult.ok(key, entry.getValue());
-            }
-        }
-        return null;
+        Slice entryKey = entry.getValue().getKey();
+        InternalKey ansKey = new InternalKey( entryKey );
+        InternalKey lookKey = new InternalKey( key );
+        if( !ansKey.getId().equals( lookKey.getId() ) )
+            return null;
+        return entry.getValue().getValue().copySlice( 0, ansKey.getValueLength() );
     }
 
     @Override
@@ -102,10 +101,45 @@ public class MemTable
         return new MemTableIterator();
     }
 
-    public class MemTableIterator
-            implements InternalIterator
+    
+    private class MemEntry implements Entry<Slice,Slice>
     {
-        private PeekingIterator<Entry<InternalKey, Slice>> iterator;
+
+        private Slice key;
+        private Slice value;
+        
+        MemEntry(Slice key, Slice value)
+        {
+            this.key = key;
+            this.value = value;
+        }
+        
+        @Override
+        public Slice getKey()
+        {
+            return key;
+        }
+
+        @Override
+        public Slice getValue()
+        {
+            return value;
+        }
+
+        @Override
+        public Slice setValue( Slice value )
+        {
+            Slice former = this.value;
+            this.value = value;
+            return former;
+        }
+        
+    }
+    
+    public class MemTableIterator
+            implements SeekingIterator<Slice,Slice>
+    {
+        private PeekingIterator<Entry<Slice, MemEntry>> iterator;
 
         public MemTableIterator()
         {
@@ -125,24 +159,29 @@ public class MemTable
         }
 
         @Override
-        public void seek(InternalKey targetKey)
+        public void seek(Slice targetKey)
         {
-            InternalKey fromkey = MemTable.this.table.floorKey( targetKey );
-            iterator = Iterators.peekingIterator(table.tailMap(fromkey).entrySet().iterator());
+            Slice fromkey = MemTable.this.table.floorKey( targetKey );
+            if( null == fromkey )
+            {
+                iterator = Iterators.peekingIterator(table.entrySet().iterator());
+            }
+            else    
+                iterator = Iterators.peekingIterator(table.tailMap(fromkey).entrySet().iterator());
         }
 
         @Override
-        public InternalEntry peek()
+        public Entry<Slice, Slice> peek()
         {
-            Entry<InternalKey, Slice> entry = iterator.peek();
-            return new InternalEntry(entry.getKey(), entry.getValue());
+            Entry<Slice, MemEntry> entry = iterator.peek();
+            return entry.getValue();
         }
 
         @Override
-        public InternalEntry next()
+        public Entry<Slice, Slice> next()
         {
-            Entry<InternalKey, Slice> entry = iterator.next();
-            return new InternalEntry(entry.getKey(), entry.getValue());
+            Entry<Slice, MemEntry> entry = iterator.next();
+            return entry.getValue();
         }
 
         @Override

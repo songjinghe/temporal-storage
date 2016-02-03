@@ -91,7 +91,8 @@ public class BlockBuilder
 
         return block.size() +                              // raw data buffer
                 restartPositions.size() * SIZE_OF_INT +    // restart positions
-                SIZE_OF_INT;                               // restart position size
+                SIZE_OF_INT +                              // restart position size
+                SIZE_OF_INT;                               // data size
     }
 
     public void add(BlockEntry blockEntry)
@@ -107,7 +108,7 @@ public class BlockBuilder
         Preconditions.checkState(!finished, "block is finished");
         Preconditions.checkPositionIndex(restartBlockEntryCount, blockRestartInterval);
 
-        Preconditions.checkArgument(lastKey == null || comparator.compare(key, lastKey) > 0, "key %s must be greater than last key %s",key,lastKey);
+        Preconditions.checkArgument(lastKey == null || comparator.compare(key, lastKey) >= 0, "key %s must be greater than last key %s",key,lastKey);
 
         int sharedKeyBytes = 0;
         if (restartBlockEntryCount < blockRestartInterval) {
@@ -119,6 +120,9 @@ public class BlockBuilder
             restartBlockEntryCount = 0;
         }
 
+        //stop using the sharedkey, make easy for update the record
+        sharedKeyBytes = 0;
+        
         int nonSharedKeyBytes = key.length() - sharedKeyBytes;
 
         // write "<shared><non_shared><value_size>"
@@ -167,6 +171,6 @@ public class BlockBuilder
                 block.writeInt(0);
             }
         }
-        return block.slice();
+        return block.slice( block.size() );
     }
 }
