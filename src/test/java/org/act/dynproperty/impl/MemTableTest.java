@@ -1,74 +1,130 @@
 package org.act.dynproperty.impl;
 
-import java.util.LinkedList;
-import java.util.List;
+import java.util.Map.Entry;
 
 import junit.framework.Assert;
 
-import org.act.dynproperty.table.MemTableComparator;
+import org.act.dynproperty.impl.MemTable.MemTableIterator;
+import org.act.dynproperty.table.TableComparator;
 import org.act.dynproperty.util.Slice;
-import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
-/**
- * 测试的数据为多个id，每个id有多个时间，时间以10为间隔。
- *
- *
- * @author huanghx( huanghx@act.buaa.edu.cn )
- */
 public class MemTableTest
 { 
-    private List<Long> ids = new LinkedList<Long>();
-    private List<Integer> times = new LinkedList<Integer>();
-    private MemTable table;
-    private final int NUM = 10;
+    private static MemTable table;
+    private final static int TIME_NUMS = 100;
+    private final static int PRO_NUMS = 50;
+    private final static int ID_NUMS = 100;
 
-    @Before
-    public void setUp()
+    @BeforeClass
+    public static void setUp()
     {
-        for( long i = 0; i < NUM; i++ )
+        table = new MemTable( TableComparator.instence() );
+        for( long i = 0; i<ID_NUMS; i++ )
         {
-            ids.add( i );
-            times.add( (int)i * 10 );
-        }
-        table = new MemTable( MemTableComparator.instence(), 0 );
-        for( int i = 0; i<ids.size(); i++ )
-        {
-            for( int t = 0; t<times.size(); t++ )
+            for( int p = 0; p<PRO_NUMS; p++ )
             {
-                long id = ids.get( i );
-                int time = times.get( t );
-                Slice idSlice = new Slice( 12 );
-                idSlice.setLong( 0, id );
-//                byte[] bytes = idSlice.getBytes();
-//                for( int j = 0; j<8; j++ )
-//                    bytes[j] += (byte)'0';
-//                idSlice.setBytes( 0, bytes, 0, 8 );
-                Slice valueSlice = new Slice( 4 );
-                valueSlice.setInt( 0, time );
-                table.add( idSlice, ValueType.VALUE, time, valueSlice );
+                for( int t = 0; t<TIME_NUMS; t++ )
+                {
+                    Slice idSlice = new Slice( 12 );
+                    idSlice.setLong( 0, i );
+                    idSlice.setInt( 8, p );
+                    Slice value = new Slice( 20 );
+                    value.setLong( 0, i );
+                    value.setInt( 8, p );
+                    long sequence = SequenceNumber.packSequenceAndValueType( t, 20, ValueType.VALUE );
+                    value.setLong( 12, sequence );
+                    InternalKey key = new InternalKey( idSlice, t, 20, ValueType.VALUE );
+                    table.add( key.encode(), value );
+                }
+            }
+        }
+    }
+    
+    
+    @Test
+    public void testChangeKey()
+    {
+        for( long i = 0; i<ID_NUMS; i++ )
+        {
+            for( int p = 0; p<PRO_NUMS; p++ )
+            {
+                for( int t = 0; t<TIME_NUMS; t++ )
+                {
+                    Slice idSlice = new Slice(12);
+                    idSlice.setLong( 0, i );
+                    idSlice.setInt( 8, p );
+                    Slice key = new InternalKey( idSlice, t, 20, ValueType.DELETION ).encode();
+                    Slice newvalue = new Slice( 20 );
+                    newvalue.setLong( 0, i );
+                    newvalue.setInt( 8, p );
+                    long sequnence = SequenceNumber.packSequenceAndValueType( t, 20, ValueType.VALUE );
+                    newvalue.setLong( 12, sequnence );
+                    table.add( key, newvalue );
+                }
+            }
+        }
+        MemTableIterator iterator = table.iterator();
+        for( long i = 0; i<ID_NUMS; i++ )
+        {
+            for( int p = 0; p<PRO_NUMS; p++ )
+            {
+                for( int t = 0; t<TIME_NUMS; t++ )
+                {
+                    Entry<Slice,Slice> entry = iterator.next();
+                    InternalKey valuekey = new InternalKey( entry.getValue() );
+                    InternalKey key = new InternalKey( entry.getKey() );
+                    Slice idSlice = new Slice( 12 );
+                    idSlice.setLong( 0, i );
+                    idSlice.setInt( 8, p );
+                    Assert.assertEquals( idSlice, valuekey.getId() );
+                    Assert.assertEquals( ValueType.VALUE.getPersistentId(), valuekey.getValueType().getPersistentId() );
+                    Assert.assertEquals( ValueType.DELETION.getPersistentId(), key.getValueType().getPersistentId() );
+                }
             }
         }
     }
     
     @Test
-    public void testValue()
+    public void testChangeValue()
     {
-        for( int i = 0; i< NUM; i++ )
+        for( long i = 0; i<ID_NUMS; i++ )
         {
-            for( int t = 0; t<times.size(); t++ )
+            for( int p = 0; p<PRO_NUMS; p++ )
             {
-                long id = ids.get( i );
-                int time = times.get( t );
-                Slice idSlice = new Slice( 12 );
-                idSlice.setLong( 0, id );
-//                byte[] bytes = idSlice.getBytes();
-//                for( int j = 0; j<8; j++ )
-//                    bytes[j] += (byte)'0';
-//                idSlice.setBytes( 0, bytes, 0, 8 );
-                LookupKey key = new LookupKey( idSlice, time );
-                LookupResult result = table.get( key );
-                Assert.assertEquals( (int)times.get( t ), result.getValue().getInt( 0 ) );
+                for( int t = 0; t<TIME_NUMS; t++ )
+                {
+                    Slice idSlice = new Slice(12);
+                    idSlice.setLong( 0, i );
+                    idSlice.setInt( 8, p );
+                    Slice key = new InternalKey( idSlice, t, 20, ValueType.VALUE ).encode();
+                    Slice newvalue = new Slice( 20 );
+                    newvalue.setLong( 0, i+1 );
+                    newvalue.setInt( 8, p+1 );
+                    long sequnence = SequenceNumber.packSequenceAndValueType( t, 20, ValueType.DELETION );
+                    newvalue.setLong( 12, sequnence );
+                    table.add( key, newvalue );
+                }
+            }
+        }
+        MemTableIterator iterator = table.iterator();
+        for( long i = 0; i<ID_NUMS; i++ )
+        {
+            for( int p = 0; p<PRO_NUMS; p++ )
+            {
+                for( int t = 0; t<TIME_NUMS; t++ )
+                {
+                    Entry<Slice,Slice> entry = iterator.next();
+                    InternalKey valuekey = new InternalKey( entry.getValue() );
+                    InternalKey key = new InternalKey( entry.getKey() );
+                    Slice idSlice = new Slice( 12 );
+                    idSlice.setLong( 0, i+1 );
+                    idSlice.setInt( 8, p+1 );
+                    Assert.assertEquals( idSlice, valuekey.getId() );
+                    Assert.assertEquals( ValueType.DELETION.getPersistentId(), valuekey.getValueType().getPersistentId() );
+                    Assert.assertEquals( ValueType.VALUE.getPersistentId(), key.getValueType().getPersistentId() );
+                }
             }
         }
     }

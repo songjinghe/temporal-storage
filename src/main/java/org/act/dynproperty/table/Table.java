@@ -72,10 +72,10 @@ public abstract class Table
         return new TableIterator(this, indexBlock.iterator());
     }
     
-    public TableLatestValueIterator lastestValueIterator()
-    {
-        return new TableLatestValueIterator( this, indexBlock.iterator() );
-    }
+//    public TableLatestValueIterator lastestValueIterator()
+//    {
+//        return new TableLatestValueIterator( this, indexBlock.iterator() );
+//    }
 
     public Block openBlock(Slice blockEntry)
     {

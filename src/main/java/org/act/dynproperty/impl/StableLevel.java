@@ -11,8 +11,11 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.act.dynproperty.Level;
+import org.act.dynproperty.impl.MemTable.MemTableIterator;
+import org.act.dynproperty.table.BufferFileAndTableIterator;
 import org.act.dynproperty.table.TableComparator;
 import org.act.dynproperty.util.Slice;
+import org.act.dynproperty.util.TableLatestValueIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -191,5 +194,29 @@ class StableLevel implements Level, StableLevelAddFile
             //FIXME
             e.printStackTrace();
         }
+    }
+    
+    @Override
+    public SeekingIterator<Slice,Slice> getlastFileIterator()
+    {
+        if( this.files.size() > 0 )
+        {
+            SeekingIterator<Slice,Slice> table = this.cache.newIterator( this.files.get( this.files.size()-1 ).getNumber() );
+            if( this.fileBuffers.get( this.files.size()-1 ) != null )
+            {
+                MemTableIterator buffer = this.fileBuffers.get( this.files.size()-1 ).iterator();
+                table = new BufferFileAndTableIterator( buffer, table, TableComparator.instence() );
+            }
+            return new TableLatestValueIterator( table );
+        }
+        return null;
+    }
+    @Override
+    public int getlastBoundary()
+    {
+        if(this.files.size() == 0 )
+            return 0;
+        else
+            return this.files.get( this.files.size()-1 ).getLargest()+1;
     }
 }

@@ -14,6 +14,7 @@ import java.util.TreeMap;
 import java.util.Map.Entry;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.locks.Lock;
@@ -44,7 +45,7 @@ class UnstableLevel implements Level
     private TableCache cache;
     private ReentrantLock memtableLock;
     private BlockingQueue<MemTable> mergeWaitingQueue = new LinkedBlockingQueue<MemTable>();
-    private Executor mergeThread = Executors.newFixedThreadPool(1);
+    private ExecutorService mergeThread = Executors.newFixedThreadPool(1);
     private volatile boolean mergeIsHappening = false;
     private ReadWriteLock fileMetaDataLock;
     private StableLevel stLevel;
@@ -74,6 +75,7 @@ class UnstableLevel implements Level
                     }
                     catch ( Exception e )
                     {
+                        e.printStackTrace( );
                         log.error( "error happens when dump memtable to disc", e );
                     }
                     finally
@@ -300,7 +302,7 @@ class UnstableLevel implements Level
     @Override
     public boolean set( InternalKey key, Slice value )
     {
-        if( this.memTable.approximateMemoryUsage() >= 8*1024*1024 )
+        if( this.memTable.approximateMemoryUsage() >= 4*1024*1024 )
         {
             while( this.mergeIsHappening || this.mergeWaitingQueue.size() != 0 )
             {
@@ -401,6 +403,7 @@ class UnstableLevel implements Level
         {
             while(this.mergeIsHappening || this.mergeWaitingQueue.size() != 0 )
                 Thread.currentThread().sleep( 1000 );
+            this.mergeThread.shutdown();
             LogWriter writer = Logs.createLogWriter( dbDir, false );
             VersionEdit edit = new VersionEdit();
             for( FileMetaData meta : this.files.values() )

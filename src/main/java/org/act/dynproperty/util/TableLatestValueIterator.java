@@ -1,153 +1,107 @@
 package org.act.dynproperty.util;
 
+import java.util.NoSuchElementException;
 import java.util.Map.Entry;
 
-import org.act.dynproperty.impl.InternalKey;
-import org.act.dynproperty.table.Block;
-import org.act.dynproperty.table.BlockEntry;
-import org.act.dynproperty.table.BlockIterator;
-import org.act.dynproperty.table.Table;
+import org.act.dynproperty.impl.SeekingIterator;
 
-public class TableLatestValueIterator extends AbstractSeekingIterator<Slice, Slice>
+public class TableLatestValueIterator implements SeekingIterator<Slice, Slice>
 {
-    private final Table table;
-    private final BlockIterator blockIterator;
-    private BlockLatestValueIterator current;
-
-    public TableLatestValueIterator(Table table, BlockIterator blockIterator)
+    
+    private SeekingIterator<Slice,Slice> iterator;
+    private Entry<Slice,Slice> next = null;
+    private Entry<Slice,Slice> next_next = null; 
+    
+    public TableLatestValueIterator(SeekingIterator<Slice,Slice> iterator)
     {
-        this.table = table;
-        this.blockIterator = blockIterator;
-        current = null;
+        this.iterator = iterator;
     }
 
     @Override
-    protected void seekToFirstInternal()
+    public Entry<Slice,Slice> peek()
     {
-        // reset index to before first and clear the data iterator
-        blockIterator.seekToFirst();
-        current = null;
+        if( hasNext() )
+            return next;
+        else
+            throw new NoSuchElementException();
     }
 
     @Override
-    protected void seekInternal(Slice targetKey)
+    public Entry<Slice,Slice> next()
     {
-        // seek the index to the block containing the key
-        blockIterator.seek(targetKey);
+        if( hasNext() )
+        {
+            Entry<Slice,Slice> toret = this.next;
+            this.next = null;
+            return toret;
+        }
+        else
+            throw new NoSuchElementException();
+    }
 
-        // if indexIterator does not have a next, it mean the key does not exist in this iterator
-        if (blockIterator.hasNext()) {
-            // seek the current iterator to the key
-            BlockEntry pre = null;
-            if( blockIterator.peek().getKey().equals( targetKey ) )
+    private void getnext()
+    {
+        if( this.next_next == null )
+        {
+            try
             {
-                pre = blockIterator.peek();
-                blockIterator.next();
-            }
-            current = getNextBlock();
-            if( null == current )
-                current = getBlockByBlockEntry( pre );
-            current.seek(targetKey);
-        }
-        else {
-            current = null;
-        }
-    }
-
-    private BlockLatestValueIterator getBlockByBlockEntry( BlockEntry entry )
-    {
-        Slice blockHandle = entry.getValue();
-        Block dataBlock = table.openBlock(blockHandle);
-        return dataBlock.latestValueIterator();
-    }
-        
-    @Override
-    protected Entry<Slice, Slice> getNextElement()
-    {
-        // note: it must be here & not where 'current' is assigned,
-        // because otherwise we'll have called inputs.next() before throwing
-        // the first NPE, and the next time around we'll call inputs.next()
-        // again, incorrectly moving beyond the error.
-        boolean currentHasNext = false;
-        while (true) {
-            if (current != null) {
-                currentHasNext = current.hasNext();
-            }
-            if (!(currentHasNext)) {
-                if (blockIterator.hasNext()) {
-                    current = getNextBlock();
-                }
-                else {
-                    break;
+                this.next = this.iterator.next();
+                this.next_next = this.iterator.next();
+                while( this.next.getKey().copySlice( 0, 12 ).equals( this.next_next.getKey().copySlice( 0, 12 ) ) )
+                {
+                    this.next = this.next_next;
+                    this.next_next = this.iterator.next();
                 }
             }
-            else {
-                break;
-            }
+            catch( NoSuchElementException e )
+            {}
         }
-        if (currentHasNext) {
-            Entry<Slice,Slice> toret = current.next();
-            if( current.hasNext() )
-                return toret;
-            else
+        else
+        {
+            this.next = this.next_next;
+            this.next_next = this.iterator.next();
+            try
             {
-                BlockLatestValueIterator preIterator;
-                if( blockIterator.hasNext() )
+                while( this.next.getKey().copySlice( 0, 12 ).equals( this.next_next.getKey().copySlice( 0, 12 ) ) )
                 {
-                    preIterator = peekNextBlock();
-                    Entry<Slice,Slice> tempEntry = preIterator.next();
-                    InternalKey preKey = new InternalKey( toret.getKey() );
-                    InternalKey nextKey = new InternalKey( tempEntry.getKey() );
-                    if( preKey.getId().equals( nextKey.getId() ))
-                    {
-                        return getNextElement();
-                    }
-                    else
-                    {
-                        return toret;
-                    }
-                }
-                else
-                {
-                    return toret;
+                    this.next = this.next_next;
+                    this.next_next = this.iterator.next();
                 }
             }
-        }
-        else {
-            // set current to empty iterator to avoid extra calls to user iterators
-            current = null;
-            return null;
+            catch( NoSuchElementException e )
+            {
+                this.next_next = null;
+            }
         }
     }
-
-    private BlockLatestValueIterator peekNextBlock()
+    
+    @Override
+    public void remove()
     {
-        BlockEntry entry = blockIterator.peek();
-        if( null == entry )
-            return null;
-        Slice blockHandle = entry.getValue();
-        Block dataBlock = table.openBlock(blockHandle);
-        return dataBlock.latestValueIterator();
-    }
-
-    private BlockLatestValueIterator getNextBlock()
-    {
-        BlockEntry entry = blockIterator.next();
-        if( null == entry )
-            return null;
-        Slice blockHandle = entry.getValue();
-        Block dataBlock = table.openBlock(blockHandle);
-        return dataBlock.latestValueIterator();
+        next();
     }
 
     @Override
-    public String toString()
+    public boolean hasNext()
     {
-        StringBuilder sb = new StringBuilder();
-        sb.append("ConcatenatingIterator");
-        sb.append("{blockIterator=").append(blockIterator);
-        sb.append(", current=").append(current);
-        sb.append('}');
-        return sb.toString();
+        if( null != next )
+            return true;
+        else
+        {
+            getnext();
+            return (null != next);
+        }
+            
     }
+
+    @Override
+    public void seekToFirst()
+    {
+    }
+
+    @Override
+    public void seek( Slice targetKey )
+    {
+    }
+    
 }

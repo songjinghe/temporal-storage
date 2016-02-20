@@ -194,6 +194,9 @@ public class MergeProcess
             List<Long> table2evict = new LinkedList<Long>();
             
             mergeIterators.add( memTable2merge.iterator() );
+            SeekingIterator<Slice,Slice> lastFile = this.stableLevel.getlastFileIterator();
+            if( null != lastFile )
+                mergeIterators.add( this.stableLevel.getlastFileIterator() );
             channel2close.add( targetStream );
             channel2close.add( targetChannel );
             for( Long fileNumber : mergeParticipants )
@@ -228,22 +231,22 @@ public class MergeProcess
                 mergeIterators.add( mergeIterator );
             }
             MergingIterator buildIterator = new MergingIterator( mergeIterators, TableComparator.instence() );
-            int smallest = Integer.MAX_VALUE;
+            //int smallest = Integer.MAX_VALUE;
             int largest = -1;
             int count = 0;
             while( buildIterator.hasNext() )
             {
                 Entry<Slice,Slice> entry = buildIterator.next();
                 InternalKey key = new InternalKey( entry.getKey() );
-                if( key.getStartTime() < smallest )
-                    smallest = key.getStartTime();
+//                if( key.getStartTime() < smallest )
+//                    smallest = key.getStartTime();
                 if( key.getStartTime() > largest )
                     largest = key.getStartTime();
                 builder.add( entry.getKey(), entry.getValue() );
                 count++;
             }
             builder.finish();
-            FileMetaData targetMetaData = new FileMetaData( this.stableLevel.getNextFileNumber(), targetChannel.size(), smallest, largest );
+            FileMetaData targetMetaData = new FileMetaData( this.stableLevel.getNextFileNumber(), targetChannel.size(), this.stableLevel.getlastBoundary(), largest );
             this.stableLevel.addFile( targetMetaData );
             this.fileMonitor.addFile( 1, targetMetaData );
             //files.put( mergeParticipants.size(), targetMetaData );
