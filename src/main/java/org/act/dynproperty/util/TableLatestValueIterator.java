@@ -59,9 +59,9 @@ public class TableLatestValueIterator implements SeekingIterator<Slice, Slice>
         else
         {
             this.next = this.next_next;
-            this.next_next = this.iterator.next();
             try
             {
+                this.next_next = this.iterator.next();
                 while( this.next.getKey().copySlice( 0, 12 ).equals( this.next_next.getKey().copySlice( 0, 12 ) ) )
                 {
                     this.next = this.next_next;
