@@ -45,7 +45,7 @@ class UnstableLevel implements Level
     private TableCache cache;
     private ReentrantLock memtableLock;
     private BlockingQueue<MemTable> mergeWaitingQueue = new LinkedBlockingQueue<MemTable>();
-    private ExecutorService mergeThread = Executors.newFixedThreadPool(1);
+    private Thread mergeThread;
     private volatile boolean mergeIsHappening = false;
     private ReadWriteLock fileMetaDataLock;
     private StableLevel stLevel;
@@ -60,7 +60,7 @@ class UnstableLevel implements Level
         this.memtableLock = new ReentrantLock( true );
         this.fileMetaDataLock = fileLock;
         this.stLevel = stLevel;
-        this.mergeThread.execute( new Runnable()
+        this.mergeThread = new Thread( new Runnable()
         {
             @Override
             public void run()
@@ -73,10 +73,14 @@ class UnstableLevel implements Level
                         mergeIsHappening = true;
                         UnstableLevel.this.startMergeProcess( temp );
                     }
-                    catch ( Exception e )
+                    catch ( IOException e )
                     {
                         e.printStackTrace( );
                         log.error( "error happens when dump memtable to disc", e );
+                    }
+                    catch ( InterruptedException e )
+                    {
+                        return;
                     }
                     finally
                     {
@@ -85,6 +89,7 @@ class UnstableLevel implements Level
                 }
             }
         } );
+        this.mergeThread.start();
     }
     
     public void initfromdisc( FileMetaData metaData )
@@ -329,7 +334,7 @@ class UnstableLevel implements Level
         return true;
     }
 
-    private void startMergeProcess( MemTable temp ) throws Exception
+    private void startMergeProcess( MemTable temp ) throws IOException
     {
         SeekingIterator<Slice,Slice> iterator = temp.iterator();
         this.stableMemTable = new MemTable( TableComparator.instence() );
@@ -347,7 +352,7 @@ class UnstableLevel implements Level
         this.stableMemTable = null;
     }
 
-    private void insert2fileBuffer( InternalKey key, Slice value ) throws Exception
+    private void insert2fileBuffer( InternalKey key, Slice value ) throws IOException
     {
         int insertTime = key.getStartTime();
         if( insertTime <= this.stLevel.getTimeBoundary() )
@@ -403,7 +408,9 @@ class UnstableLevel implements Level
         {
             while(this.mergeIsHappening || this.mergeWaitingQueue.size() != 0 )
                 Thread.currentThread().sleep( 1000 );
-            this.mergeThread.shutdown();
+            this.mergeThread.interrupt();
+            while( mergeThread.isAlive() )
+                this.mergeThread.interrupt();
             LogWriter writer = Logs.createLogWriter( dbDir, false );
             VersionEdit edit = new VersionEdit();
             for( FileMetaData meta : this.files.values() )

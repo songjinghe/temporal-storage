@@ -47,7 +47,7 @@ public class UnSortedTable implements Closeable
         }
     }
     
-    public void add( Slice key, Slice value ) throws Exception
+    public void add( Slice key, Slice value ) throws IOException
     {
         this.channel.position( writePostion );
         ByteBuffer byteBuffer = ByteBuffer.allocate( key.length() + value.length() + SIZE_OF_INT + SIZE_OF_INT );

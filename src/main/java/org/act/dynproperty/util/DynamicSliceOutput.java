@@ -213,7 +213,8 @@ public class DynamicSliceOutput
     {
         if( new Options().blockEmptyRatio() == 1.0f )
         {
-            this.slice.setInt( size, size );
+            slice = Slices.ensureSize(slice, size+4 );
+            slice.setInt( size, size );
             return slice.slice( 0, size+4 );
         }
         this.slice.setInt( slice.length() - SIZE_OF_INT, size );

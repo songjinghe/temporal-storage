@@ -31,7 +31,7 @@ public class FileBuffer implements Closeable
         }
     }
     
-    public void add( Slice key, Slice value ) throws Exception
+    public void add( Slice key, Slice value ) throws IOException
     {
         discTable.add( key, value );
         this.memTable.add( key, value );
