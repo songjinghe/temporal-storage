@@ -14,8 +14,10 @@ import org.act.dynproperty.Level;
 import org.act.dynproperty.impl.MemTable.MemTableIterator;
 import org.act.dynproperty.table.BufferFileAndTableIterator;
 import org.act.dynproperty.table.TableComparator;
+import org.act.dynproperty.table.TableIterator;
 import org.act.dynproperty.util.Slice;
 import org.act.dynproperty.util.TableLatestValueIterator;
+import org.act.dynproperty.util.TimeIntervalUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -124,10 +126,53 @@ class StableLevel implements Level, StableLevelAddFile
         return null;
     }
     @Override
-    public Slice getRangeValue( Slice idSlice, int startTime, int endTime, RangeQueryCallBack callback )
+    public void getRangeValue( Slice idSlice, int startTime, int endTime, RangeQueryCallBack callback )
     {
-        // TODO Auto-generated method stub
-        return null;
+        for( FileMetaData metaData : this.files.values() )
+        {
+            if( null == metaData )
+                continue;
+            if( metaData.getSmallest() > endTime )
+                break;
+            if( TimeIntervalUtil.Union( startTime, endTime, metaData.getSmallest(), metaData.getLargest() ) )
+            {
+                int start = Math.max( startTime, metaData.getSmallest() );
+                int end = Math.min( endTime, metaData.getLargest() );
+                InternalKey searchKey = new InternalKey( idSlice, start, 0, ValueType.VALUE );
+                SeekingIterator<Slice,Slice> iterator = this.cache.newIterator( metaData.getNumber() );
+                iterator.seek( searchKey.encode() );
+                while( iterator.hasNext() )
+                {
+                    Entry<Slice,Slice> entry = iterator.next();
+                    InternalKey key = new InternalKey( entry.getKey() );
+                    if( key.getId().equals( idSlice ) && key.getStartTime() <= end && key.getValueType().getPersistentId() != ValueType.INVALID.getPersistentId() )
+                    {
+                        callback.onCall( entry.getValue() );
+                    }
+                    else
+                        break;
+                }
+                FileBuffer buffer = this.fileBuffers.get( (int)metaData.getNumber() );
+                if( null != buffer )
+                {
+                    MemTableIterator bufferiterator = buffer.iterator();
+                    bufferiterator.seek( searchKey.encode() );
+                    while( bufferiterator.hasNext() )
+                    {
+                        Entry<Slice,Slice> entry = bufferiterator.next();
+                        InternalKey key = new InternalKey( entry.getKey() );
+                        if( key.getId().equals( idSlice ) && key.getStartTime() <= end 
+                                && key.getValueType().getPersistentId() != ValueType.INVALID.getPersistentId()
+                                && key.getValueType().getPersistentId() != ValueType.DELETION.getPersistentId())
+                        {
+                            callback.onCall( entry.getValue() );
+                        }
+                        else
+                            break;
+                    }
+                }
+            }
+        }
     }
     @Override
     public boolean set( InternalKey key, Slice value )

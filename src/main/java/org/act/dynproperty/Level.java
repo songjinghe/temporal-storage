@@ -9,7 +9,7 @@ import org.act.dynproperty.util.Slice;
 public interface Level
 {
     public Slice getPointValue( Slice idSlice, int time );
-    public Slice getRangeValue( Slice idSlice, int startTime, int endTime, RangeQueryCallBack callback );
+    public void getRangeValue( Slice idSlice, int startTime, int endTime, RangeQueryCallBack callback );
     public boolean set( InternalKey key, Slice value );
     public void initfromdisc( FileMetaData metaData );
 }
