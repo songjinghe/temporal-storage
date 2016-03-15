@@ -1,7 +1,13 @@
 package org.act.dynproperty.impl;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.channels.FileChannel;
+import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -13,8 +19,11 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.act.dynproperty.Level;
 import org.act.dynproperty.impl.MemTable.MemTableIterator;
 import org.act.dynproperty.table.BufferFileAndTableIterator;
+import org.act.dynproperty.table.Table;
+import org.act.dynproperty.table.TableBuilder;
 import org.act.dynproperty.table.TableComparator;
 import org.act.dynproperty.table.TableIterator;
+import org.act.dynproperty.util.MergingIterator;
 import org.act.dynproperty.util.Slice;
 import org.act.dynproperty.util.TableLatestValueIterator;
 import org.act.dynproperty.util.TimeIntervalUtil;
@@ -23,18 +32,19 @@ import org.slf4j.LoggerFactory;
 
 class StableLevel implements Level, StableLevelAddFile
 {
-    private SortedMap<Integer,FileMetaData> files;
-    private SortedMap<Integer,FileBuffer> fileBuffers;
+    private SortedMap<Long,FileMetaData> files;
+    private SortedMap<Long,FileBuffer> fileBuffers;
     private String dbDir;
     private TableCache cache;
     private static Logger log = LoggerFactory.getLogger( StableLevel.class );
     private ReadWriteLock fileMetaLock;
+    private final int bufferMergeboundary = 2;
     
     StableLevel( String dbDir, ReadWriteLock fileLock )
     {
         this.dbDir = dbDir;
-        this.files = new TreeMap<Integer,FileMetaData>();
-        this.fileBuffers = new TreeMap<Integer,FileBuffer>();
+        this.files = new TreeMap<Long,FileMetaData>();
+        this.fileBuffers = new TreeMap<Long,FileBuffer>();
         this.cache = new TableCache( new File( dbDir ), 20, TableComparator.instence(), false, true );
         this.fileMetaLock = fileLock;
     }
@@ -42,19 +52,25 @@ class StableLevel implements Level, StableLevelAddFile
     {
         try
         {
-            this.files.put( (int)metaData.getNumber(), metaData );
+            this.files.put( metaData.getNumber(), metaData );
             String bufferName = Filename.stbufferFileName( metaData.getNumber() );
-            FileBuffer buffer = new FileBuffer( bufferName, this.dbDir + "/" + bufferName );
-            this.fileBuffers.put( (int)metaData.getNumber(), buffer );
+            File bufferfile = new File(this.dbDir + "/" + bufferName );
+            if( bufferfile.exists() )
+            {
+                FileBuffer buffer = new FileBuffer( bufferName, this.dbDir + "/" + bufferName );
+                this.fileBuffers.put( metaData.getNumber(), buffer );
+            }
+            else
+                this.fileBuffers.put( metaData.getNumber(), null );
         }
         catch( IOException e )
         {
             log.error( "Error happens when load bufferfile:" + metaData.getNumber() + " contents!" );
         }
     }
-    int getTimeBoundary()
+    long getTimeBoundary()
     {
-        int lastNumber = -1;
+        long lastNumber = -1l;
         try
         {
             lastNumber = this.files.lastKey();
@@ -70,7 +86,7 @@ class StableLevel implements Level, StableLevelAddFile
     {
         InternalKey searchKey = new InternalKey( idSlice, time, 0, ValueType.VALUE );
         this.fileMetaLock.readLock().lock();
-        for( Integer fileNumber : this.files.keySet() )
+        for( long fileNumber : this.files.keySet() )
         {
             FileMetaData meta = this.files.get( fileNumber );
             if( null != meta && time >= meta.getSmallest() && time <= meta.getLargest() )
@@ -128,6 +144,7 @@ class StableLevel implements Level, StableLevelAddFile
     @Override
     public void getRangeValue( Slice idSlice, int startTime, int endTime, RangeQueryCallBack callback )
     {
+        this.fileMetaLock.readLock().lock();
         for( FileMetaData metaData : this.files.values() )
         {
             if( null == metaData )
@@ -152,7 +169,7 @@ class StableLevel implements Level, StableLevelAddFile
                     else
                         break;
                 }
-                FileBuffer buffer = this.fileBuffers.get( (int)metaData.getNumber() );
+                FileBuffer buffer = this.fileBuffers.get( metaData.getNumber() );
                 if( null != buffer )
                 {
                     MemTableIterator bufferiterator = buffer.iterator();
@@ -173,6 +190,7 @@ class StableLevel implements Level, StableLevelAddFile
                 }
             }
         }
+        this.fileMetaLock.readLock().unlock();
     }
     @Override
     public boolean set( InternalKey key, Slice value )
@@ -191,7 +209,8 @@ class StableLevel implements Level, StableLevelAddFile
     private void insert2Bufferfile( InternalKey key, Slice value ) throws Exception
     {
         int insertTime = key.getStartTime();
-        for( Integer fileNumber : this.files.keySet() )
+        this.fileMetaLock.writeLock().lock();
+        for( long fileNumber : this.files.keySet() )
         {
             FileMetaData metaData = this.files.get( fileNumber );
             if( null == metaData )
@@ -208,11 +227,50 @@ class StableLevel implements Level, StableLevelAddFile
                 break;
             }
         }
+        this.fileMetaLock.writeLock().unlock();
     }
     @Override
-    public void addFile( FileMetaData file )
+    public void addFile( FileMetaData file ) throws IOException
     {
-        this.files.put( (int)file.getNumber(), file );
+        this.fileMetaLock.writeLock().lock();
+        this.files.put( file.getNumber(), file );
+        if( this.files.size() >= bufferMergeboundary )
+        {
+            FileMetaData metafile = this.files.get( (long)this.files.size()- bufferMergeboundary );
+            Table table = this.cache.newTable( metafile.getNumber() );
+            FileBuffer buffer = this.fileBuffers.get( (long)this.files.size()- bufferMergeboundary );
+            if( null != buffer )
+            {
+                String tempfilename = Filename.tempFileName( 5 );
+                File tempFile = new File(this.dbDir + "/" + tempfilename );
+                if( !tempFile.exists() )
+                    tempFile.createNewFile();
+                FileOutputStream stream = new FileOutputStream( tempFile );
+                FileChannel channel = stream.getChannel();
+                TableBuilder builder = new TableBuilder( new Options(), channel, TableComparator.instence() );
+                List<SeekingIterator<Slice,Slice>> iterators = new ArrayList<SeekingIterator<Slice,Slice>>(2);
+                SeekingIterator<Slice,Slice> iterator = new BufferFileAndTableIterator( buffer.iterator(), table.iterator(), TableComparator.instence() );
+                iterators.add( iterator );
+                MergingIterator mergeIterator = new MergingIterator( iterators, TableComparator.instence() );
+                while( mergeIterator.hasNext() )
+                {
+                    Entry<Slice,Slice> entry = mergeIterator.next();
+                    builder.add( entry.getKey(), entry.getValue() );
+                }
+                builder.finish();
+                channel.close();
+                stream.close();
+                table.close();
+                this.cache.evict( metafile.getNumber() );
+                File originFile = new File( this.dbDir + "/" + Filename.stableFileName( metafile.getNumber() ));
+                Files.delete( originFile.toPath() );
+                buffer.close();
+                Files.delete( new File( this.dbDir + "/" + Filename.stbufferFileName( metafile.getNumber() ) ).toPath() );
+                this.fileBuffers.put( metafile.getNumber(), null );
+                tempFile.renameTo( new File( this.dbDir + "/" + Filename.stableFileName( metafile.getNumber() ) ) );
+            }
+        }
+        this.fileMetaLock.writeLock().unlock();
     }
     @Override
     public long getNextFileNumber()
@@ -246,10 +304,10 @@ class StableLevel implements Level, StableLevelAddFile
     {
         if( this.files.size() > 0 )
         {
-            SeekingIterator<Slice,Slice> table = this.cache.newIterator( this.files.get( this.files.size()-1 ).getNumber() );
-            if( this.fileBuffers.get( this.files.size()-1 ) != null )
+            SeekingIterator<Slice,Slice> table = this.cache.newIterator( this.files.get( (long)this.files.size()-1 ).getNumber() );
+            if( this.fileBuffers.get( (long)this.files.size()-1 ) != null )
             {
-                MemTableIterator buffer = this.fileBuffers.get( this.files.size()-1 ).iterator();
+                MemTableIterator buffer = this.fileBuffers.get( (long)this.files.size()-1 ).iterator();
                 table = new BufferFileAndTableIterator( buffer, table, TableComparator.instence() );
             }
             return new TableLatestValueIterator( table );
@@ -262,6 +320,6 @@ class StableLevel implements Level, StableLevelAddFile
         if(this.files.size() == 0 )
             return 0;
         else
-            return this.files.get( this.files.size()-1 ).getLargest()+1;
+            return this.files.get( (long)this.files.size()-1 ).getLargest()+1;
     }
 }

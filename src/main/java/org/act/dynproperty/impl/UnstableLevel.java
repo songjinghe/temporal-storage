@@ -100,8 +100,14 @@ class UnstableLevel implements Level
         {
             this.files.put( metaData.getNumber(), metaData );
             String bufferName = Filename.bufferFileName( metaData.getNumber() );
-            FileBuffer buffer = new FileBuffer( bufferName, this.dbDir + "/" + bufferName );
-            this.fileBuffers.put( metaData.getNumber(), buffer );
+            File bufferfile = new File(this.dbDir + "/" + bufferName );
+            if( bufferfile.exists() )
+            {
+                FileBuffer buffer = new FileBuffer( bufferName, this.dbDir + "/" + bufferName );
+                this.fileBuffers.put( metaData.getNumber(), buffer );
+            }
+            else
+                this.fileBuffers.put( metaData.getNumber(), null );
         }
         catch( IOException e )
         {

@@ -137,9 +137,9 @@ public class DynPropertyStoreImpl implements DynPropertyStore
         idSlice.setLong( 0, id );
         idSlice.setInt( 8, proId );
         if( startTime < this.stlevel.getTimeBoundary() )
-            this.stlevel.getRangeValue( idSlice, startTime, Math.min( this.stlevel.getTimeBoundary(), endTime ), callback );
+            this.stlevel.getRangeValue( idSlice, startTime, Math.min( (int)this.stlevel.getTimeBoundary(), endTime ), callback );
         if( endTime >= this.stlevel.getTimeBoundary() )
-            this.unLevel.getRangeValue( idSlice, Math.max( this.stlevel.getTimeBoundary(), startTime ), endTime, callback );
+            this.unLevel.getRangeValue( idSlice, Math.max( (int)this.stlevel.getTimeBoundary(), startTime ), endTime, callback );
         return callback.onReturn();
     }
 
