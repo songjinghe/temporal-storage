@@ -6,6 +6,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -37,7 +39,7 @@ import org.slf4j.LoggerFactory;
 /**
  * UnStableLevel，所有的UnStableFile和MemTable相关信息保存的地方
  */
-class UnstableLevel implements Level
+public class UnstableLevel implements Level
 {
 	/**
 	 * 所有的UnStableFile的元信息
@@ -114,6 +116,7 @@ class UnstableLevel implements Level
                     finally
                     {
                         mergeIsHappening = false;
+                        dumpFileMeta2disc();
                     }
                 }
             }
@@ -449,7 +452,7 @@ class UnstableLevel implements Level
             }
         }
         this.memtableLock.lock();
-        this.memTable.add( key.encode(), value );
+        this.memTable.add(key.encode(), value);
         if( !mergeIsHappening && this.memTable.approximateMemoryUsage() >= 4*1024*1024 )
         {
             MemTable temp = this.memTable;
@@ -478,7 +481,7 @@ class UnstableLevel implements Level
             else
                 this.stableMemTable.add( entry.getKey(), entry.getValue() );
         }
-        this.mergeProcess.merge( stableMemTable, this.files, this.fileBuffers, this.cache );
+        this.mergeProcess.merge(stableMemTable, this.files, this.fileBuffers, this.cache);
         this.memTableBoundary = stableMemTable.getEndTime()+1;
         this.stableMemTable = null;
     }
@@ -553,6 +556,44 @@ class UnstableLevel implements Level
             this.mergeThread.interrupt();
             while( mergeThread.isAlive() )
                 this.mergeThread.interrupt();
+            forceFileMetaToDisk();
+        }
+        catch ( InterruptedException e )
+        {
+            //FIXME
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * this method is called and blocked until merge process complete.
+     */
+    public synchronized void forceMemTableMerge()
+    {
+        if( ! mergeIsHappening )
+        {
+            MemTable temp = this.memTable;
+            this.mergeWaitingQueue.offer( temp );
+            this.memTable = new MemTable( TableComparator.instence() );
+        }
+        while (this.mergeIsHappening || this.mergeWaitingQueue.size() != 0)
+        {
+            try {
+                Thread.currentThread().sleep(50);
+            } catch (InterruptedException e) {
+                //FIXME
+                e.printStackTrace();
+            }
+        }
+    }
+
+    /**
+     * 将所有UnStableFile的元数据写入磁盘
+     */
+    public void forceFileMetaToDisk()
+    {
+        try
+        {
             LogWriter writer = Logs.createLogWriter( dbDir, false );
             VersionEdit edit = new VersionEdit();
             for( FileMetaData meta : this.files.values() )
@@ -560,13 +601,24 @@ class UnstableLevel implements Level
                 if( null != meta )
                     edit.addFile( 0, meta );
             }
-            writer.addRecord( edit.encode(), true );
+            Slice fileSlice = edit.encode();
+//            fileSlice.setBytes();
+            writer.addRecord(fileSlice, true);
+            writer.addRecord( new Slice( "EOF!EOF!EOF!".getBytes() ), true );
             writer.close();
+            File oldFile = new File(dbDir+"/unstable.meta");
+            if( oldFile.exists() ) {
+                if( !oldFile.delete()) throw new IOException("can not delete unstable.meta");
+            }
+            Path source = Paths.get(dbDir+"/unstable.new.meta");
+            Files.move(source, source.resolveSibling("unstable.meta"));
         }
-        catch ( IOException | InterruptedException e )
+        catch ( IOException e )
         {
             //FIXME
             e.printStackTrace();
         }
     }
+
+
 }

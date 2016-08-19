@@ -35,9 +35,15 @@ public final class Logs
     {
         String fileName;
         if( isStableLevel )
-            fileName = dbDir + "/" + Filename.logFileName( 1 );
+        {
+//            fileName = dbDir + "/" + Filename.logFileName( 1 );
+            fileName = dbDir + "/" + "stable.new.meta";
+        }
         else
-            fileName = dbDir + "/" + Filename.logFileName( 0 );
+        {
+//            fileName = dbDir + "/" + Filename.logFileName( 0 );
+            fileName = dbDir + "/" + "unstable.new.meta";
+        }
         File file = new File(fileName);
         if (false) 
         {

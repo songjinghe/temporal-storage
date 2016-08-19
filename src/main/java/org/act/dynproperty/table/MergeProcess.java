@@ -15,15 +15,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.act.dynproperty.impl.FileBuffer;
-import org.act.dynproperty.impl.FileMetaData;
-import org.act.dynproperty.impl.Filename;
-import org.act.dynproperty.impl.InternalKey;
-import org.act.dynproperty.impl.MemTable;
-import org.act.dynproperty.impl.Options;
-import org.act.dynproperty.impl.SeekingIterator;
-import org.act.dynproperty.impl.StableLevelAddFile;
-import org.act.dynproperty.impl.TableCache;
+import org.act.dynproperty.impl.*;
 import org.act.dynproperty.util.FileChangeMonitor;
 import org.act.dynproperty.util.MergingIterator;
 import org.act.dynproperty.util.Slice;
@@ -35,11 +27,12 @@ import org.act.dynproperty.util.Slice;
 public class MergeProcess
 {
     private String dbDir;
-    private StableLevelAddFile stableLevel;
+    private StableLevel stableLevel;
     private FileChangeMonitor fileMonitor;
     private ReadWriteLock fileMetaLock;
-    
-    public MergeProcess( String db, StableLevelAddFile stableLevel, ReadWriteLock fileMetaLock )
+    private UnstableLevel unStableLevel;
+
+    public MergeProcess( String db, StableLevel stableLevel, ReadWriteLock fileMetaLock )
     {
         this.dbDir = db;
         this.stableLevel = stableLevel;
@@ -158,6 +151,7 @@ public class MergeProcess
                     fileBuffers.put( fileNumber, null );
                     fileMonitor.deleteFile( 0, metaData );
                 }
+
                 for( File f : files2delete )
                 {
                     Files.delete( f.toPath() );
@@ -188,12 +182,12 @@ public class MergeProcess
         }
         if( mergeParticipants.size() < 5 )
         {
-            merge( memTable2merge, files, fileBuffers, cache );
+            merge(memTable2merge, files, fileBuffers, cache);
             return;
         }
         try
         {
-            String targetFileName = Filename.stableFileName( this.stableLevel.getNextFileNumber() );
+            String targetFileName = Filename.stableFileName(this.stableLevel.getNextFileNumber());
             File targetFile = new File( dbDir + "/" + targetFileName );
             if( targetFile.exists() )
                 targetFile.delete();
@@ -283,6 +277,8 @@ public class MergeProcess
                     fileBuffers.put( fileNumber, null );
                     this.fileMonitor.deleteFile( 0, metaData );
                 }
+                this.stableLevel.dumFileMeta2disc();
+                this.unStableLevel.forceFileMetaToDisk();
                 for( File f : files2delete )
                 {
                     Files.delete( f.toPath() );
@@ -295,5 +291,9 @@ public class MergeProcess
             //FIXME
             e.printStackTrace();
         }
+    }
+
+    public void setUnStableLevel(UnstableLevel unStableLevel) {
+        this.unStableLevel = unStableLevel;
     }
 }

@@ -49,7 +49,7 @@ public class LogWriterAndReaderTest
             writer.addRecord( edit.encode(), true );
         }
         writer.close();
-        File logFile = new File(dbDir + "/" + Filename.logFileName( 0 ));
+        File logFile = new File(dbDir + "/unstable.meta");
         FileChannel channel = new FileInputStream( logFile ).getChannel();
         LogReader reader = new LogReader( channel, null, false, 0 );
         Slice s;

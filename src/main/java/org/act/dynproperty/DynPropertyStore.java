@@ -48,6 +48,10 @@ public interface DynPropertyStore
      * @return 是否删除成功
      */
     public boolean delete(Slice id);
-    
+
+    void flushMemTable2Disk();
+
+    void flushMetaInfo2Disk();
+
     public void shutDown();
 }

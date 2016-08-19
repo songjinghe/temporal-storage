@@ -1,10 +1,10 @@
 package org.act.dynproperty.impl;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
+import java.io.*;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Map.Entry;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -38,6 +38,7 @@ public class DynPropertyStoreImpl implements DynPropertyStore
         this.stlevel = new StableLevel( dbDir,fileMetaLock );
         this.mergeProcess = new MergeProcess( dbDir, this.stlevel,fileMetaLock );
         this.unLevel = new UnstableLevel( dbDir, this.mergeProcess,fileMetaLock, this.stlevel );
+        this.mergeProcess.setUnStableLevel(this.unLevel);
 //        Runtime.getRuntime().addShutdownHook( new Thread(){
 //            public void run()
 //            {
@@ -80,8 +81,8 @@ public class DynPropertyStoreImpl implements DynPropertyStore
         try
         {
             // unstable 
-            String logFileName = Filename.logFileName( 0 );
-            File logFile = new File( this.dbDir + "/" + logFileName );
+//            String logFileName = Filename.logFileName( 0 );
+            File logFile = getValidMetaFile("unstable");
             if( !logFile.exists() )
             {
                 return;
@@ -99,11 +100,11 @@ public class DynPropertyStoreImpl implements DynPropertyStore
             }
             inputStream.close();
             channel.close();
-            Files.delete( logFile.toPath() );
+//            Files.delete( logFile.toPath() );
             
             // stable
-            logFileName = Filename.logFileName( 1 );
-            logFile = new File( this.dbDir + "/" + logFileName );
+//            logFileName = Filename.logFileName( 1 );
+            logFile = getValidMetaFile("stable");
             if( !logFile.exists() )
             {
                 return;
@@ -121,7 +122,7 @@ public class DynPropertyStoreImpl implements DynPropertyStore
             }
             inputStream.close();
             channel.close();
-            Files.delete( logFile.toPath() );
+//            Files.delete( logFile.toPath() );
             
         }
         catch( IOException e )
@@ -129,6 +130,28 @@ public class DynPropertyStoreImpl implements DynPropertyStore
             //FIXME
             log.error( "PropertyStore Init fails when retore existing file's info!" );
         }
+    }
+
+    private File getValidMetaFile(String stableOrUnStable) throws IOException {
+        File oldMetaFile = new File( this.dbDir + "/"+stableOrUnStable+".meta" );
+        File newMetaFile = new File( this.dbDir + "/"+stableOrUnStable+".new.meta" );
+        if( newMetaFile.exists() && isValidMetaFile(newMetaFile)){
+            if (oldMetaFile.exists()) {
+                if (!oldMetaFile.delete()) throw new IOException("can not delete "+stableOrUnStable+".meta");
+            }
+            Path source = Paths.get(dbDir + "/"+stableOrUnStable+".new.meta");
+            Files.move(source, source.resolveSibling(stableOrUnStable+".meta"));
+        }
+        return oldMetaFile;
+    }
+
+    private boolean isValidMetaFile(File newMetaFile) throws IOException {
+        String EOF = "EOF!EOF!EOF!";
+        RandomAccessFile raf = new RandomAccessFile(newMetaFile, "r");
+        raf.seek(newMetaFile.length() - EOF.length());// Seek to the end of file
+        byte[] bytes = new byte[EOF.length()];
+        raf.read(bytes, 0, EOF.length());// Read it out.
+        return new String(bytes).equals(EOF);
     }
 
 
@@ -189,5 +212,26 @@ public class DynPropertyStoreImpl implements DynPropertyStore
         // TODO Auto-generated method stub
         return false;
     }
-    
+
+    /**
+     * @Author Sjh
+     * this is called when we need to manually start a merge process which force all data in memory to unstable file
+     * on disk. we than create a new empty MemTable.
+     * note that this method blocks current thread until all operation done.
+     */
+    @Override
+    public void flushMemTable2Disk()
+    {
+        this.unLevel.forceMemTableMerge();
+    }
+
+
+    @Override
+    public void flushMetaInfo2Disk()
+    {
+        this.unLevel.dumpFileMeta2disc();
+        this.stlevel.dumFileMeta2disc();
+    }
+
+
 }

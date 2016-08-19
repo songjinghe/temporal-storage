@@ -6,6 +6,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -34,7 +36,7 @@ import org.slf4j.LoggerFactory;
  * StableLevel中存储着所有UnStableFile的相关元信息，并且是对其进行查询和写入的入口
  *
  */
-class StableLevel implements Level, StableLevelAddFile
+public class StableLevel implements Level, StableLevelAddFile
 {
 	/**
 	 * 所有的StableFile的元信息
@@ -390,7 +392,14 @@ class StableLevel implements Level, StableLevelAddFile
                     edit.addFile( 0, meta );
             }
             writer.addRecord( edit.encode(), true );
+            writer.addRecord( new Slice( "EOF!EOF!EOF!".getBytes() ), true );
             writer.close();
+            File oldFile = new File(dbDir+"/stable.meta");
+            if( oldFile.exists() ) {
+                if( !oldFile.delete()) throw new IOException("can not delete stable.meta");
+            }
+            Path source = Paths.get(dbDir + "/stable.new.meta");
+            Files.move(source, source.resolveSibling("stable.meta"));
         }
         catch ( IOException e )
         {
