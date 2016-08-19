@@ -15,7 +15,10 @@ import org.act.dynproperty.table.MergeProcess;
 import org.act.dynproperty.util.Slice;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
+/**
+ * DynPropertyStore的实现类
+ *
+ */
 public class DynPropertyStoreImpl implements DynPropertyStore
 {
     private UnstableLevel unLevel;
@@ -24,6 +27,10 @@ public class DynPropertyStoreImpl implements DynPropertyStore
     private String dbDir;
     private Logger log = LoggerFactory.getLogger( DynPropertyStoreImpl.class );
     
+    /**
+     * 实例化方法
+     * @param dbDir 存储动态属性数据的目录地址
+     */
     public DynPropertyStoreImpl( String dbDir )
     {
         this.dbDir = dbDir;
@@ -31,15 +38,24 @@ public class DynPropertyStoreImpl implements DynPropertyStore
         this.stlevel = new StableLevel( dbDir,fileMetaLock );
         this.mergeProcess = new MergeProcess( dbDir, this.stlevel,fileMetaLock );
         this.unLevel = new UnstableLevel( dbDir, this.mergeProcess,fileMetaLock, this.stlevel );
-        Runtime.getRuntime().addShutdownHook( new Thread(){
-            public void run()
-            {
-                DynPropertyStoreImpl.this.stop();
-            }
-        });
+//        Runtime.getRuntime().addShutdownHook( new Thread(){
+//            public void run()
+//            {
+//                DynPropertyStoreImpl.this.stop();
+//            }
+//        });
         start();
     }
     
+    
+    public void shutDown()
+    {
+    	this.stop();
+    }
+    
+    /**
+     * 退出系统时调用，主要作用是将内存中的数据写入磁盘。
+     */
     private void stop()
     {
         this.unLevel.dumpMemTable2disc();
@@ -47,13 +63,18 @@ public class DynPropertyStoreImpl implements DynPropertyStore
         this.stlevel.dumFileMeta2disc();
     }
     
+    /**
+     * 系统启动时调用，主要作用是将上次系统关闭时写入磁盘的数据读入内存
+     */
     private void start()
     {
         loadExitingFilesFromdisc();
         this.unLevel.restoreMemTable();
     }
 
-
+    /**
+     * 将磁盘中所有StableFile和UnStableFile的元信息读入内存
+     */
     private void loadExitingFilesFromdisc()
     {
         try
@@ -111,6 +132,9 @@ public class DynPropertyStoreImpl implements DynPropertyStore
     }
 
 
+    /**
+     * 进行时间点查询，参考{@link DynPropertyStore}中的说明
+     */
     @Override
     public Slice getPointValue( long id, int proId, int time )
     {
@@ -130,6 +154,10 @@ public class DynPropertyStoreImpl implements DynPropertyStore
         else
             return this.stlevel.getPointValue( idSlice, time );
     }
+    
+    /**
+     * 进行实践段查询，参考{@link DynPropertyStore}中的说明
+     */
     @Override
     public Slice getRangeValue( long id, int proId, int startTime, int endTime, RangeQueryCallBack callback )
     {
@@ -143,6 +171,10 @@ public class DynPropertyStoreImpl implements DynPropertyStore
         return callback.onReturn();
     }
 
+    
+    /**
+     * 写数据，参考{@link DynPropertyStore}中的说明
+     */
     @Override
     public boolean setProperty( Slice key, byte[] value )
     {

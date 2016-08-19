@@ -1,20 +1,4 @@
-/*
- * Copyright (C) 2011 the original author or authors.
- * See the notice.md file distributed with this work for additional
- * information regarding copyright ownership.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+
 package org.act.dynproperty.impl;
 
 import com.google.common.base.Preconditions;
@@ -40,6 +24,10 @@ import org.act.dynproperty.util.Finalizer;
 import org.act.dynproperty.util.InternalTableIterator;
 import org.act.dynproperty.util.Slice;
 
+/**
+ * 对所有存储文件的缓存机制，使用FIFO的方式进行，如果需要对某个文件进行访问，可以直接从TableCache这里对文件的Iterator进行查询
+ *
+ */
 public class TableCache
 {
     private final LoadingCache<Long, TableAndFile> cache;
@@ -70,15 +58,26 @@ public class TableCache
                 });
     }
 
+    /**
+     * 通过需要查询文件的元信息，得到相应文件的Iterator
+     * @param file 文件元信息
+     * @return 相应文件的Iterator
+     */
     public SeekingIterator<Slice,Slice> newIterator(FileMetaData file)
     {
         return newIterator(file.getNumber());
     }
 
+    /**
+     * 通过文件的编号，得到相应文件的Iterator
+     * @param number 文件编号
+     * @return 相应文件的Iterator
+     */
     public SeekingIterator<Slice,Slice> newIterator(long number)
     {
         return getTable(number).iterator();
     }
+    
     
     public Table newTable( long number )
     {
@@ -106,12 +105,19 @@ public class TableCache
         return table;
     }
 
+    /**
+     * 关闭缓存，将缓存在内存中的文件channel关闭
+     */
     public void close()
     {
         cache.invalidateAll();
         finalizer.destroy();
     }
 
+    /**
+     * 将某个文件从缓存中排除
+     * @param number 文件编号
+     */
     public void evict(long number)
     {
         cache.invalidate(number);

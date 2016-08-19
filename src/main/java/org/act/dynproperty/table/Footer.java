@@ -28,6 +28,9 @@ import static org.act.dynproperty.table.BlockHandle.readBlockHandle;
 import static org.act.dynproperty.table.BlockHandle.writeBlockHandleTo;
 import static org.act.dynproperty.util.SizeOf.SIZE_OF_LONG;
 
+/**
+ * 每个存储文件末尾，都保存的索引块的位置信息
+ */
 public class Footer
 {
     public static final int ENCODED_LENGTH = (BlockHandle.MAX_ENCODED_LENGTH * 2) + SIZE_OF_LONG;

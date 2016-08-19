@@ -30,13 +30,32 @@ import org.act.dynproperty.util.TimeIntervalUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * StableLevel中存储着所有UnStableFile的相关元信息，并且是对其进行查询和写入的入口
+ *
+ */
 class StableLevel implements Level, StableLevelAddFile
 {
+	/**
+	 * 所有的StableFile的元信息
+	 */
     private SortedMap<Long,FileMetaData> files;
+    /**
+     * 所有StableFile对应的Buffer
+     */
     private SortedMap<Long,FileBuffer> fileBuffers;
+    /**
+     * 存储目录
+     */
     private String dbDir;
+    /**
+     * 对StableFile进行的缓存
+     */
     private TableCache cache;
     private static Logger log = LoggerFactory.getLogger( StableLevel.class );
+    /**
+     * 修改和读取StableFile元信息时的读写锁
+     */
     private ReadWriteLock fileMetaLock;
     private final int bufferMergeboundary = 2;
     
@@ -48,6 +67,10 @@ class StableLevel implements Level, StableLevelAddFile
         this.cache = new TableCache( new File( dbDir ), 20, TableComparator.instence(), false, true );
         this.fileMetaLock = fileLock;
     }
+    
+    /**
+     * 回复相关文件元信息，判断其是否有Buffer存在。
+     */
     public void initfromdisc( FileMetaData metaData )
     {
         try
@@ -68,6 +91,9 @@ class StableLevel implements Level, StableLevelAddFile
             log.error( "Error happens when load bufferfile:" + metaData.getNumber() + " contents!" );
         }
     }
+    /**
+     * 返回StableLevel存储的数据的最晚有效时间
+     */
     long getTimeBoundary()
     {
         long lastNumber = -1l;
@@ -81,16 +107,21 @@ class StableLevel implements Level, StableLevelAddFile
         }
         return this.files.get( lastNumber ).getLargest();
     }
+    /**
+     * 进行时间点查询
+     */
     @Override
     public Slice getPointValue( Slice idSlice, int time )
     {
         InternalKey searchKey = new InternalKey( idSlice, time, 0, ValueType.VALUE );
         this.fileMetaLock.readLock().lock();
+        boolean found = false;
         for( long fileNumber : this.files.keySet() )
         {
             FileMetaData meta = this.files.get( fileNumber );
             if( null != meta && time >= meta.getSmallest() && time <= meta.getLargest() )
             {
+            	found = true;
                 SeekingIterator<Slice,Slice> iterator = this.cache.newIterator( meta );
                 iterator.seek( searchKey.encode() );
                 Entry<Slice,Slice> entry = iterator.next();
@@ -138,9 +169,61 @@ class StableLevel implements Level, StableLevelAddFile
                 }
             }
         }
+        if(!found){
+        	long fileNumber = this.files.lastKey();
+        	FileMetaData meta = this.files.get(fileNumber);
+        	SeekingIterator<Slice,Slice> iterator = this.cache.newIterator( meta );
+            iterator.seek( searchKey.encode() );
+            Entry<Slice,Slice> entry = iterator.next();
+            FileBuffer buffer = this.fileBuffers.get( fileNumber );
+            if( null != buffer )
+            {
+                SeekingIterator<Slice,Slice> bufferIterator = this.fileBuffers.get( fileNumber ).iterator();
+                bufferIterator.seek( searchKey.encode() );
+                Entry<Slice,Slice> bufferEntry = bufferIterator.next();
+                InternalKey bufferkey = new InternalKey( bufferEntry.getKey() );
+                InternalKey key = new InternalKey( entry.getKey() );
+                if( key.getId().equals( idSlice ) )
+                {
+                    if( bufferkey.getId().equals( idSlice ) )
+                    {
+                        if( key.getStartTime() == bufferkey.getStartTime() )
+                        {
+                            if( bufferkey.getValueType().getPersistentId() != ValueType.DELETION.getPersistentId() )
+                            {
+                                this.fileMetaLock.readLock().unlock();
+                                return bufferEntry.getValue().slice( 0, bufferkey.getValueLength() );
+                            }
+                        }
+                        else if( bufferkey.getStartTime() <= time && bufferkey.getStartTime() > key.getStartTime() && bufferkey.getValueType().getPersistentId() != ValueType.DELETION.getPersistentId()
+                                && bufferkey.getValueType().getPersistentId() != ValueType.INVALID.getPersistentId())
+                        {
+                            this.fileMetaLock.readLock().unlock();
+                            return bufferEntry.getValue().slice( 0, bufferkey.getValueLength() );
+                        }
+                    }
+                    this.fileMetaLock.readLock().unlock();
+                    return entry.getValue().slice( 0, key.getValueLength() );
+                }
+            }
+            else
+            {
+                InternalKey key = new InternalKey( entry.getKey() );
+                if( key.getId().equals( idSlice ) )
+                {
+                    this.fileMetaLock.readLock().unlock();
+                    return entry.getValue().slice( 0, key.getValueLength() ); 
+                }
+                this.fileMetaLock.readLock().unlock();
+                return null;
+            }
+        }
         this.fileMetaLock.readLock().unlock();
         return null;
     }
+    /**
+     * 进行时间段查询
+     */
     @Override
     public void getRangeValue( Slice idSlice, int startTime, int endTime, RangeQueryCallBack callback )
     {
@@ -192,6 +275,9 @@ class StableLevel implements Level, StableLevelAddFile
         }
         this.fileMetaLock.readLock().unlock();
     }
+    /**
+     * 进行写入
+     */
     @Override
     public boolean set( InternalKey key, Slice value )
     {
@@ -206,6 +292,9 @@ class StableLevel implements Level, StableLevelAddFile
         return true;
     }
     
+    /**
+     * 针对某个Buffer的插入操作， 如果不存在则新建一个Buffer
+     */
     private void insert2Bufferfile( InternalKey key, Slice value ) throws Exception
     {
         int insertTime = key.getStartTime();
@@ -229,6 +318,10 @@ class StableLevel implements Level, StableLevelAddFile
         }
         this.fileMetaLock.writeLock().unlock();
     }
+    
+    /**
+     * 当有新的StableFile生成的时候，通过这个方法将其信息加入StableLevel
+     */
     @Override
     public void addFile( FileMetaData file ) throws IOException
     {
@@ -272,12 +365,19 @@ class StableLevel implements Level, StableLevelAddFile
         }
         this.fileMetaLock.writeLock().unlock();
     }
+    
+    /**
+     * 返回最新的StableFile的编号
+     */
     @Override
     public long getNextFileNumber()
     {
         return this.files.size();
     }
     
+    /**
+     * 在系统关闭的时候，将所有的文件元信息写入磁盘
+     */
     public void dumFileMeta2disc()
     {
         try

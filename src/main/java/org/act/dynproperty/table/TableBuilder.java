@@ -37,7 +37,10 @@ import org.act.dynproperty.util.Snappy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
+/**
+ * 新建存储文件的Builder
+ *
+ */
 public class TableBuilder
 {
     /**

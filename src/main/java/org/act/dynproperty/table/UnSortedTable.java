@@ -13,6 +13,9 @@ import org.act.dynproperty.util.Slice;
 
 import static org.act.dynproperty.util.SizeOf.SIZE_OF_INT;
 
+/**
+ * Buffer的备份文件。文件中的写入都是在末尾进行append。文件内数据没有顺序
+ */
 public class UnSortedTable implements Closeable
 {
     private FileChannel channel;

@@ -1,20 +1,3 @@
-/*
- * Copyright (C) 2011 the original author or authors.
- * See the notice.md file distributed with this work for additional
- * information regarding copyright ownership.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package org.act.dynproperty.impl;
 
 import com.google.common.base.Function;
@@ -23,6 +6,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.act.dynproperty.util.Slice;
 
+/**
+ * 存储文件元信息，包括文件名，负责存储的有效时间段等
+ *
+ */
 public class FileMetaData
 {
     public static final Function<FileMetaData, Integer> GET_LARGEST_USER_KEY = new Function<FileMetaData, Integer>()
@@ -34,29 +21,35 @@ public class FileMetaData
         }
     };
 
+    /**
+     * 文件编码，起文件名作用。
+     */
     private final long number;
 
     /**
-     * File size in bytes
+     * 文件大小，以byte为单位
      */
     private final long fileSize;
 
     /**
-     * Smallest time key served by table
+     * 负责存储有效时间的起始时间
      */
     private final int smallest;
 
     /**
-     * Largest internal key served by table
+     * 负责存储有效时间的结束席间
      */
     private final int largest;
-
-    /**
-     * Seeks allowed until compaction
-     */
     // todo this mutable state should be moved elsewhere
     private final AtomicInteger allowedSeeks = new AtomicInteger(1 << 30);
 
+    /**
+     * 实例化
+     * @param number 文件编号
+     * @param fileSize 文件大小
+     * @param smallest 有效时间的起始时间
+     * @param largest 有效时间的结束时间
+     */
     public FileMetaData(long number, long fileSize, int smallest, int largest)
     {
         this.number = number;

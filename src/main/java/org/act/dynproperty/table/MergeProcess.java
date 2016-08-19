@@ -28,6 +28,10 @@ import org.act.dynproperty.util.FileChangeMonitor;
 import org.act.dynproperty.util.MergingIterator;
 import org.act.dynproperty.util.Slice;
 
+/**
+ * 文件合并过程
+ *
+ */
 public class MergeProcess
 {
     private String dbDir;
@@ -43,6 +47,13 @@ public class MergeProcess
         this.fileMetaLock = fileMetaLock;
     }
     
+    /**
+     * 将MemTable写入磁盘并与UnStableFile进行合并
+     * @param memTable2merge 写入磁盘的MemTable
+     * @param files UnStableLevel中的UnStableFile信息
+     * @param fileBuffers UnStableFile对应的Buffer信息
+     * @param cache 用来读取UnStableFile的缓存结构
+     */
     public void merge( MemTable memTable2merge, SortedMap<Long,FileMetaData> files,
             SortedMap<Long,FileBuffer> fileBuffers, TableCache cache )
     {
@@ -161,6 +172,9 @@ public class MergeProcess
         }
     }
 
+    /**
+     * 将UnStableFile合并为StableFile的过程
+     */
     private void merge2StableFile( MemTable memTable2merge, SortedMap<Long,FileMetaData> files,
             SortedMap<Long,FileBuffer> fileBuffers, TableCache cache )
     {

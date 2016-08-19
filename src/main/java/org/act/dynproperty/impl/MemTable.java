@@ -1,20 +1,4 @@
-/*
- * Copyright (C) 2011 the original author or authors.
- * See the notice.md file distributed with this work for additional
- * information regarding copyright ownership.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+
 package org.act.dynproperty.impl;
 
 import com.google.common.base.Preconditions;
@@ -27,15 +11,30 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.act.dynproperty.table.UserComparator;
 import org.act.dynproperty.util.Slice;
-
+/**
+ * MemTable结构，是动态属性在内存中的存储结构
+ *
+ */
 public class MemTable
         implements SeekingIterable<Slice, Slice>
 {
+	/**
+	 * 所有的数据存储在table中，使用SkipListMap
+	 */
     private final ConcurrentSkipListMap<Slice, MemEntry> table;
+    /**
+     * 所占用的空间
+     */
     private final AtomicLong approximateMemoryUsage = new AtomicLong();
     
-    //Start time of the MemTable
+    /**
+     * 当前MemTable中数据的最小有效时间
+     */
     private int start = Integer.MAX_VALUE;
+    
+    /**
+     * 当前MemTable中数据的最大有效时间
+     */
     private int end = -1;
 
     public MemTable(UserComparator internalKeyComparator )
@@ -63,6 +62,11 @@ public class MemTable
         return approximateMemoryUsage.get();
     }
 
+    /**
+     * 向MemTable中增加动态属性数据
+     * @param key 动态属性record经过InternalKey编码后的key
+     * @param value 值
+     */
     public void add( Slice key, Slice value )
     {
         Preconditions.checkArgument( key.length() == 20, "key should all be 20 bytes" );
@@ -77,6 +81,10 @@ public class MemTable
         approximateMemoryUsage.addAndGet( key.length() + value.length());
     }
 
+    /**
+     * 从MemTable中查询相应数据
+     * @param key 动态属性record经过InternalKey编码后的key
+     */
     public Slice get(Slice key)
     {
         Preconditions.checkNotNull(key, "key is null");
@@ -95,6 +103,9 @@ public class MemTable
         return entry.getValue().getValue().copySlice( 0, ansKey.getValueLength() );
     }
 
+    /**
+     * 返回能够对整个MemTable提供便利的iterator
+     */
     @Override
     public MemTableIterator iterator()
     {
@@ -136,6 +147,10 @@ public class MemTable
         
     }
     
+    /**
+     * 对MemTable提供遍历功能的Iterator
+     *
+     */
     public class MemTableIterator
             implements SeekingIterator<Slice,Slice>
     {
@@ -152,12 +167,18 @@ public class MemTable
             return iterator.hasNext();
         }
 
+        /**
+         * 将指针指向第一个数据项
+         */
         @Override
         public void seekToFirst()
         {
             iterator = Iterators.peekingIterator(table.entrySet().iterator());
         }
 
+        /**
+         * 将指针指向制定key的数据项
+         */
         @Override
         public void seek(Slice targetKey)
         {

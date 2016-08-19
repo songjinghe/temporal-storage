@@ -1,20 +1,3 @@
-/*
- * Copyright (C) 2011 the original author or authors.
- * See the notice.md file distributed with this work for additional
- * information regarding copyright ownership.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package org.act.dynproperty.impl;
 
 import com.google.common.base.Charsets;
@@ -25,13 +8,19 @@ import com.google.common.io.Files;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
-
+/**
+ * 将文件编号转化为文件名的工具类
+ *
+ */
 public final class Filename
 {
     private Filename()
     {
     }
 
+    /**
+     * 各种文件的类型
+     */
     public enum FileType
     {
         STBUFFER,
@@ -57,7 +46,7 @@ public final class Filename
     }
     
     /**
-     * Return the name of the log file with the specified number.
+     * 返回对应编号的日志文件的名称
      */
     public static String logFileName(long number)
     {
@@ -65,21 +54,25 @@ public final class Filename
     }
 
     /**
-     * Return the name of the sstable with the specified number.
+     * 返回对应编号的StableFile文件的名称.
      */
     public static String stableFileName(long number)
     {
         return makeFileName(number, "st");
     }
     
+    /**
+     * 返回对应编号的UnStableFile文件的名称
+     */
     public static String unStableFileName(long number)
     {
         return makeFileName( number, "un" );
     }
 
     /**
-     * Return the name of the descriptor file with the specified incarnation number.
+     * 返回对应编号的描述文件的名称，目前还没有用到。
      */
+    @Deprecated
     public static String descriptorFileName(long number)
     {
         Preconditions.checkArgument(number >= 0, "number is negative");
@@ -87,15 +80,16 @@ public final class Filename
     }
 
     /**
-     * Return the name of the current file.
+     * 返回CURRENT文件的名称，目前没有用到
      */
+    @Deprecated
     public static String currentFileName()
     {
         return "CURRENT";
     }
 
     /**
-     * Return the name of the lock file.
+     * 返回锁文件的名称
      */
     public static String lockFileName()
     {
@@ -103,7 +97,7 @@ public final class Filename
     }
 
     /**
-     * Return the name of a temporary file with the specified number.
+     * 返回临时文件的名称
      */
     public static String tempFileName(long number)
     {
@@ -111,16 +105,14 @@ public final class Filename
     }
 
     /**
-     * Return the name of the info log file.
+     * 返回LOG文件名称，目前没有用到
      */
+    @Deprecated
     public static String infoLogFileName()
     {
         return "LOG";
     }
-
-    /**
-     * Return the name of the old info log file.
-     */
+    
     public static String oldInfoLogFileName()
     {
         return "LOG.old";

@@ -1,20 +1,4 @@
-/*
- * Copyright (C) 2011 the original author or authors.
- * See the notice.md file distributed with this work for additional
- * information regarding copyright ownership.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+
 package org.act.dynproperty.impl;
 
 import org.act.dynproperty.util.Slice;
@@ -28,18 +12,36 @@ import static org.act.dynproperty.util.SizeOf.SIZE_OF_LONG;
 import static org.act.dynproperty.util.SizeOf.SIZE_OF_INT;
 
 /**
- * InternalKey contains the id and proId of the property(12bytes) , time(4bytes), value length (4bytes), deletion bit , valid bit
- *
- *
- * @author huanghx( huanghx@act.buaa.edu.cn )
+ * InternalKey是将一个动态属性的点/边id，属性id，某个时间以及相关控制位编码为一个键值对中的键的机制。在设计文档中，我们将一个动态属性的数据分为多个record，而InternalKey就
+ * 是一个record的key
  */
 public class InternalKey
 {
+	/**
+	 * 点/边id，和属性id的编码，用于确定一个动态属性
+	 */
     private final Slice Id;
+    /**
+     * 一个动态属性某个值的起始时间
+     */
     private final int startTime;
+    /**
+     * 值的长度
+     */
     private final int valueLength;
+    /**
+     * 此key对应的record类型
+     */
     private final ValueType valueType;
 
+    
+    /**
+     * 新建一个InternalKey，将相关信息传入，用于编码后生成一个Slice
+     * @param Id
+     * @param startTime
+     * @param valueLength
+     * @param valueType
+     */
     public InternalKey(Slice Id, int startTime, int valueLength, ValueType valueType)
     {
         Preconditions.checkNotNull(Id, "userKey is null");
@@ -53,6 +55,10 @@ public class InternalKey
         this.valueLength = valueLength;
     }
 
+    /**
+     * 新建一个InternalKey，将相关Slice传入，可用于解码相关信息。如起始时间，record类型，id等
+     * @param data
+     */
     public InternalKey(Slice data)
     {
         Preconditions.checkNotNull(data, "data is null");
@@ -64,31 +70,53 @@ public class InternalKey
         this.valueLength = SequenceNumber.unpackValueLength( packedSequenceAndType );
     }
 
+    /**
+     * 新建一个InternalKey，将相关byte数组传入，可用于解码相关信息。如起始时间，record类型，id等
+     * @param data
+     */
     public InternalKey(byte[] data)
     {
         this(Slices.wrappedBuffer(data));
     }
 
+    /**
+     * 返回唯一确定某个动态属性的标识，其中其点/边id保存在返回值的前8位，属性id保存在返回值的后4位。
+     * @return 唯一确定某个动态属性的标识
+     */
     public Slice getId()
     {
         return Id;
     }
 
+    /**
+     * 
+     * @return 返回此key对应的值的长度
+     */
     public int getValueLength()
     {
         return valueLength;
     }
     
+    /**
+     * @return 返回此key对应值的起始有效时间
+     */
     public int getStartTime()
     {
         return startTime;
     }
 
+    /**
+     * @return 返回此key对应record的类型
+     */
     public ValueType getValueType()
     {
         return valueType;
     }
 
+    /**
+     * 用于将相关信息编码为一个Slice
+     * @return 编码后的Slice
+     */
     public Slice encode()
     {
         Slice slice = Slices.allocate(Id.length() + SIZE_OF_LONG );

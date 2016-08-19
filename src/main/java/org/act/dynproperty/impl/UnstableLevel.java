@@ -34,21 +34,48 @@ import org.act.dynproperty.util.TimeIntervalUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * UnStableLevel，所有的UnStableFile和MemTable相关信息保存的地方
+ */
 class UnstableLevel implements Level
 {
+	/**
+	 * 所有的UnStableFile的元信息
+	 */
     private SortedMap<Long,FileMetaData> files;
+    /**
+     * 所有UnStableFile对应的Buffer
+     */
     private SortedMap<Long,FileBuffer> fileBuffers;
     private String dbDir;
+    /**
+     * MemTable
+     */
     private MemTable memTable;
     private MemTable stableMemTable;
     private int memTableBoundary;
+    /**
+     * 文件合并过程的工具类
+     */
     private MergeProcess mergeProcess;
     private static Logger log = LoggerFactory.getLogger( UnstableLevel.class );
+    /**
+     * UNStableLevel中对文件的缓存
+     */
     private TableCache cache;
     private ReentrantLock memtableLock;
+    /**
+     * 等待写入磁盘的MemTable的队列
+     */
     private BlockingQueue<MemTable> mergeWaitingQueue = new LinkedBlockingQueue<MemTable>();
+    /**
+     * 合并文件的线程
+     */
     private Thread mergeThread;
     private volatile boolean mergeIsHappening = false;
+    /**
+     * 更新和度去文件元信息的读写锁
+     */
     private ReadWriteLock fileMetaDataLock;
     private StableLevel stLevel;
     
@@ -93,7 +120,9 @@ class UnstableLevel implements Level
         } );
         this.mergeThread.start();
     }
-    
+    /**
+     * 回复相关文件元信息，判断其是否有Buffer存在。
+     */
     public void initfromdisc( FileMetaData metaData )
     {
         try
@@ -115,6 +144,9 @@ class UnstableLevel implements Level
         }
     }
     
+    /**
+     * 从磁盘中回复MemTable中的数据
+     */
     public void restoreMemTable()
     {
         try
@@ -156,6 +188,9 @@ class UnstableLevel implements Level
         }
     }
 
+    /**
+     * 时间点查询
+     */
     @Override
     public Slice getPointValue( Slice idSlice, int time )
     {
@@ -305,6 +340,9 @@ class UnstableLevel implements Level
             return toret.getValue().slice( 0, key.getValueLength() );
     }
 
+    /**
+     * 时间段查询
+     */
     @Override
     public void getRangeValue( Slice idSlice, int startTime, int endTime, RangeQueryCallBack callback )
     {
@@ -389,6 +427,9 @@ class UnstableLevel implements Level
         this.fileMetaDataLock.readLock().unlock();
     }
 
+    /**
+     * 写入
+     */
     @Override
     public boolean set( InternalKey key, Slice value )
     {
@@ -419,6 +460,11 @@ class UnstableLevel implements Level
         return true;
     }
 
+    /**
+     * 触发数据写入磁盘，如果需要还需要对文件进行合并
+     * @param temp 需要写入磁盘的MemTable
+     * @throws IOException
+     */
     private void startMergeProcess( MemTable temp ) throws IOException
     {
         SeekingIterator<Slice,Slice> iterator = temp.iterator();
@@ -437,6 +483,11 @@ class UnstableLevel implements Level
         this.stableMemTable = null;
     }
 
+    /**
+     * 对某个已存在的UnStableFile的插入，插入到相应的Buffer中。
+     * @param key
+     * @param value
+     */
     private void insert2fileBuffer( InternalKey key, Slice value ) throws IOException
     {
         int insertTime = key.getStartTime();
@@ -461,6 +512,9 @@ class UnstableLevel implements Level
         }
     }
 
+    /**
+     * 在系统关闭时，将MemTable中的数据写入磁盘
+     */
     public void dumpMemTable2disc()
     {
         try
@@ -487,6 +541,9 @@ class UnstableLevel implements Level
         }
     }
 
+    /**
+     * 在系统关闭时，将所有UnStableFile的元数据写入磁盘
+     */
     public void dumpFileMeta2disc()
     {
         try

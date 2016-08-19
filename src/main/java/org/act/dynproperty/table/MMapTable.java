@@ -35,7 +35,10 @@ import org.act.dynproperty.util.Snappy;
 
 import static org.act.dynproperty.impl.CompressionType.SNAPPY;
 
-
+/**
+ * 以MMap形式打开文件并提供读取接口的类，以Block为单文进行文件读取
+ *
+ */
 public class MMapTable
         extends Table
 {

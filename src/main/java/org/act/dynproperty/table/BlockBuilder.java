@@ -1,20 +1,4 @@
-/*
- * Copyright (C) 2011 the original author or authors.
- * See the notice.md file distributed with this work for additional
- * information regarding copyright ownership.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+
 package org.act.dynproperty.table;
 
 import com.google.common.base.Preconditions;
@@ -29,6 +13,9 @@ import org.act.dynproperty.util.VariableLengthQuantity;
 
 import static org.act.dynproperty.util.SizeOf.SIZE_OF_INT;
 
+/**
+ * 创建Block的Builder
+ */
 public class BlockBuilder
 {
     private final int blockRestartInterval;
@@ -42,6 +29,12 @@ public class BlockBuilder
     private final DynamicSliceOutput block;
     private Slice lastKey;
 
+    /**
+     * 初始化函数
+     * @param estimatedSize block需要满足的大小
+     * @param blockRestartInterval 一级跳跃的间隔
+     * @param comparator 对数据的比较方式
+     */
     public BlockBuilder(int estimatedSize, int blockRestartInterval, Comparator<Slice> comparator)
     {
         Preconditions.checkArgument(estimatedSize >= 0, "estimatedSize is negative");
@@ -101,6 +94,11 @@ public class BlockBuilder
         add(blockEntry.getKey(), blockEntry.getValue());
     }
 
+    /**
+     * 想Block中写入动态属性数据
+     * @param key 动态属性record的用InternalKey编码后的key
+     * @param value 值
+     */
     public void add(Slice key, Slice value)
     {
         Preconditions.checkNotNull(key, "key is null");
@@ -158,6 +156,10 @@ public class BlockBuilder
         return sharedKeyBytes;
     }
 
+    /**
+     * 完成所有插入后，调用此方法
+     * @return
+     */
     public Slice finish()
     {
         if (!finished) {

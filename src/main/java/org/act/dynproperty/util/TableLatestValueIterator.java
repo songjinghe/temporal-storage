@@ -5,6 +5,9 @@ import java.util.Map.Entry;
 
 import org.act.dynproperty.impl.SeekingIterator;
 
+/**
+ * 在生成新的StableFile的时候，需要把上一个tableFile的每个动态属性的最新的值加入到新的文件中，这个类就是提取StableFile中每个动态属性的最近值的工具
+ */
 public class TableLatestValueIterator implements SeekingIterator<Slice, Slice>
 {
     

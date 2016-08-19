@@ -7,6 +7,7 @@ public class CountCallBack implements RangeQueryCallBack
 {
 
     int Number = 0;
+    String valueType;
     
     @Override
     public void onCall( Slice value )
@@ -21,4 +22,10 @@ public class CountCallBack implements RangeQueryCallBack
         toret.setInt( 0, Number );
         return toret;
     }
+
+	@Override
+	public void setValueType(String valueType) 
+	{
+		this.valueType = valueType;
+	}
 }

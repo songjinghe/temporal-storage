@@ -22,6 +22,10 @@ import java.util.NoSuchElementException;
 
 import org.act.dynproperty.util.Slice;
 
+/**
+ * 索引块的Iterator，使用它查询需要读取的DataBlock的位置
+ *
+ */
 public class IndexBlockIterator extends BlockIterator
 {
 

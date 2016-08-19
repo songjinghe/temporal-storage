@@ -33,6 +33,10 @@ import org.act.dynproperty.util.Slice;
 import org.act.dynproperty.util.TableLatestValueIterator;
 import org.act.dynproperty.util.VariableLengthQuantity;
 
+/**
+ * 一个存储文件的抽象，一个Table对应一个存储文件
+ *
+ */
 public abstract class Table
         implements SeekingIterable<Slice, Slice>, Closeable
 {

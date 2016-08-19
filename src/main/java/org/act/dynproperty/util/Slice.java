@@ -40,7 +40,7 @@ import static org.act.dynproperty.util.SizeOf.SIZE_OF_LONG;
 import static org.act.dynproperty.util.SizeOf.SIZE_OF_SHORT;
 
 /**
- * Little Endian slice of a byte array.
+ * 可以理解为bytebuffer，使用小端法保存各种数据如int，long等。并提供基本的写入和读取函数
  */
 public final class Slice
         implements Comparable<Slice>

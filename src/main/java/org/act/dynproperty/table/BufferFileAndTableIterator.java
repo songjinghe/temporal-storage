@@ -10,6 +10,10 @@ import org.act.dynproperty.impl.MemTable.MemTableIterator;
 import org.act.dynproperty.impl.SeekingIterator;
 import org.act.dynproperty.util.Slice;
 
+/**
+ * 将某个文件及其Buffer中的内容合并，并组成同意的Iterator。在查询，文件合并的过程中起到作用：包括排除有delete标记的record、从文件中和Buffer中返回正确的值
+ *
+ */
 public class BufferFileAndTableIterator implements SeekingIterator<Slice,Slice>
 {
 
