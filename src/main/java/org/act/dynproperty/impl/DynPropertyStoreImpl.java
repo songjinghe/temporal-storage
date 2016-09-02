@@ -151,6 +151,7 @@ public class DynPropertyStoreImpl implements DynPropertyStore
         raf.seek(newMetaFile.length() - EOF.length());// Seek to the end of file
         byte[] bytes = new byte[EOF.length()];
         raf.read(bytes, 0, EOF.length());// Read it out.
+        raf.close();
         return new String(bytes).equals(EOF);
     }
 
@@ -229,7 +230,7 @@ public class DynPropertyStoreImpl implements DynPropertyStore
     @Override
     public void flushMetaInfo2Disk()
     {
-        this.unLevel.dumpFileMeta2disc();
+        this.unLevel.forceFileMetaToDisk();
         this.stlevel.dumFileMeta2disc();
     }
 

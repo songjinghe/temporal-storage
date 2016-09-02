@@ -151,7 +151,8 @@ public class MergeProcess
                     fileBuffers.put( fileNumber, null );
                     fileMonitor.deleteFile( 0, metaData );
                 }
-
+                this.stableLevel.dumFileMeta2disc();
+                this.unStableLevel.forceFileMetaToDisk();
                 for( File f : files2delete )
                 {
                     Files.delete( f.toPath() );

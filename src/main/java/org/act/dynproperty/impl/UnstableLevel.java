@@ -96,6 +96,7 @@ public class UnstableLevel implements Level
             @Override
             public void run()
             {
+                Thread.currentThread().setName("Dynamic-Storage-Merge");
                 while(true)
                 {
                     try
@@ -116,7 +117,6 @@ public class UnstableLevel implements Level
                     finally
                     {
                         mergeIsHappening = false;
-                        dumpFileMeta2disc();
                     }
                 }
             }
