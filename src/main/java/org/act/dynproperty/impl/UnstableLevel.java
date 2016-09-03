@@ -482,7 +482,7 @@ public class UnstableLevel implements Level
                 this.stableMemTable.add( entry.getKey(), entry.getValue() );
         }
         this.mergeProcess.merge(stableMemTable, this.files, this.fileBuffers, this.cache);
-        this.memTableBoundary = stableMemTable.getEndTime()+1;
+        this.memTableBoundary = Math.max(stableMemTable.getEndTime()+1,this.memTableBoundary);
         this.stableMemTable = null;
     }
 
