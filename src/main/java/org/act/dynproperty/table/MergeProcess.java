@@ -50,8 +50,10 @@ public class MergeProcess
     public void merge( MemTable memTable2merge, SortedMap<Long,FileMetaData> files,
             SortedMap<Long,FileBuffer> fileBuffers, TableCache cache )
     {
+        if(memTable2merge.isEmpty())
+            return;
         List<Long> mergeParticipants = new LinkedList<Long>();
-        for( Long fileNumber : files.keySet() )
+        for( Long fileNumber : new long[]{0,1,2,3,4} )
         {
             FileMetaData metaData = files.get( fileNumber );
             if( null == metaData )

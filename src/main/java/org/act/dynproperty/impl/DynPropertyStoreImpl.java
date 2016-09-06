@@ -127,7 +127,7 @@ public class DynPropertyStoreImpl implements DynPropertyStore
         }
         catch( IOException e )
         {
-            //FIXME
+            e.printStackTrace();
             log.error( "PropertyStore Init fails when retore existing file's info!" );
         }
     }
