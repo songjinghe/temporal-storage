@@ -1,8 +1,13 @@
 package org.act.dynproperty.util;
 
 import org.act.dynproperty.impl.FileMetaData;
+import org.act.dynproperty.impl.InternalKey;
 import org.act.dynproperty.impl.LogReader;
 import org.act.dynproperty.impl.VersionEdit;
+import org.act.dynproperty.table.FileChannelTable;
+import org.act.dynproperty.table.Table;
+import org.act.dynproperty.table.TableComparator;
+import org.act.dynproperty.table.TableIterator;
 import org.junit.Test;
 
 import java.io.*;
@@ -87,6 +92,67 @@ public class DBFileInfoReader
                 System.out.println("Warning: file end up with["+eof+"]");
                 return false;
             }
+        }
+
+    }
+
+    @Test
+    public void dbtmpFileInfo() throws IOException {
+        String fileName = "000000.dbtmp";
+        File metaFile = new File( this.dbDir + "/" + fileName );
+        if(!metaFile.exists()){
+            System.out.println("##### Warning: file not exist: "+ metaFile.getAbsolutePath());
+            return;
+        }
+        System.out.println("################## "+fileName+" #################");
+        FileInputStream inputStream = new FileInputStream( new File( this.dbDir + "/" + fileName ) );
+        FileChannel channel = inputStream.getChannel();
+        Table table = new FileChannelTable( fileName, channel, TableComparator.instence(), false );
+        TableIterator iterator = table.iterator();
+        if( !iterator.hasNext() )
+        {
+            System.out.println("Empty 000000.dbtmp file.");
+            return;
+        }
+        int maxTime = Integer.MIN_VALUE;
+        int minTime = Integer.MAX_VALUE;
+        long size = 0;
+        long recordCount = 0;
+        while( iterator.hasNext() )
+        {
+            Map.Entry<Slice,Slice> entry = iterator.next();
+            Slice key = entry.getKey();
+            Slice value = entry.getValue();
+            InternalKey internalKey = new InternalKey( key );
+            int time = internalKey.getStartTime();
+            if( time < minTime )
+            {
+                minTime = time;
+            }
+            if( time > maxTime )
+            {
+                maxTime = time;
+            }
+            size += (key.length() + value.length());
+            recordCount++;
+        }
+        inputStream.close();
+        channel.close();
+        System.out.println("Size: "+ humanReadableFileSize(size)+" minTime:"+ minTime +" maxTime:"+maxTime +" record count:"+recordCount);
+    }
+
+    private String humanReadableFileSize(long size)
+    {
+        float oneMB = 1024*1024;
+        float oneKB = 1024;
+        if( size > oneMB )
+        {
+            return ( size / oneMB ) + "MB";
+        }else if ( size > oneKB )
+        {
+            return ( size / oneKB ) + "KB";
+        }else{
+            return size + "Byte";
         }
 
     }

@@ -130,7 +130,7 @@ public class UnstableLevel implements Level
     {
         try
         {
-            this.files.put( metaData.getNumber(), metaData );
+            this.files.put(metaData.getNumber(), metaData);
             String bufferName = Filename.bufferFileName( metaData.getNumber() );
             File bufferfile = new File(this.dbDir + "/" + bufferName );
             if( bufferfile.exists() )
@@ -398,7 +398,7 @@ public class UnstableLevel implements Level
         }
         MemTableIterator bufferiterator = this.memTable.iterator();
         InternalKey searchKey = new InternalKey( idSlice, startTime, 0, ValueType.VALUE );
-        bufferiterator.seek( searchKey.encode() );
+        bufferiterator.seek(searchKey.encode());
         while( bufferiterator.hasNext() )
         {
             Entry<Slice,Slice> entry = bufferiterator.next();
@@ -472,18 +472,23 @@ public class UnstableLevel implements Level
     {
         SeekingIterator<Slice,Slice> iterator = temp.iterator();
         this.stableMemTable = new MemTable( TableComparator.instence() );
+        long countBuffer=0, countMerge = 0;
         while( iterator.hasNext() )
         {
             Entry<Slice,Slice> entry = iterator.next();
             InternalKey key = new InternalKey( entry.getKey() );
-            if( key.getStartTime() < this.memTableBoundary || key.getStartTime() <= this.stLevel.getTimeBoundary() )
-                insert2fileBuffer( key, entry.getValue() );
-            else
-                this.stableMemTable.add( entry.getKey(), entry.getValue() );
+            if( key.getStartTime() < this.memTableBoundary || key.getStartTime() <= this.stLevel.getTimeBoundary() ) {
+                insert2fileBuffer(key, entry.getValue());
+                countBuffer++;
+            }else {
+                this.stableMemTable.add(entry.getKey(), entry.getValue());
+                countMerge++;
+            }
         }
         this.mergeProcess.merge(stableMemTable, this.files, this.fileBuffers, this.cache);
         this.memTableBoundary = Math.max(stableMemTable.getEndTime()+1,this.memTableBoundary);
         this.stableMemTable = null;
+        log.info("buffer: "+countBuffer+" merge: "+countMerge+" memTableBoundary: "+this.memTableBoundary);
     }
 
     /**
