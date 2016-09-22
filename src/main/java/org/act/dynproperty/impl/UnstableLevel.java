@@ -154,40 +154,50 @@ public class UnstableLevel implements Level
     {
         try
         {
-            String tempFileName = Filename.tempFileName( 0 );
+            String tempFileName = Filename.tempFileName(0);
             File tempFile = new File( this.dbDir + "/" + tempFileName );
-            if( !tempFile.exists() )
+            if( tempFile.exists() )
             {
-                this.memTable = new MemTable( TableComparator.instence() );
-                this.memTableBoundary = 0;
-                for( Long number : this.files.keySet() )
+                FileInputStream inputStream = new FileInputStream(tempFile);
+                FileChannel channel = inputStream.getChannel();
+                Table table = new FileChannelTable(tempFileName, channel, TableComparator.instence(), false);
+                TableIterator iterator = table.iterator();
+                if( iterator.hasNext() )
                 {
-                    if( this.files.get( number ) != null )
-                    {
-                        this.memTableBoundary = this.files.get( number ).getLargest()+1;
-                        break;
+                    this.memTable = new MemTable(TableComparator.instence());
+                    while (iterator.hasNext()) {
+                        Entry<Slice, Slice> entry = iterator.next();
+                        this.memTable.add(entry.getKey(), entry.getValue());
                     }
+                    this.memTableBoundary = this.memTable.getStartTime();
+                    inputStream.close();
+                    channel.close();
                 }
-                return;
+                else
+                {
+                    this.createNewEmptyMemTable();
+                }
+                Files.delete(tempFile.toPath());
             }
-            FileInputStream inputStream = new FileInputStream( tempFile );
-            FileChannel channel = inputStream.getChannel();
-            Table table = new FileChannelTable( tempFileName, channel, TableComparator.instence(), false );
-            TableIterator iterator = table.iterator();
-            this.memTable = new MemTable( TableComparator.instence() );
-            while( iterator.hasNext() )
+            else
             {
-                Entry<Slice,Slice> entry = iterator.next(); 
-                this.memTable.add( entry.getKey(), entry.getValue() );
+                this.createNewEmptyMemTable();
             }
-            this.memTableBoundary = this.memTable.getStartTime();
-            inputStream.close();
-            channel.close();
-            Files.delete( tempFile.toPath() );
         }
         catch( IOException e )
         {
             log.error( "Restore MemTable Failed!" );
+        }
+    }
+
+    private void createNewEmptyMemTable() {
+        this.memTable = new MemTable(TableComparator.instence());
+        this.memTableBoundary = 0;
+        for (Long number : this.files.keySet()) {
+            if (this.files.get(number) != null) {
+                this.memTableBoundary = this.files.get(number).getLargest() + 1;
+                break;
+            }
         }
     }
 
@@ -488,7 +498,7 @@ public class UnstableLevel implements Level
         this.mergeProcess.merge(stableMemTable, this.files, this.fileBuffers, this.cache);
         this.memTableBoundary = Math.max(stableMemTable.getEndTime()+1,this.memTableBoundary);
         this.stableMemTable = null;
-        log.info("buffer: "+countBuffer+" merge: "+countMerge+" memTableBoundary: "+this.memTableBoundary);
+        log.debug("buffer: "+countBuffer+" merge: "+countMerge+" memTableBoundary: "+this.memTableBoundary);
     }
 
     /**
