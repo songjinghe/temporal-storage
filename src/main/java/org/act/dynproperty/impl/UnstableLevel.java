@@ -25,12 +25,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.act.dynproperty.Level;
 import org.act.dynproperty.impl.MemTable.MemTableIterator;
-import org.act.dynproperty.table.FileChannelTable;
-import org.act.dynproperty.table.MergeProcess;
-import org.act.dynproperty.table.Table;
-import org.act.dynproperty.table.TableBuilder;
-import org.act.dynproperty.table.TableComparator;
-import org.act.dynproperty.table.TableIterator;
+import org.act.dynproperty.table.*;
 import org.act.dynproperty.util.Slice;
 import org.act.dynproperty.util.TimeIntervalUtil;
 import org.slf4j.Logger;
@@ -96,14 +91,18 @@ public class UnstableLevel implements Level
             @Override
             public void run()
             {
-                Thread.currentThread().setName("Dynamic-Storage-Merge");
+                Thread.currentThread().setName("DynStore-Merge-"+(dbDir.endsWith("dynNode")?"Node":"Rel"));
                 while(true)
                 {
                     try
                     {
                         MemTable temp = mergeWaitingQueue.take();
                         mergeIsHappening = true;
-                        UnstableLevel.this.startMergeProcess( temp );
+                        if(!temp.isEmpty()) {
+                            UnstableLevel.this.startMergeProcess(temp);
+                        }else{
+//                            log.debug("empty memtable");
+                        }
                     }
                     catch ( IOException e )
                     {
@@ -131,12 +130,12 @@ public class UnstableLevel implements Level
         try
         {
             this.files.put(metaData.getNumber(), metaData);
-            String bufferName = Filename.bufferFileName( metaData.getNumber() );
+            String bufferName = Filename.bufferFileName(metaData.getNumber());
             File bufferfile = new File(this.dbDir + "/" + bufferName );
             if( bufferfile.exists() )
             {
                 FileBuffer buffer = new FileBuffer( bufferName, this.dbDir + "/" + bufferName );
-                this.fileBuffers.put( metaData.getNumber(), buffer );
+                this.fileBuffers.put(metaData.getNumber(), buffer);
             }
             else
                 this.fileBuffers.put( metaData.getNumber(), null );
@@ -156,11 +155,16 @@ public class UnstableLevel implements Level
         {
             String tempFileName = Filename.tempFileName(0);
             File tempFile = new File( this.dbDir + "/" + tempFileName );
-            if( tempFile.exists() )
+            if( tempFile.exists() && (tempFile.length() >= Footer.ENCODED_LENGTH))
             {
                 FileInputStream inputStream = new FileInputStream(tempFile);
                 FileChannel channel = inputStream.getChannel();
-                Table table = new FileChannelTable(tempFileName, channel, TableComparator.instence(), false);
+                Table table;
+                try {
+                    table = new FileChannelTable(tempFileName, channel, TableComparator.instence(), false);
+                }catch (IllegalArgumentException e){
+                    throw new RuntimeException(tempFileName+" file size larger than "+Integer.MAX_VALUE+" bytes. Should not happen.",e);
+                }
                 TableIterator iterator = table.iterator();
                 if( iterator.hasNext() )
                 {
@@ -452,7 +456,7 @@ public class UnstableLevel implements Level
             {
                 try
                 {
-                    Thread.currentThread().sleep(1000);
+                    Thread.sleep(200);
                 }
                 catch ( InterruptedException e )
                 {
@@ -465,12 +469,21 @@ public class UnstableLevel implements Level
         this.memTable.add(key.encode(), value);
         if( !mergeIsHappening && this.memTable.approximateMemoryUsage() >= 4*1024*1024 )
         {
-            MemTable temp = this.memTable;
+            MemTable temp = this.memTable;debugMemtable("beforOfferInSet",memTable);
             this.mergeWaitingQueue.offer( temp );
             this.memTable = new MemTable( TableComparator.instence() );
         }
         this.memtableLock.unlock();
         return true;
+    }
+
+    void debugMemtable(String mark, MemTable t){
+        MemTableIterator i = t.iterator();
+        long size = 0;
+        log.debug("{}-{} {}", t.getStartTime(), t.getEndTime());
+        log.debug("{}", t.approximateMemoryUsage());
+//        while(i.hasNext()){i.next(); size++;}
+//        log.info(mark+" {} size:{}", t, size);
     }
 
     /**
@@ -479,7 +492,7 @@ public class UnstableLevel implements Level
      * @throws IOException
      */
     private void startMergeProcess( MemTable temp ) throws IOException
-    {
+    {debugMemtable("StartMergeProcess",temp);
         SeekingIterator<Slice,Slice> iterator = temp.iterator();
         this.stableMemTable = new MemTable( TableComparator.instence() );
         long countBuffer=0, countMerge = 0;
@@ -566,8 +579,7 @@ public class UnstableLevel implements Level
     {
         try
         {
-            while(this.mergeIsHappening || this.mergeWaitingQueue.size() != 0 )
-                Thread.currentThread().sleep( 1000 );
+            waitUntilCurrentMergeComplete();
             this.mergeThread.interrupt();
             while( mergeThread.isAlive() )
                 this.mergeThread.interrupt();
@@ -581,27 +593,34 @@ public class UnstableLevel implements Level
     }
 
     /**
-     * this method is called and blocked until merge process complete.
+     * this method is called from [main] thread and will block until merge process complete.
+     * Note: this method can only guarantee that data written in memtable before the time this
+     * method is called is written into disk. There can be lots of SET operation blocked when
+     * this method is running.
      */
     public synchronized void forceMemTableMerge()
     {
-        if( ! mergeIsHappening )
-        {
+        try {
+            this.memtableLock.lock();
             MemTable temp = this.memTable;
-            this.mergeWaitingQueue.offer( temp );
-            this.memTable = new MemTable( TableComparator.instence() );
-        }
-        while (this.mergeIsHappening || this.mergeWaitingQueue.size() != 0)
-        {
-            try {
-                Thread.currentThread().sleep(50);
-            } catch (InterruptedException e) {
-                //FIXME
-                e.printStackTrace();
-            }
+            this.mergeWaitingQueue.offer(temp);
+            this.memTable = new MemTable(TableComparator.instence());
+            waitUntilCurrentMergeComplete();
+        }catch (InterruptedException e){
+            //FIXME
+            log.warn("Force merge interrupted. Merge operation may failed.");
+            e.printStackTrace();
+        }finally {
+            this.memtableLock.unlock();
         }
     }
 
+    private void waitUntilCurrentMergeComplete() throws InterruptedException{
+        while (this.mergeIsHappening || this.mergeWaitingQueue.size() != 0)
+        {
+            Thread.sleep(50);
+        }
+    }
     /**
      * 将所有UnStableFile的元数据写入磁盘
      */
