@@ -147,12 +147,17 @@ public class DynPropertyStoreImpl implements DynPropertyStore
 
     private boolean isValidMetaFile(File newMetaFile) throws IOException {
         String EOF = "EOF!EOF!EOF!";
-        RandomAccessFile raf = new RandomAccessFile(newMetaFile, "r");
-        raf.seek(newMetaFile.length() - EOF.length());// Seek to the end of file
-        byte[] bytes = new byte[EOF.length()];
-        raf.read(bytes, 0, EOF.length());// Read it out.
-        raf.close();
-        return new String(bytes).equals(EOF);
+        long index = newMetaFile.length() - EOF.length();
+        if( index > 0 ) {
+            RandomAccessFile raf = new RandomAccessFile(newMetaFile, "r");
+            raf.seek(index);// Seek to the end of file
+            byte[] bytes = new byte[EOF.length()];
+            raf.read(bytes, 0, EOF.length());// Read it out.
+            raf.close();
+            return new String(bytes).equals(EOF);
+        }else{
+            return false;
+        }
     }
 
 
