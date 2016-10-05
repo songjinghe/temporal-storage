@@ -469,7 +469,7 @@ public class UnstableLevel implements Level
         this.memTable.add(key.encode(), value);
         if( !mergeIsHappening && this.memTable.approximateMemoryUsage() >= 4*1024*1024 )
         {
-            MemTable temp = this.memTable;debugMemtable("beforOfferInSet",memTable);
+            MemTable temp = this.memTable;
             this.mergeWaitingQueue.offer( temp );
             this.memTable = new MemTable( TableComparator.instence() );
         }
@@ -492,7 +492,7 @@ public class UnstableLevel implements Level
      * @throws IOException
      */
     private void startMergeProcess( MemTable temp ) throws IOException
-    {debugMemtable("StartMergeProcess",temp);
+    {
         SeekingIterator<Slice,Slice> iterator = temp.iterator();
         this.stableMemTable = new MemTable( TableComparator.instence() );
         long countBuffer=0, countMerge = 0;
@@ -508,10 +508,12 @@ public class UnstableLevel implements Level
                 countMerge++;
             }
         }
-        this.mergeProcess.merge(stableMemTable, this.files, this.fileBuffers, this.cache);
-        this.memTableBoundary = Math.max(stableMemTable.getEndTime()+1,this.memTableBoundary);
+        if(!stableMemTable.isEmpty()){
+            this.mergeProcess.merge(stableMemTable, this.files, this.fileBuffers, this.cache);
+            this.memTableBoundary = Math.max(stableMemTable.getEndTime()+1,this.memTableBoundary);
+        }
         this.stableMemTable = null;
-        log.debug("buffer: "+countBuffer+" merge: "+countMerge+" memTableBoundary: "+this.memTableBoundary);
+//        log.debug("buffer: "+countBuffer+" merge: "+countMerge+" memTableBoundary: "+this.memTableBoundary);
     }
 
     /**
