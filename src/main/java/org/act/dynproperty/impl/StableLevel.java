@@ -77,22 +77,44 @@ public class StableLevel implements Level, StableLevelAddFile
     {
         try
         {
-            this.files.put( metaData.getNumber(), metaData );
-            String bufferName = Filename.stbufferFileName( metaData.getNumber() );
-            File bufferfile = new File(this.dbDir + "/" + bufferName );
-            if( bufferfile.exists() )
-            {
-                FileBuffer buffer = new FileBuffer( bufferName, this.dbDir + "/" + bufferName );
-                this.fileBuffers.put( metaData.getNumber(), buffer );
+            File stableFile = new File(this.dbDir + "/" +Filename.stableFileName(metaData.getNumber()));
+            if( stableFile.exists() ) {
+                this.files.put(metaData.getNumber(), metaData);
+                this.loadStableBufferFile(metaData);
+            }else{ // recover from last un-planed shutdown.
+                File mergeTempFile = new File(this.dbDir + "/" + Filename.tempFileName( 5 ) );
+                if( mergeTempFile.exists() ){
+                    boolean success = mergeTempFile.renameTo(stableFile);
+                    if(success){
+                        Files.deleteIfExists( new File( this.dbDir + "/" + Filename.stbufferFileName(metaData.getNumber() ) ).toPath() );
+                        this.files.put(metaData.getNumber(), metaData);
+                        this.loadStableBufferFile(metaData);
+                    }else{
+                        log.error("Rename failed when recovery.");
+                        throw new RuntimeException("Rename failed when recovery.");
+                    }
+                }else{
+                    log.error("DynStore System is in inconsistent state.");
+                    throw new RuntimeException("DynStore System is in inconsistent state.");
+                }
             }
-            else
-                this.fileBuffers.put( metaData.getNumber(), null );
         }
         catch( IOException e )
         {
             log.error( "Error happens when load bufferfile:" + metaData.getNumber() + " contents!" );
         }
     }
+
+    private void loadStableBufferFile(FileMetaData metaData) throws IOException {
+        String bufferName = Filename.stbufferFileName(metaData.getNumber());
+        File bufferfile = new File(this.dbDir + "/" + bufferName);
+        if (bufferfile.exists()) {
+            FileBuffer buffer = new FileBuffer(bufferName, this.dbDir + "/" + bufferName);
+            this.fileBuffers.put(metaData.getNumber(), buffer);
+        } else
+            this.fileBuffers.put(metaData.getNumber(), null);
+    }
+
     /**
      * 返回StableLevel存储的数据的最晚有效时间
      */

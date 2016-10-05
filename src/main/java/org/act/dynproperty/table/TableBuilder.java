@@ -187,7 +187,7 @@ public class TableBuilder
         // close the block
         Slice raw = blockBuilder.finish();
         
-        log.debug( "block raw length: " + raw.length() + " block data length: " + blockBuilder.currentSizeEstimate() );
+//        log.debug( "block raw length: " + raw.length() + " block data length: " + blockBuilder.currentSizeEstimate() );
         //Preconditions.checkArgument( raw.length() >= blockSize, "datablock not equal to blocksize" );
         //Preconditions.checkArgument( blockBuilder.currentSizeEstimate() <= raw.length(),"datablock's data size shold smaller than block size" );
 
