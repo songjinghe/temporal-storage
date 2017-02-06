@@ -10,4 +10,12 @@ public interface RangeQueryCallBack
 	public void setValueType(String valueType );
     public void onCall( Slice value );
     public Slice onReturn();
+    public enum CallBackType{
+    	COUNT,
+    	SUM,
+    	MIN,
+    	MAX,
+    	USER;
+    }
+    public CallBackType getType();
 }

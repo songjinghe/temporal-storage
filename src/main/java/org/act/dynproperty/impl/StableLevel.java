@@ -362,21 +362,64 @@ public class StableLevel implements Level, StableLevelAddFile
                 File tempFile = new File(this.dbDir + "/" + tempfilename );
                 if( !tempFile.exists() )
                     tempFile.createNewFile();
+                File indexFile = new File(this.dbDir + "/index" + metafile.getNumber());
+                FileOutputStream indexStream = new FileOutputStream( indexFile );
                 FileOutputStream stream = new FileOutputStream( tempFile );
+                FileChannel indexChannel = indexStream.getChannel();
                 FileChannel channel = stream.getChannel();
                 TableBuilder builder = new TableBuilder( new Options(), channel, TableComparator.instence() );
+                TableBuilder indexBuilder = new TableBuilder(new Options(), indexChannel, TableComparator.instence() );
                 List<SeekingIterator<Slice,Slice>> iterators = new ArrayList<SeekingIterator<Slice,Slice>>(2);
                 SeekingIterator<Slice,Slice> iterator = new BufferFileAndTableIterator( buffer.iterator(), table.iterator(), TableComparator.instence() );
                 iterators.add( iterator );
                 MergingIterator mergeIterator = new MergingIterator( iterators, TableComparator.instence() );
+                InternalKey lastKey = null;
+                int count = 0;
+                Slice max = null;
+                Slice min = null;
+                Slice sum = null;
                 while( mergeIterator.hasNext() )
                 {
                     Entry<Slice,Slice> entry = mergeIterator.next();
                     builder.add( entry.getKey(), entry.getValue() );
+                    InternalKey currentKey = new InternalKey(entry.getKey());
+                    if(lastKey == null || lastKey.getId().equals(currentKey.getId()) ){ 
+                    	if( lastKey == null ){
+	                		lastKey = currentKey;
+	                		max = entry.getKey();
+	                		min = entry.getKey();
+	                		sum = entry.getKey();
+	                	}                  
+                    	count++;
+                    	max = RangeQueryUtil.max(max,entry.getValue());
+                    	min = RangeQueryUtil.min(min,entry.getValue());
+                    	sum = RangeQueryUtil.sum(max,entry.getValue());
+                    	continue;
+                    }
+                    else{
+                    	InternalKey countKey = new InternalKey(lastKey.getId(), 0, 4, ValueType.VALUE);
+                    	Slice countSlice = new Slice(4);
+                    	countSlice.setInt(0, count);
+                    	InternalKey maxKey = new InternalKey(lastKey.getId(), 1, max.length(), ValueType.VALUE);
+                    	InternalKey minKey = new InternalKey(lastKey.getId(), 2, min.length(), ValueType.VALUE);
+                    	InternalKey sumKey = new InternalKey(lastKey.getId(), 3, sum.length(), ValueType.VALUE);
+                    	indexBuilder.add(countKey.encode(), countSlice);
+                    	indexBuilder.add(maxKey.encode(), max);
+                    	indexBuilder.add(minKey.encode(), min);
+                    	indexBuilder.add(sumKey.encode(), sum);
+                    	count = 1;
+                    	max = entry.getKey();
+                    	min = entry.getKey();
+                    	sum = entry.getKey();
+                    	lastKey = currentKey;
+                    }
                 }
+                indexBuilder.finish();
                 builder.finish();
                 channel.close();
+                indexChannel.close();
                 stream.close();
+                indexStream.close();
                 table.close();
                 this.cache.evict( metafile.getNumber() );
                 File originFile = new File( this.dbDir + "/" + Filename.stableFileName( metafile.getNumber() ));
