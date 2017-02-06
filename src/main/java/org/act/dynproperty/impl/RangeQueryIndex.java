@@ -1,8 +1,10 @@
 package org.act.dynproperty.impl;
 
+import org.act.dynproperty.table.TableComparator;
 import org.act.dynproperty.util.Slice;
 import static org.act.dynproperty.impl.callback.CountCallBack.*;
 
+import java.io.File;
 import java.util.Map.Entry;
 
 public class RangeQueryIndex {
@@ -10,8 +12,13 @@ public class RangeQueryIndex {
 	private String dbDir;
 	private IndexTableCache tableCache;
 	
+	public RangeQueryIndex(String dbDir){
+		this.dbDir = dbDir;
+		this.tableCache = new IndexTableCache(new File(dbDir), 1, TableComparator.instence(), false);
+	}
 	
-	public Slice get(int fileNumber, CallBackType type, Slice idSlice ){
+	
+	public Slice get(long fileNumber, CallBackType type, Slice idSlice ){
 		SeekingIterator<Slice, Slice> iterator = this.tableCache.newIterator( fileNumber );
 		InternalKey searchKey = null;
 		switch (type) {

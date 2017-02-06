@@ -9,6 +9,7 @@ public interface RangeQueryCallBack
 {
 	public void setValueType(String valueType );
     public void onCall( Slice value );
+    public void onCallBatch( Slice batchValue );
     public Slice onReturn();
     public enum CallBackType{
     	COUNT,

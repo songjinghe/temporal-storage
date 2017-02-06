@@ -61,6 +61,8 @@ public class StableLevel implements Level, StableLevelAddFile
     private ReadWriteLock fileMetaLock;
     private final int bufferMergeboundary = 2;
     
+    private RangeQueryIndex rangeQueryIndex;
+    
     StableLevel( String dbDir, ReadWriteLock fileLock )
     {
         this.dbDir = dbDir;
@@ -68,6 +70,7 @@ public class StableLevel implements Level, StableLevelAddFile
         this.fileBuffers = new TreeMap<Long,FileBuffer>();
         this.cache = new TableCache( new File( dbDir ), 20, TableComparator.instence(), false, true );
         this.fileMetaLock = fileLock;
+        this.rangeQueryIndex = new RangeQueryIndex(dbDir);
     }
     
     /**
@@ -262,6 +265,11 @@ public class StableLevel implements Level, StableLevelAddFile
             {
                 int start = Math.max( startTime, metaData.getSmallest() );
                 int end = Math.min( endTime, metaData.getLargest() );
+                if( start == metaData.getSmallest() && end == metaData.getLargest() && callback.getType() != RangeQueryCallBack.CallBackType.USER ){
+                	Slice value = this.rangeQueryIndex.get(metaData.getNumber(), callback.getType(), idSlice);
+                	callback.onCallBatch(value);
+                	continue;
+                }
                 InternalKey searchKey = new InternalKey( idSlice, start, 0, ValueType.VALUE );
                 SeekingIterator<Slice,Slice> iterator = this.cache.newIterator( metaData.getNumber() );
                 iterator.seek( searchKey.encode() );

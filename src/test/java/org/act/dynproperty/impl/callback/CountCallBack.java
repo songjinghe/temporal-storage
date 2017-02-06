@@ -33,4 +33,10 @@ public class CountCallBack implements RangeQueryCallBack
 	public CallBackType getType() {
 		return CallBackType.COUNT;
 	}
+
+	@Override
+	public void onCallBatch(Slice batchValue) {
+		// TODO Auto-generated method stub
+		
+	}
 }
