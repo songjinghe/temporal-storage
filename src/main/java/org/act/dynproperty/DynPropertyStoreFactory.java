@@ -12,8 +12,7 @@ public class DynPropertyStoreFactory
 	 * @param dbDir 保存动态属性存储文件的目录
 	 * @return
 	 */
-    public static DynPropertyStore newPropertyStore( String dbDir )
-    {
+    public static DynPropertyStore newPropertyStore( String dbDir ) throws Throwable {
         return new DynPropertyStoreImpl( dbDir );
     }
 }

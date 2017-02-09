@@ -1,18 +1,11 @@
 package org.act.dynproperty.impl;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.NoSuchElementException;
-import java.util.SortedMap;
-import java.util.TreeMap;
+import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Executor;
@@ -26,6 +19,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.act.dynproperty.Level;
 import org.act.dynproperty.impl.MemTable.MemTableIterator;
 import org.act.dynproperty.table.*;
+import org.act.dynproperty.util.MergingIterator;
 import org.act.dynproperty.util.Slice;
 import org.act.dynproperty.util.TimeIntervalUtil;
 import org.slf4j.Logger;
@@ -125,10 +119,15 @@ public class UnstableLevel implements Level
     /**
      * 回复相关文件元信息，判断其是否有Buffer存在。
      */
+    @Override
     public void initfromdisc( FileMetaData metaData )
     {
-        try
-        {
+        recoverIfNeeded(metaData);
+        loadBufferIfExist(metaData);
+    }
+
+    private void loadBufferIfExist(FileMetaData metaData) {
+        try{
             this.files.put(metaData.getNumber(), metaData);
             String bufferName = Filename.bufferFileName(metaData.getNumber());
             File bufferfile = new File(this.dbDir + "/" + bufferName );
@@ -143,9 +142,32 @@ public class UnstableLevel implements Level
         catch( IOException e )
         {
             log.error( "Error happens when load bufferfile:" + metaData.getNumber() + " contents!" );
+            throw new RuntimeException(e);
         }
     }
-    
+
+    private void recoverIfNeeded(FileMetaData metaData) {
+        File file = new File(this.dbDir + "/" + Filename.unStableFileName(metaData.getNumber()));
+        if(file.exists()){
+            if(file.isDirectory()) {
+                throw new RuntimeException("found data file "+file.getName()+" as dir!");
+            }else{
+                return;
+            }
+        }else{ // not exist, search for 000006.dbtmp and rename it.
+            File tmpFile = new File(this.dbDir+'/'+Filename.tempFileName(6));
+            if(tmpFile.exists()){
+                if(!tmpFile.renameTo(file)){
+                    throw new RuntimeException("Recovery: can not rename " + tmpFile.getName() + " file!");
+                }else{
+                    return;
+                }
+            }else{
+                throw new RuntimeException("data file "+file.getName()+" not found, db is damaged.");
+            }
+        }
+    }
+
     /**
      * 从磁盘中回复MemTable中的数据
      */
@@ -540,8 +562,52 @@ public class UnstableLevel implements Level
                     this.fileBuffers.put( fileNumber, buffer );
                 }
                 buffer.add( key.encode(), value );
+                if(buffer.size()>1024*1024*10) {
+                    mergeBufferToFile( fileNumber );
+                }
                 break;
             }
+        }
+    }
+
+    /**
+     * this method merge (but not upgrade levels) buffer file to its
+     * responsible unstable file. if no buffer then nothing happened.
+     * @param number
+     * @throws IOException
+     */
+    private void mergeBufferToFile(Long number) throws IOException {
+        FileBuffer buffer = this.fileBuffers.get( number );
+        if( null != buffer )
+        {
+            Table table = this.cache.newTable( number );
+            String tempfilename = Filename.tempFileName( 6 );
+            File tempFile = new File(this.dbDir + "/" + tempfilename );
+            if( !tempFile.exists() )
+                tempFile.createNewFile();
+            FileOutputStream stream = new FileOutputStream( tempFile );
+            FileChannel channel = stream.getChannel();
+            TableBuilder builder = new TableBuilder( new Options(), channel, TableComparator.instence() );
+            List<SeekingIterator<Slice,Slice>> iterators = new ArrayList<SeekingIterator<Slice,Slice>>(2);
+            SeekingIterator<Slice,Slice> iterator = new BufferFileAndTableIterator( buffer.iterator(), table.iterator(), TableComparator.instence() );
+            iterators.add( iterator );
+            MergingIterator mergeIterator = new MergingIterator( iterators, TableComparator.instence() );
+            while( mergeIterator.hasNext() )
+            {
+                Entry<Slice,Slice> entry = mergeIterator.next();
+                builder.add( entry.getKey(), entry.getValue() );
+            }
+            builder.finish();
+            channel.close();
+            stream.close();
+            table.close();
+            this.cache.evict( number );
+            File originFile = new File( this.dbDir + "/" + Filename.stableFileName( number ));
+            Files.delete( originFile.toPath() );
+            buffer.close();
+            Files.delete( new File( this.dbDir + "/" + Filename.stbufferFileName( number ) ).toPath() );
+            this.fileBuffers.put( number, null );
+            tempFile.renameTo( new File( this.dbDir + "/" + Filename.stableFileName( number ) ) );
         }
     }
 
@@ -597,8 +663,7 @@ public class UnstableLevel implements Level
     /**
      * this method is called from [main] thread and will block until merge process complete.
      * Note: this method can only guarantee that data written in memtable before the time this
-     * method is called is written into disk. There can be lots of SET operation blocked when
-     * this method is running.
+     * method is called is written into disk. SET operation are blocked when this method is running.
      */
     public synchronized void forceMemTableMerge()
     {

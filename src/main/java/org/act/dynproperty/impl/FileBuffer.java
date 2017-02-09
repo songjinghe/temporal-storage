@@ -77,4 +77,8 @@ public class FileBuffer implements Closeable
         this.memTable = null;
         this.discTable.close();
     }
+
+    public long size(){
+        return this.memTable.approximateMemoryUsage();
+    }
 }

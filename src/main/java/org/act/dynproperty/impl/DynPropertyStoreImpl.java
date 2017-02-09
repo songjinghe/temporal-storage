@@ -5,9 +5,10 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.act.dynproperty.DynPropertyStore;
@@ -31,7 +32,7 @@ public class DynPropertyStoreImpl implements DynPropertyStore
      * 实例化方法
      * @param dbDir 存储动态属性数据的目录地址
      */
-    public DynPropertyStoreImpl( String dbDir )
+    public DynPropertyStoreImpl( String dbDir ) throws Throwable
     {
         this.dbDir = dbDir;
         ReadWriteLock fileMetaLock = new ReentrantReadWriteLock( true );
@@ -61,33 +62,37 @@ public class DynPropertyStoreImpl implements DynPropertyStore
     {
         this.unLevel.dumpMemTable2disc();
         this.unLevel.dumpFileMeta2disc();
-        this.stlevel.dumFileMeta2disc();
+        this.stlevel.dumpFileMeta2disc();
     }
     
     /**
      * 系统启动时调用，主要作用是将上次系统关闭时写入磁盘的数据读入内存
      */
-    private void start()
+    private void start() throws Throwable
     {
-        loadExitingFilesFromdisc();
+        List<FileMetaData> unstableFiles = readMetaInfo("unstable");
+        List<FileMetaData> stableFiles = readMetaInfo("stable");
+
+        for(FileMetaData file : unstableFiles){
+            this.unLevel.initfromdisc( file );
+        }
+
+        for(FileMetaData file: stableFiles){
+            this.stlevel.initfromdisc( file );
+        }
+
+        Files.deleteIfExists(new File(this.dbDir+'/'+Filename.tempFileName(6)).toPath());
+        Files.deleteIfExists(new File(this.dbDir+'/'+Filename.tempFileName(7)).toPath());
+
         this.unLevel.restoreMemTable();
     }
 
-    /**
-     * 将磁盘中所有StableFile和UnStableFile的元信息读入内存
-     */
-    private void loadExitingFilesFromdisc()
-    {
-        try
+    private List<FileMetaData> readMetaInfo(String stableOrUnStable) throws IOException {
+        List<FileMetaData> metaDataList = new ArrayList<>();
+        File metaFile = getValidMetaFile(stableOrUnStable);
+        if( metaFile.exists() )
         {
-            // unstable 
-//            String logFileName = Filename.logFileName( 0 );
-            File logFile = getValidMetaFile("unstable");
-            if( !logFile.exists() )
-            {
-                return;
-            }
-            FileInputStream inputStream = new FileInputStream( logFile );
+            FileInputStream inputStream = new FileInputStream( metaFile );
             FileChannel channel = inputStream.getChannel();
             LogReader logReader = new LogReader( channel, null, false, 0 );
             for( Slice logRecord = logReader.readRecord(); logRecord != null; logRecord = logReader.readRecord() )
@@ -95,54 +100,37 @@ public class DynPropertyStoreImpl implements DynPropertyStore
                 VersionEdit edit = new VersionEdit( logRecord );
                 for( Entry<Integer,FileMetaData> entry : edit.getNewFiles().entries() )
                 {
-                    this.unLevel.initfromdisc( entry.getValue() );
+                    metaDataList.add(entry.getValue());
                 }
             }
             inputStream.close();
             channel.close();
-//            Files.delete( logFile.toPath() );
-            
-            // stable
-//            logFileName = Filename.logFileName( 1 );
-            logFile = getValidMetaFile("stable");
-            if( !logFile.exists() )
-            {
-                return;
-            }
-            inputStream = new FileInputStream( logFile );
-            channel = inputStream.getChannel();
-            logReader = new LogReader( channel, null, false, 0 );
-            for( Slice logRecord = logReader.readRecord(); logRecord != null; logRecord = logReader.readRecord() )
-            {
-                VersionEdit edit = new VersionEdit( logRecord );
-                for( Entry<Integer,FileMetaData> entry : edit.getNewFiles().entries() )
-                {
-                    this.stlevel.initfromdisc( entry.getValue() );
-                }
-            }
-            inputStream.close();
-            channel.close();
-//            Files.delete( logFile.toPath() );
-            
         }
-        catch( IOException e )
-        {
-            e.printStackTrace();
-            log.error( "PropertyStore Init fails when retore existing file's info!" );
-        }
+        return metaDataList;
     }
 
     private File getValidMetaFile(String stableOrUnStable) throws IOException {
         File oldMetaFile = new File( this.dbDir + "/"+stableOrUnStable+".meta" );
         File newMetaFile = new File( this.dbDir + "/"+stableOrUnStable+".new.meta" );
-        if( newMetaFile.exists() && isValidMetaFile(newMetaFile)){
-            if (oldMetaFile.exists()) {
-                if (!oldMetaFile.delete()) throw new IOException("can not delete "+stableOrUnStable+".meta");
+        if( oldMetaFile.exists()) { // old exist then use old.
+            if(newMetaFile.exists() && !newMetaFile.delete()){ // delete new.
+                throw new IOException("Recovery: can not delete " + stableOrUnStable + ".new.meta file!");
             }
-            Path source = Paths.get(dbDir + "/"+stableOrUnStable+".new.meta");
-            Files.move(source, source.resolveSibling(stableOrUnStable+".meta"));
+            return oldMetaFile;
+        }else if(newMetaFile.exists()){
+            if(isValidMetaFile(newMetaFile)) {
+                // old not exist and new exist & valid. so rename to old
+                if (!newMetaFile.renameTo(oldMetaFile)) {
+                    throw new IOException("Recovery: can not rename " + stableOrUnStable + ".new.meta file!");
+                }
+            }else{
+                // old not exist and new invalid. so db is damaged.
+                throw new IOException("Recovery: invalid " + stableOrUnStable + ".new.meta , db is damaged!");
+            }
+            return oldMetaFile;
+        }else { // both old new not exist. is a empty folder. do nothing.
+            return oldMetaFile;
         }
-        return oldMetaFile;
     }
 
     private boolean isValidMetaFile(File newMetaFile) throws IOException {
@@ -236,7 +224,7 @@ public class DynPropertyStoreImpl implements DynPropertyStore
     public void flushMetaInfo2Disk()
     {
         this.unLevel.forceFileMetaToDisk();
-        this.stlevel.dumFileMeta2disc();
+        this.stlevel.dumpFileMeta2disc();
     }
 
 

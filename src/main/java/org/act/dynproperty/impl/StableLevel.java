@@ -8,11 +8,7 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.NoSuchElementException;
-import java.util.SortedMap;
-import java.util.TreeMap;
+import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -75,46 +71,49 @@ public class StableLevel implements Level, StableLevelAddFile
      */
     public void initfromdisc( FileMetaData metaData )
     {
+        recoverIfNeeded(metaData);
+        loadBufferIfExist(metaData);
+    }
+
+    private void loadBufferIfExist(FileMetaData metaData) {
         try
         {
-            File stableFile = new File(this.dbDir + "/" +Filename.stableFileName(metaData.getNumber()));
-            if( stableFile.exists() ) {
-                this.files.put(metaData.getNumber(), metaData);
-                this.loadStableBufferFile(metaData);
-            }else{ // recover from last un-planed shutdown.
-                File mergeTempFile = new File(this.dbDir + "/" + Filename.tempFileName( 5 ) );
-                if( mergeTempFile.exists() ){
-                    boolean success = mergeTempFile.renameTo(stableFile);
-                    if(success){
-                        Files.deleteIfExists( new File( this.dbDir + "/" + Filename.stbufferFileName(metaData.getNumber() ) ).toPath() );
-                        this.files.put(metaData.getNumber(), metaData);
-                        this.loadStableBufferFile(metaData);
-                    }else{
-                        log.error("Rename failed when recovery.");
-                        throw new RuntimeException("Rename failed when recovery.");
-                    }
-                }else{
-                    log.error("DynStore System is in inconsistent state.");
-                    throw new RuntimeException("DynStore System is in inconsistent state.");
-                }
-            }
+            String bufferName = Filename.stbufferFileName(metaData.getNumber());
+            File bufferfile = new File(this.dbDir + "/" + bufferName);
+            if (bufferfile.exists()) {
+                FileBuffer buffer = new FileBuffer(bufferName, this.dbDir + "/" + bufferName);
+                this.fileBuffers.put(metaData.getNumber(), buffer);
+            } else
+                this.fileBuffers.put(metaData.getNumber(), null);
         }
         catch( IOException e )
         {
             log.error( "Error happens when load bufferfile:" + metaData.getNumber() + " contents!" );
+            throw new RuntimeException(e);
         }
     }
 
-    private void loadStableBufferFile(FileMetaData metaData) throws IOException {
-        String bufferName = Filename.stbufferFileName(metaData.getNumber());
-        File bufferfile = new File(this.dbDir + "/" + bufferName);
-        if (bufferfile.exists()) {
-            FileBuffer buffer = new FileBuffer(bufferName, this.dbDir + "/" + bufferName);
-            this.fileBuffers.put(metaData.getNumber(), buffer);
-        } else
-            this.fileBuffers.put(metaData.getNumber(), null);
+    private void recoverIfNeeded(FileMetaData metaData) {
+        File file = new File(this.dbDir + "/" + Filename.stableFileName(metaData.getNumber()));
+        if(file.exists()){
+            if(file.isDirectory()) {
+                throw new RuntimeException("found data file "+file.getName()+" as dir!");
+            }else{
+                return;
+            }
+        }else{ // not exist, search for 000007.dbtmp and rename it.
+            File tmpFile = new File(this.dbDir+'/'+Filename.tempFileName(7));
+            if(tmpFile.exists()){
+                if(!tmpFile.renameTo(file)){
+                    throw new RuntimeException("Recovery: can not rename " + tmpFile.getName() + " file!");
+                }else{
+                    return;
+                }
+            }else{
+                throw new RuntimeException("data file "+file.getName()+" not found, db is damaged.");
+            }
+        }
     }
-
     /**
      * 返回StableLevel存储的数据的最晚有效时间
      */
@@ -280,7 +279,7 @@ public class StableLevel implements Level, StableLevelAddFile
                 if( null != buffer )
                 {
                     MemTableIterator bufferiterator = buffer.iterator();
-                    bufferiterator.seek( searchKey.encode() );
+                    bufferiterator.seek(searchKey.encode());
                     while( bufferiterator.hasNext() )
                     {
                         Entry<Slice,Slice> entry = bufferiterator.next();
@@ -330,13 +329,16 @@ public class StableLevel implements Level, StableLevelAddFile
                 continue;
             if( insertTime >= metaData.getSmallest() && insertTime <= metaData.getLargest() )
             {
-                FileBuffer buffer = this.fileBuffers.get( fileNumber );
+                FileBuffer buffer = this.fileBuffers.get(fileNumber);
                 if( null == buffer )
                 {
                     buffer = new FileBuffer( Filename.stbufferFileName( fileNumber ), this.dbDir + "/" + Filename.stbufferFileName( fileNumber ) );
                     this.fileBuffers.put( fileNumber, buffer );
                 }
                 buffer.add( key.encode(), value );
+                if(buffer.size()>1024*1024*10) {
+                    mergeBufferToFile( fileNumber );
+                }
                 break;
             }
         }
@@ -350,43 +352,12 @@ public class StableLevel implements Level, StableLevelAddFile
     public void addFile( FileMetaData file ) throws IOException
     {
         this.fileMetaLock.writeLock().lock();
-        this.files.put( file.getNumber(), file );
         if( this.files.size() >= bufferMergeboundary )
         {
-            FileMetaData metafile = this.files.get( (long)this.files.size()- bufferMergeboundary );
-            Table table = this.cache.newTable( metafile.getNumber() );
-            FileBuffer buffer = this.fileBuffers.get( (long)this.files.size()- bufferMergeboundary );
-            if( null != buffer )
-            {
-                String tempfilename = Filename.tempFileName( 5 );
-                File tempFile = new File(this.dbDir + "/" + tempfilename );
-                if( !tempFile.exists() )
-                    tempFile.createNewFile();
-                FileOutputStream stream = new FileOutputStream( tempFile );
-                FileChannel channel = stream.getChannel();
-                TableBuilder builder = new TableBuilder( new Options(), channel, TableComparator.instence() );
-                List<SeekingIterator<Slice,Slice>> iterators = new ArrayList<SeekingIterator<Slice,Slice>>(2);
-                SeekingIterator<Slice,Slice> iterator = new BufferFileAndTableIterator( buffer.iterator(), table.iterator(), TableComparator.instence() );
-                iterators.add( iterator );
-                MergingIterator mergeIterator = new MergingIterator( iterators, TableComparator.instence() );
-                while( mergeIterator.hasNext() )
-                {
-                    Entry<Slice,Slice> entry = mergeIterator.next();
-                    builder.add( entry.getKey(), entry.getValue() );
-                }
-                builder.finish();
-                channel.close();
-                stream.close();
-                table.close();
-                this.cache.evict( metafile.getNumber() );
-                File originFile = new File( this.dbDir + "/" + Filename.stableFileName( metafile.getNumber() ));
-                Files.delete( originFile.toPath() );
-                buffer.close();
-                Files.delete( new File( this.dbDir + "/" + Filename.stbufferFileName( metafile.getNumber() ) ).toPath() );
-                this.fileBuffers.put( metafile.getNumber(), null );
-                tempFile.renameTo( new File( this.dbDir + "/" + Filename.stableFileName( metafile.getNumber() ) ) );
-            }
+            long fileNumber = (long) this.files.size() - bufferMergeboundary;
+            mergeBufferToFile(fileNumber);
         }
+        this.files.put(file.getNumber(), file);
         this.fileMetaLock.writeLock().unlock();
     }
     
@@ -402,7 +373,7 @@ public class StableLevel implements Level, StableLevelAddFile
     /**
      * 在系统关闭的时候，将所有的文件元信息写入磁盘
      */
-    public void dumFileMeta2disc()
+    public void dumpFileMeta2disc()
     {
         try
         {
@@ -453,4 +424,48 @@ public class StableLevel implements Level, StableLevelAddFile
         else
             return this.files.get( (long)this.files.size()-1 ).getLargest()+1;
     }
+
+    /**
+     * this method merge (but not upgrade levels) buffer file to its
+     * responsible stable file.
+     * this method is ONLY used for stable files.
+     * if no buffer then nothing happened.
+     * note: meta data is not update, therefore the size of file is not update.
+     * @throws IOException
+     */
+    private void mergeBufferToFile(long number) throws IOException {
+        FileBuffer buffer = this.fileBuffers.get( number );
+        if( null != buffer )
+        {
+            Table table = this.cache.newTable( number );
+            String tempfilename = Filename.tempFileName( 7 );
+            File tempFile = new File(this.dbDir + "/" + tempfilename );
+            if( !tempFile.exists() )
+                tempFile.createNewFile();
+            FileOutputStream stream = new FileOutputStream( tempFile );
+            FileChannel channel = stream.getChannel();
+            TableBuilder builder = new TableBuilder( new Options(), channel, TableComparator.instence() );
+            List<SeekingIterator<Slice,Slice>> iterators = new ArrayList<SeekingIterator<Slice,Slice>>(2);
+            SeekingIterator<Slice,Slice> iterator = new BufferFileAndTableIterator( buffer.iterator(), table.iterator(), TableComparator.instence() );
+            iterators.add( iterator );
+            MergingIterator mergeIterator = new MergingIterator( iterators, TableComparator.instence() );
+            while( mergeIterator.hasNext() )
+            {
+                Entry<Slice,Slice> entry = mergeIterator.next();
+                builder.add( entry.getKey(), entry.getValue() );
+            }
+            builder.finish();
+            channel.close();
+            stream.close();
+            table.close();
+            this.cache.evict( number );
+            File originFile = new File( this.dbDir + "/" + Filename.stableFileName(number));
+            Files.delete( originFile.toPath() );
+            buffer.close();
+            Files.delete(new File(this.dbDir + "/" + Filename.stbufferFileName( number ) ).toPath());
+            this.fileBuffers.put( number, null);
+            tempFile.renameTo(new File(this.dbDir + "/" + Filename.stableFileName( number ) ) );
+        }
+    }
+
 }

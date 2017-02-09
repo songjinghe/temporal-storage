@@ -2,7 +2,6 @@ package org.act.dynproperty.table;
 
 import java.io.Closeable;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
@@ -11,9 +10,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.SortedMap;
 import java.util.Map.Entry;
-import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantLock;
 
 import org.act.dynproperty.impl.*;
 import org.act.dynproperty.util.FileChangeMonitor;
@@ -151,7 +148,7 @@ public class MergeProcess
                     fileBuffers.put( fileNumber, null );
                     fileMonitor.deleteFile( 0, metaData );
                 }
-                this.stableLevel.dumFileMeta2disc();
+                this.stableLevel.dumpFileMeta2disc();
                 this.unStableLevel.forceFileMetaToDisk();
                 for( File f : files2delete )
                 {
@@ -278,7 +275,7 @@ public class MergeProcess
                     fileBuffers.put( fileNumber, null );
                     this.fileMonitor.deleteFile( 0, metaData );
                 }
-                this.stableLevel.dumFileMeta2disc();
+                this.stableLevel.dumpFileMeta2disc();
                 this.unStableLevel.forceFileMetaToDisk();
                 for( File f : files2delete )
                 {
