@@ -456,6 +456,9 @@ public class StableLevel implements Level, StableLevelAddFile
             if( !tempFile.exists() )
                 tempFile.createNewFile();
             File indexFile = new File(this.dbDir + "/index" + number);
+            boolean hasIndexFile = indexFile.exists();
+            if( hasIndexFile )
+            	indexFile = new File(this.dbDir + "/index" + number + "temp");
             FileOutputStream indexStream = new FileOutputStream( indexFile );
             FileOutputStream stream = new FileOutputStream( tempFile );
             FileChannel indexChannel = indexStream.getChannel();
@@ -521,6 +524,10 @@ public class StableLevel implements Level, StableLevelAddFile
             Files.delete(new File(this.dbDir + "/" + Filename.stbufferFileName( number ) ).toPath());
             this.fileBuffers.put( number, null);
             tempFile.renameTo(new File(this.dbDir + "/" + Filename.stableFileName( number ) ) );
+            if( hasIndexFile ){
+            	Files.delete(indexFile.toPath());
+            	new File(this.dbDir + "/index" + number + "temp").renameTo(new File(this.dbDir + "/index" + number));
+            }
         }
     }
 

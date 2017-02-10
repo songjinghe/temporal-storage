@@ -23,10 +23,10 @@ public class DynPropertyStoreTest
     private static DynPropertyStore store;
     
     @Before
-    public void writeData()
+    public void writeData() throws Throwable
     {
         makeDir();
-        store = new DynPropertyStoreFactory().newPropertyStore( dbDir );
+		store = DynPropertyStoreFactory.newPropertyStore( dbDir );
         long start = System.currentTimeMillis();
         singleThreadWrite();
         //singleThreadRecureWrite();

@@ -2,7 +2,7 @@ package org.act.dynproperty.impl;
 
 import org.act.dynproperty.table.TableComparator;
 import org.act.dynproperty.util.Slice;
-import static org.act.dynproperty.impl.callback.CountCallBack.*;
+import static org.act.dynproperty.impl.RangeQueryCallBack.*;
 
 import java.io.File;
 import java.util.Map.Entry;
