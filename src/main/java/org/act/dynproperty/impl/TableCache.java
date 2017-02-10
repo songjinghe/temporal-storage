@@ -1,15 +1,7 @@
 
 package org.act.dynproperty.impl;
 
-import com.google.common.base.Preconditions;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
-import com.google.common.cache.RemovalListener;
-import com.google.common.cache.RemovalNotification;
-
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
@@ -21,8 +13,12 @@ import org.act.dynproperty.table.Table;
 import org.act.dynproperty.table.UserComparator;
 import org.act.dynproperty.util.Closeables;
 import org.act.dynproperty.util.Finalizer;
-import org.act.dynproperty.util.InternalTableIterator;
 import org.act.dynproperty.util.Slice;
+
+import com.google.common.base.Preconditions;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 
 /**
  * 对所有存储文件的缓存机制，使用FIFO的方式进行，如果需要对某个文件进行访问，可以直接从TableCache这里对文件的Iterator进行查询
@@ -125,10 +121,11 @@ public class TableCache
 
     private static final class TableAndFile
     {
+
         private final Table table;
         private final FileChannel fileChannel;
-
-        private TableAndFile(File databaseDir, long fileNumber, UserComparator userComparator, boolean verifyChecksums, boolean isStableFile)
+    	
+    	private TableAndFile(File databaseDir, long fileNumber, UserComparator userComparator, boolean verifyChecksums, boolean isStableFile)
                 throws IOException
         {
             String tableFileName;

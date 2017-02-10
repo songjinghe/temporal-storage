@@ -25,20 +25,20 @@ public class DynPropertyStoreTest
     @Before
     public void writeData()
     {
-        //makeDir();
+        makeDir();
         store = new DynPropertyStoreFactory().newPropertyStore( dbDir );
         long start = System.currentTimeMillis();
-        //singleThreadWrite();
+        singleThreadWrite();
         //singleThreadRecureWrite();
         //multiThreadWrite();
         System.out.println( "write " + TIME_NUMS*PRO_NUMS*ID_NUMS*40/1024/1024 + "M data. use time :" + (System.currentTimeMillis() - start)/100 +"second" );
     }
     
     
-    //@Test
+    @Test
     public void doNothing(){}
     
-    @Test
+    //@Test
     public void readDataTest() throws InterruptedException
     {
         long start = System.currentTimeMillis();

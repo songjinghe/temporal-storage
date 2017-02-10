@@ -8,7 +8,11 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.Map.Entry;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -57,6 +61,8 @@ public class StableLevel implements Level, StableLevelAddFile
     private ReadWriteLock fileMetaLock;
     private final int bufferMergeboundary = 2;
     
+    private RangeQueryIndex rangeQueryIndex;
+    
     StableLevel( String dbDir, ReadWriteLock fileLock )
     {
         this.dbDir = dbDir;
@@ -64,6 +70,7 @@ public class StableLevel implements Level, StableLevelAddFile
         this.fileBuffers = new TreeMap<Long,FileBuffer>();
         this.cache = new TableCache( new File( dbDir ), 20, TableComparator.instence(), false, true );
         this.fileMetaLock = fileLock;
+        this.rangeQueryIndex = new RangeQueryIndex(dbDir);
     }
     
     /**
@@ -261,6 +268,11 @@ public class StableLevel implements Level, StableLevelAddFile
             {
                 int start = Math.max( startTime, metaData.getSmallest() );
                 int end = Math.min( endTime, metaData.getLargest() );
+                if( start == metaData.getSmallest() && end == metaData.getLargest() && callback.getType() != RangeQueryCallBack.CallBackType.USER ){
+                	Slice value = this.rangeQueryIndex.get(metaData.getNumber(), callback.getType(), idSlice);
+                	callback.onCallBatch(value);
+                	continue;
+                }
                 InternalKey searchKey = new InternalKey( idSlice, start, 0, ValueType.VALUE );
                 SeekingIterator<Slice,Slice> iterator = this.cache.newIterator( metaData.getNumber() );
                 iterator.seek( searchKey.encode() );
@@ -279,7 +291,7 @@ public class StableLevel implements Level, StableLevelAddFile
                 if( null != buffer )
                 {
                     MemTableIterator bufferiterator = buffer.iterator();
-                    bufferiterator.seek(searchKey.encode());
+                    bufferiterator.seek( searchKey.encode() );
                     while( bufferiterator.hasNext() )
                     {
                         Entry<Slice,Slice> entry = bufferiterator.next();
@@ -329,7 +341,7 @@ public class StableLevel implements Level, StableLevelAddFile
                 continue;
             if( insertTime >= metaData.getSmallest() && insertTime <= metaData.getLargest() )
             {
-                FileBuffer buffer = this.fileBuffers.get(fileNumber);
+                FileBuffer buffer = this.fileBuffers.get( fileNumber );
                 if( null == buffer )
                 {
                     buffer = new FileBuffer( Filename.stbufferFileName( fileNumber ), this.dbDir + "/" + Filename.stbufferFileName( fileNumber ) );
@@ -426,10 +438,11 @@ public class StableLevel implements Level, StableLevelAddFile
     }
 
     /**
-     * this method merge (but not upgrade levels) buffer file to its
-     * responsible stable file.
+     * this method do three things:
+     * 1. merge (but not upgrade levels) buffer file to its responsible stable file.
+     * 2. update index
+     * 3. if no buffer then nothing happened.
      * this method is ONLY used for stable files.
-     * if no buffer then nothing happened.
      * note: meta data is not update, therefore the size of file is not update.
      * @throws IOException
      */
@@ -442,21 +455,64 @@ public class StableLevel implements Level, StableLevelAddFile
             File tempFile = new File(this.dbDir + "/" + tempfilename );
             if( !tempFile.exists() )
                 tempFile.createNewFile();
+            File indexFile = new File(this.dbDir + "/index" + number);
+            FileOutputStream indexStream = new FileOutputStream( indexFile );
             FileOutputStream stream = new FileOutputStream( tempFile );
+            FileChannel indexChannel = indexStream.getChannel();
             FileChannel channel = stream.getChannel();
             TableBuilder builder = new TableBuilder( new Options(), channel, TableComparator.instence() );
+            TableBuilder indexBuilder = new TableBuilder(new Options(), indexChannel, TableComparator.instence() );
             List<SeekingIterator<Slice,Slice>> iterators = new ArrayList<SeekingIterator<Slice,Slice>>(2);
             SeekingIterator<Slice,Slice> iterator = new BufferFileAndTableIterator( buffer.iterator(), table.iterator(), TableComparator.instence() );
             iterators.add( iterator );
             MergingIterator mergeIterator = new MergingIterator( iterators, TableComparator.instence() );
+            InternalKey lastKey = null;
+            int count = 0;
+            Slice max = null;
+            Slice min = null;
+            Slice sum = null;
             while( mergeIterator.hasNext() )
             {
                 Entry<Slice,Slice> entry = mergeIterator.next();
                 builder.add( entry.getKey(), entry.getValue() );
+                InternalKey currentKey = new InternalKey(entry.getKey());
+                if(lastKey == null || lastKey.getId().equals(currentKey.getId()) ){
+                    if( lastKey == null ){
+                        lastKey = currentKey;
+                        max = entry.getKey();
+                        min = entry.getKey();
+                        sum = entry.getKey();
+                    }
+                    count++;
+                    max = RangeQueryUtil.max(max,entry.getValue());
+                    min = RangeQueryUtil.min(min,entry.getValue());
+                    sum = RangeQueryUtil.sum(max,entry.getValue());
+                    continue;
+                }
+                else{
+                    InternalKey countKey = new InternalKey(lastKey.getId(), 0, 4, ValueType.VALUE);
+                    Slice countSlice = new Slice(4);
+                    countSlice.setInt(0, count);
+                    InternalKey maxKey = new InternalKey(lastKey.getId(), 1, max.length(), ValueType.VALUE);
+                    InternalKey minKey = new InternalKey(lastKey.getId(), 2, min.length(), ValueType.VALUE);
+                    InternalKey sumKey = new InternalKey(lastKey.getId(), 3, sum.length(), ValueType.VALUE);
+                    indexBuilder.add(countKey.encode(), countSlice);
+                    indexBuilder.add(maxKey.encode(), max);
+                    indexBuilder.add(minKey.encode(), min);
+                    indexBuilder.add(sumKey.encode(), sum);
+                    count = 1;
+                    max = entry.getKey();
+                    min = entry.getKey();
+                    sum = entry.getKey();
+                    lastKey = currentKey;
+                }
             }
+            indexBuilder.finish();
             builder.finish();
             channel.close();
+            indexChannel.close();
             stream.close();
+            indexStream.close();
             table.close();
             this.cache.evict( number );
             File originFile = new File( this.dbDir + "/" + Filename.stableFileName(number));
