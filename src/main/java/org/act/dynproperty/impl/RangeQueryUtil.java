@@ -6,6 +6,10 @@ import org.act.dynproperty.util.Slice;
 public class RangeQueryUtil {
 
 	public static Slice max(Slice max, Slice value) {
+		if( max == null )
+			return value;
+		if( value == null )
+			return max;
 		if(max.length() != value.length() )
 			return max;
 		byte[] maxByte = max.copyBytes();
@@ -36,6 +40,10 @@ public class RangeQueryUtil {
 	}
 
 	public static Slice min(Slice max, Slice value) {
+		if( max == null )
+			return value;
+		if( value == null )
+			return max;
 		if(max.length() != value.length() )
 			return max;
 		byte[] maxByte = max.copyBytes();
@@ -66,6 +74,10 @@ public class RangeQueryUtil {
 	}
 
 	public static Slice sum(Slice max, Slice value) {
+		if( max == null )
+			return value;
+		if( value == null )
+			return max;
 		if(max.length() != value.length() )
 			return max;
 		byte[] maxByte = max.copyBytes();

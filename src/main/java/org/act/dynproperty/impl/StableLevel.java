@@ -21,10 +21,12 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.act.dynproperty.Level;
 import org.act.dynproperty.impl.MemTable.MemTableIterator;
 import org.act.dynproperty.table.BufferFileAndTableIterator;
+import org.act.dynproperty.table.FileChannelTable;
 import org.act.dynproperty.table.Table;
 import org.act.dynproperty.table.TableBuilder;
 import org.act.dynproperty.table.TableComparator;
 import org.act.dynproperty.table.TableIterator;
+import org.act.dynproperty.table.TableUpdater;
 import org.act.dynproperty.util.MergingIterator;
 import org.act.dynproperty.util.Slice;
 import org.act.dynproperty.util.TableLatestValueIterator;
@@ -269,8 +271,68 @@ public class StableLevel implements Level, StableLevelAddFile
                 int start = Math.max( startTime, metaData.getSmallest() );
                 int end = Math.min( endTime, metaData.getLargest() );
                 if( start == metaData.getSmallest() && end == metaData.getLargest() && callback.getType() != RangeQueryCallBack.CallBackType.USER ){
-                	Slice value = this.rangeQueryIndex.get(metaData.getNumber(), callback.getType(), idSlice);
-                	callback.onCallBatch(value);
+                	
+                	FileBuffer buffer = this.fileBuffers.get( metaData.getNumber() );
+                	InternalKey searchKey = new InternalKey(idSlice, start, 0, ValueType.VALUE);
+                	boolean hasUpdate = false;
+                    if( null != buffer )
+                    {
+                        MemTableIterator bufferiterator = buffer.iterator();
+                        bufferiterator.seek( searchKey.encode() );
+                        while( bufferiterator.hasNext() )
+                        {
+                            Entry<Slice,Slice> entry = bufferiterator.next();
+                            InternalKey key = new InternalKey( entry.getKey() );
+                            if( key.getId().equals( idSlice ) )
+                            {
+                                hasUpdate = true;
+                            }
+                            else
+                                break;
+                        }
+                    }
+                	if( hasUpdate ){
+                		 
+                		SeekingIterator<Slice, Slice> iterator = new BufferFileAndTableIterator(buffer.iterator(), this.cache.newIterator(metaData), TableComparator.instence() );
+                		iterator.seek( searchKey.encode() );
+                		int count = 0;
+                        Slice max = null;
+                        Slice min = null;
+                        Slice sum = null;
+                		while( iterator.hasNext() ){
+                			Entry<Slice,Slice> entry = iterator.next();
+                			InternalKey key = new InternalKey(entry.getKey());
+                			if(!key.getId().equals(searchKey.getId()))
+                				break;
+                			else{
+                				callback.onCall(entry.getValue());
+                				count++;
+                                max = RangeQueryUtil.max(max,entry.getValue());
+                                min = RangeQueryUtil.min(min,entry.getValue());
+                                sum = RangeQueryUtil.sum(max,entry.getValue());
+                			}
+                		}
+                		try {
+                            File indexFile = new File(this.dbDir + "/index" + metaData.getNumber() );
+                            FileOutputStream stream = new FileOutputStream(indexFile);
+                            FileChannel channel = stream.getChannel();
+							Table indexTable = new FileChannelTable(this.dbDir + "/index" + metaData.getNumber(), channel, TableComparator.instence(), false);
+							TableUpdater updater = new TableUpdater(indexTable);
+							Slice countSlice = new Slice(4);
+							countSlice.setInt(0, count);
+							updater.update(idSlice, 0, 4, ValueType.VALUE, countSlice);
+							updater.update(idSlice, 1, 4, ValueType.VALUE, max);
+							updater.update(idSlice, 2, 4, ValueType.VALUE, min);
+							updater.update(idSlice, 3, 4, ValueType.VALUE, sum);
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+                		
+                	}
+                	else{ 
+	                	Slice value = this.rangeQueryIndex.get(metaData.getNumber(), callback.getType(), idSlice);
+	                	callback.onCallBatch(value);
+                	}
                 	continue;
                 }
                 InternalKey searchKey = new InternalKey( idSlice, start, 0, ValueType.VALUE );
