@@ -1,3 +1,4 @@
+dist: trusty
 sudo: false
 language: java
 matrix:
@@ -14,9 +15,6 @@ addons:
     - dpkg
     - make
     - xmlstarlet
-    - subversion
-    - wget
-    - curl
     - graphviz
     - nodejs-legacy
     - npm
