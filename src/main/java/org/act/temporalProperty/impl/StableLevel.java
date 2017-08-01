@@ -338,7 +338,7 @@ public class StableLevel implements Level, StableLevelAddFile
                 {
                     Entry<Slice,Slice> entry = iterator.next();
                     InternalKey key = new InternalKey( entry.getKey() );
-                    if( key.getId().equals( idSlice ) && key.getStartTime() <= end && key.getValueType().getPersistentId() != ValueType.INVALID.getPersistentId() )
+                    if( key.getId().equals( idSlice ) && key.getStartTime() <= end && key.getValueType().getPersistentId() != ValueType.DELETION.getPersistentId() )
                     {
                         callback.onCall( entry.getValue() );
                     }
