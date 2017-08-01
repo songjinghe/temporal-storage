@@ -7,16 +7,16 @@ import org.act.temporalProperty.util.Slice;
  */
 public interface RangeQueryCallBack
 {
-	public void setValueType(String valueType );
-    public void onCall( Slice value );
-    public void onCallBatch( Slice batchValue );
-    public Slice onReturn();
-    public enum CallBackType{
+	void setValueType(String valueType );
+    void onCall(int time, Object value);
+    void onCallBatch( Slice batchValue );
+    Object onReturn();
+    enum CallBackType{
     	COUNT,
     	SUM,
     	MIN,
     	MAX,
     	USER;
     }
-    public CallBackType getType();
+    CallBackType getType();
 }

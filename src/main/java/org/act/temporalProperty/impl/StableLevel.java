@@ -74,7 +74,8 @@ public class StableLevel implements Level, StableLevelAddFile
     /**
      * 回复相关文件元信息，判断其是否有Buffer存在。
      */
-    public void initfromdisc( FileMetaData metaData )
+    @Override
+    public void initFromDisk( FileMetaData metaData )
     {
         recoverIfNeeded(metaData);
         loadBufferIfExist(metaData);
@@ -301,7 +302,7 @@ public class StableLevel implements Level, StableLevelAddFile
                 			if(!key.getId().equals(searchKey.getId()))
                 				break;
                 			else{
-                				callback.onCall(entry.getValue());
+                				callback.onCall(key.getStartTime(), entry.getValue());
                 				count++;
                                 max = RangeQueryUtil.max(max,entry.getValue());
                                 min = RangeQueryUtil.min(min,entry.getValue());
@@ -340,7 +341,7 @@ public class StableLevel implements Level, StableLevelAddFile
                     InternalKey key = new InternalKey( entry.getKey() );
                     if( key.getId().equals( idSlice ) && key.getStartTime() <= end && key.getValueType().getPersistentId() != ValueType.DELETION.getPersistentId() )
                     {
-                        callback.onCall( entry.getValue() );
+                        callback.onCall( key.getStartTime(), entry.getValue() );
                     }
                     else
                         break;
@@ -358,7 +359,7 @@ public class StableLevel implements Level, StableLevelAddFile
                                 && key.getValueType().getPersistentId() != ValueType.INVALID.getPersistentId()
                                 && key.getValueType().getPersistentId() != ValueType.DELETION.getPersistentId())
                         {
-                            callback.onCall( entry.getValue() );
+                            callback.onCall( key.getStartTime(), entry.getValue() );
                         }
                         else
                             break;
