@@ -18,7 +18,7 @@ public interface Level
 	 * @param time 时间点
 	 * @return 返回值
 	 */
-    public Slice getPointValue( Slice idSlice, int time );
+    Slice getPointValue( Slice idSlice, int time );
     
     /**
      * 进行时间段查询
@@ -27,7 +27,7 @@ public interface Level
      * @param endTime 时间段结束时间
      * @param callback 时间段查询对值的聚集类型
      */
-    public void getRangeValue( Slice idSlice, int startTime, int endTime, RangeQueryCallBack callback );
+    void getRangeValue( Slice idSlice, int startTime, int endTime, RangeQueryCallBack callback );
     
     /**
      * 向level中写入动态属性数据
@@ -35,11 +35,11 @@ public interface Level
      * @param value
      * @return
      */
-    public boolean set( InternalKey key, Slice value );
+    boolean set( InternalKey key, Slice value );
     
     /**
      * 在系统启动阶段，初始化属于自己level的存储文件
      * @param metaData
      */
-    public void initfromdisc( FileMetaData metaData );
+    void initFromDisk(FileMetaData metaData );
 }

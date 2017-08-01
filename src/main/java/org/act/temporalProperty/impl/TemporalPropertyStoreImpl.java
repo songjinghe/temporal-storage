@@ -72,11 +72,11 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
         List<FileMetaData> stableFiles = readMetaInfo("stable");
 
         for(FileMetaData file : unstableFiles){
-            this.unLevel.initfromdisc( file );
+            this.unLevel.initFromDisk( file );
         }
 
         for(FileMetaData file: stableFiles){
-            this.stlevel.initfromdisc( file );
+            this.stlevel.initFromDisk( file );
         }
 
         Files.deleteIfExists(new File(this.dbDir+'/'+Filename.tempFileName(6)).toPath());
