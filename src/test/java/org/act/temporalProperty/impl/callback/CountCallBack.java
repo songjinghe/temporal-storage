@@ -3,20 +3,20 @@ package org.act.temporalProperty.impl.callback;
 import org.act.temporalProperty.impl.RangeQueryCallBack;
 import org.act.temporalProperty.util.Slice;
 
-public class CountCallBack implements RangeQueryCallBack
+public class CountCallBack extends RangeQueryCallBack
 {
 
     int Number = 0;
     String valueType;
     
     @Override
-    public void onCall( Slice value )
+    public void onCall(int time, Slice value)
     {
         Number++;
     }
 
     @Override
-    public Slice onReturn()
+    public Object onReturn()
     {
         Slice toret = new Slice(4);
         toret.setInt( 0, Number );

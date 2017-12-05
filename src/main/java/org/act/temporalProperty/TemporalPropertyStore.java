@@ -27,7 +27,7 @@ public interface TemporalPropertyStore
 	 * @param callback 时间段查询所采用的聚集类型
 	 * @return @{Slice} 查询的结果
 	 */
-    public Slice getRangeValue( long id, int proId, int startTime, int endTime, RangeQueryCallBack callback );
+    public Object getRangeValue( long id, int proId, int startTime, int endTime, RangeQueryCallBack callback );
     
     /**
      * 写入某个动态属性的值
