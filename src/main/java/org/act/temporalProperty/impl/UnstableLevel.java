@@ -81,7 +81,7 @@ public class UnstableLevel implements Level
             @Override
             public void run()
             {
-                Thread.currentThread().setName("DynStore-Merge-"+(dbDir.endsWith("dynNode")?"Node":"Rel"));
+                Thread.currentThread().setName("TemporalPropStore-"+(dbDir.endsWith("temporal.node.properties")?"Node":"Rel"));
                 while(true)
                 {
                     try
@@ -598,12 +598,12 @@ public class UnstableLevel implements Level
             stream.close();
             table.close();
             this.cache.evict( number );
-            File originFile = new File( this.dbDir + "/" + Filename.stableFileName( number ));
+            File originFile = new File( this.dbDir + "/" + Filename.unStableFileName( number ));
             Files.delete( originFile.toPath() );
             buffer.close();
-            Files.delete( new File( this.dbDir + "/" + Filename.stbufferFileName( number ) ).toPath() );
+            Files.delete( new File( this.dbDir + "/" + Filename.bufferFileName( number ) ).toPath() );
             this.fileBuffers.put( number, null );
-            tempFile.renameTo( new File( this.dbDir + "/" + Filename.stableFileName( number ) ) );
+            tempFile.renameTo( new File( this.dbDir + "/" + Filename.unStableFileName( number ) ) );
         }
     }
 

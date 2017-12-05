@@ -174,7 +174,7 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
      * 进行实践段查询，参考{@link TemporalPropertyStore}中的说明
      */
     @Override
-    public Slice getRangeValue( long id, int proId, int startTime, int endTime, RangeQueryCallBack callback )
+    public Object getRangeValue( long id, int proId, int startTime, int endTime, RangeQueryCallBack callback )
     {
         Slice idSlice = new Slice( 12 );
         idSlice.setLong( 0, id );
