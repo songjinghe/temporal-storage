@@ -6,4 +6,13 @@ package edu.buaa.act.temporal;
 public class TimeValueEntryCallback
 {
 
+    public boolean onTimeInterval(TimeInterval time, ValueAtTime value)
+    {
+        return false;
+    }
+
+    public void onFinish()
+    {
+
+    }
 }

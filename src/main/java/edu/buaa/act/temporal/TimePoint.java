@@ -14,14 +14,16 @@ import java.util.Comparator;
 
 /**
  * Created by song on 17-12-5.
+ *
+ * NOW == NOW, INIT == INIT
  */
 public class TimePoint implements Comparable<TimePoint>
 {
-    public static TimePoint NOW = new TimePoint(-1);
+    public static final TimePoint NOW = new TimePoint(-1, true);
 
-    public static TimePoint INIT = new TimePoint(-2);
+    public static final TimePoint INIT = new TimePoint(-2, true);
 
-    public static IOCoder<TimePoint> IO = new IOCoder<TimePoint>()
+    public static final IOCoder<TimePoint> IO = new IOCoder<TimePoint>()
     {
         @Override
         public int rawSize()
@@ -54,7 +56,7 @@ public class TimePoint implements Comparable<TimePoint>
         }
     };
 
-    public static Comparator<TimePoint> ComparatorASC = new Comparator<TimePoint>()
+    public static final Comparator<TimePoint> ComparatorASC = new Comparator<TimePoint>()
     {
         @Override
         public int compare(TimePoint o1, TimePoint o2)
@@ -69,34 +71,76 @@ public class TimePoint implements Comparable<TimePoint>
                 if(o2.time==-1) return -1; // o2 is NOW
                 else return 1; // o2 is INIT
             }else{
-                return Integer.compare(o1.time, o2.time);
+                return Integer.compare(o1.time, o2.time); // NOW == NOW, INIT == INIT
             }
         }
     };
 
 
 
-    private int time;
+    private final int time;
 
-    public TimePoint(int timestamp)
+    public TimePoint(long timestamp)
     {
-        this.time = timestamp;
+        if(0>timestamp || timestamp>Integer.MAX_VALUE)
+        {
+            throw new TPSRuntimeException("timestamp should between 0 and INT.MAX");
+        }
+        this.time = (int) timestamp;
+    }
+
+    private TimePoint(int time, boolean special)
+    {
+        this.time = time;
     }
 
     public TimePoint post() {
-        if(time<Integer.MAX_VALUE-1) {
-            return new TimePoint(time + 1);
+        if(time<=Integer.MAX_VALUE-1) {
+            if(0<time){
+                return new TimePoint(time + 1);
+            }else{
+                throw new TPSRuntimeException("NOW and INIT not support post operation.");
+            }
         }else{
             throw new TPSRuntimeException("time overflow.");
         }
     }
 
     public TimePoint pre() {
-        if(time>1) {
+        if(time>=1) {
             return new TimePoint(time - 1);
         }else{
-            throw new TPSRuntimeException("time underflow.");
+            if(0<=time){
+                throw new TPSRuntimeException("time underflow.");
+            }else{
+                throw new TPSRuntimeException("NOW and INIT not support pre operation.");
+            }
         }
+    }
+
+    public boolean hasPost()
+    {
+        return time<=Integer.MAX_VALUE-1;
+    }
+
+    public boolean hasPre()
+    {
+        return time>=0;
+    }
+
+    public boolean isNormal()
+    {
+        return hasPre() && hasPost();
+    }
+
+    public boolean isInit()
+    {
+        return this==TimePoint.INIT;
+    }
+
+    public boolean isNow()
+    {
+        return this==TimePoint.NOW;
     }
 
     public TimePoint copy(){
@@ -111,7 +155,13 @@ public class TimePoint implements Comparable<TimePoint>
 
     public TimePoint avg(TimePoint o)
     {
-        return new TimePoint((this.time+o.time)/2);
+        if(this.time<0 || o.time<0){
+            throw new TPSRuntimeException("NOW and INIT not support avg operator!");
+        }
+        long tmp = this.time;
+        tmp+=o.time;
+        tmp/=2;
+        return new TimePoint((int) tmp);
     }
 
     @Override
@@ -128,4 +178,6 @@ public class TimePoint implements Comparable<TimePoint>
     {
         return Objects.hashCode(time);
     }
+
+
 }

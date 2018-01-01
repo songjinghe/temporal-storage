@@ -18,7 +18,7 @@ public class TimeValueEntry
         return time;
     }
 
-    public TimeValueEntry clone()
+    public TimeValueEntry copy()
     {
         return new TimeValueEntry(time.copy(), value);
     }

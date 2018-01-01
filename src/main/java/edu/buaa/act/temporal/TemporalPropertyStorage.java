@@ -14,7 +14,7 @@ import java.util.List;
  */
 public interface TemporalPropertyStorage
 {
-    String version = "TGraph-TemporalStorage V2.3.12-20171227";
+    String version = "TGraph-TemporalStorage V2.3.12-201712";
 
     // READ
 
