@@ -8,6 +8,7 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.SortedMap;
 import java.util.Map.Entry;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -79,31 +80,8 @@ public class MergeProcess
             mergeIterators.add( memTable2merge.iterator() );
             channel2close.add( targetStream );
             channel2close.add( targetChannel );
-            for( Long fileNumber : mergeParticipants )
-            {
-                FileMetaData metaData = files.get( fileNumber );
-                File mergeFile = new File( dbDir + "/" + Filename.unStableFileName( metaData.getNumber() ) );
 
-                table2evict.add( fileNumber );
-                files2delete.add( mergeFile );
-
-                FileBuffer filebuffer = fileBuffers.get( fileNumber );
-                Table table = cache.newTable( fileNumber );
-                SeekingIterator<Slice,Slice> mergeIterator;
-                if( null != filebuffer )
-                {
-                    mergeIterator = new BufferFileAndTableIterator( filebuffer.iterator(),
-                            table.iterator(), TableComparator.instance() );
-                    channel2close.add( filebuffer );
-                    files2delete.add( new File( dbDir + "/" + Filename.bufferFileName( fileNumber ) ) );
-                }
-                else
-                    mergeIterator = table.iterator();
-                channel2close.add( table );
-                table2evict.add( fileNumber );
-                mergeIterators.add( mergeIterator );
-            }
-            MergingIterator buildIterator = new MergingIterator( mergeIterators, TableComparator.instance() );
+            MergingIterator buildIterator = getDataIterator(mergeParticipants, mergeIterators, files, cache, fileBuffers, channel2close, files2delete, table2evict);
             int smallest = Integer.MAX_VALUE;
             int largest = -1;
             int count = 0;
@@ -154,6 +132,39 @@ public class MergeProcess
         }
     }
 
+    private MergingIterator getDataIterator(List<Long> mergeParticipants, List<SeekingIterator<Slice, Slice>> mergeIterators,
+                                            Map<Long, FileMetaData> files, TableCache cache, Map<Long, FileBuffer> fileBuffers,
+                                            List<Closeable> channel2close, List<File> files2delete, List<Long> table2evict)
+    {
+        for( Long fileNumber : mergeParticipants )
+        {
+            FileMetaData metaData = files.get( fileNumber );
+            File mergeFile = new File( dbDir + "/" + Filename.unStableFileName( metaData.getNumber() ) );
+
+            table2evict.add( fileNumber );
+            files2delete.add( mergeFile );
+
+            FileBuffer filebuffer = fileBuffers.get( fileNumber );
+            Table table = cache.newTable( fileNumber );
+            SeekingIterator<Slice,Slice> mergeIterator;
+            if( null != filebuffer )
+            {
+                mergeIterator = new BufferFileAndTableIterator( filebuffer.iterator(),
+                        table.iterator(), TableComparator.instance() );
+                channel2close.add( filebuffer );
+                files2delete.add( new File( dbDir + "/" + Filename.bufferFileName( fileNumber ) ) );
+            }
+            else
+            {
+                mergeIterator = table.iterator();
+            }
+            channel2close.add( table );
+            table2evict.add( fileNumber );
+            mergeIterators.add( mergeIterator );
+        }
+        return new MergingIterator( mergeIterators, TableComparator.instance() );
+    }
+
     /**
      * 将UnStableFile合并为StableFile的过程
      */
@@ -195,30 +206,8 @@ public class MergeProcess
                 mergeIterators.add( this.stableLevel.getlastFileIterator() );
             channel2close.add( targetStream );
             channel2close.add( targetChannel );
-            for( Long fileNumber : mergeParticipants )
-            {
-                FileMetaData metaData = files.get( fileNumber );
-                File mergeFile = new File( dbDir + "/" + Filename.unStableFileName( metaData.getNumber() ) );
-                table2evict.add( (long)fileNumber );
-                files2delete.add( mergeFile );
 
-                FileBuffer filebuffer = fileBuffers.get( fileNumber );
-                Table table = cache.newTable( fileNumber );
-                SeekingIterator<Slice,Slice> mergeIterator;
-                if( null != filebuffer )
-                {
-                    mergeIterator = new BufferFileAndTableIterator( filebuffer.iterator(),
-                            table.iterator(), TableComparator.instance() );
-                    channel2close.add( filebuffer );
-                    files2delete.add( new File( dbDir + "/" + Filename.bufferFileName( fileNumber ) ) );
-                }
-                else
-                    mergeIterator = table.iterator();
-                channel2close.add( table );
-                table2evict.add( fileNumber );
-                mergeIterators.add( mergeIterator );
-            }
-            MergingIterator buildIterator = new MergingIterator( mergeIterators, TableComparator.instance() );
+            MergingIterator buildIterator = getDataIterator(mergeParticipants,mergeIterators, files, cache, fileBuffers, channel2close, files2delete, table2evict);
             //int smallest = Integer.MAX_VALUE;
             int largest = -1;
             int count = 0;
