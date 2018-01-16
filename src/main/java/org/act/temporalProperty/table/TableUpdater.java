@@ -16,7 +16,7 @@ public class TableUpdater
     {
         this.table = t;
         this.indexBlock = this.table.indexBlock;
-        this.comparator = TableComparator.instence();
+        this.comparator = TableComparator.instance();
     }
     
     

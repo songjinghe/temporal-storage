@@ -20,7 +20,7 @@ public class MemTableTest
     @BeforeClass
     public static void setUp()
     {
-        table = new MemTable( TableComparator.instence() );
+        table = new MemTable( TableComparator.instance() );
         for( long i = 0; i<ID_NUMS; i++ )
         {
             for( int p = 0; p<PRO_NUMS; p++ )

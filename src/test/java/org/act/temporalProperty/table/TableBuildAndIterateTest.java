@@ -59,7 +59,7 @@ public class TableBuildAndIterateTest
             String fileName = Filename.stableFileName( 0 );
             File file = new File( dbDir + fileName );
             FileChannel channel = new FileInputStream( file ).getChannel();
-            Table table = new MMapTable( fileName, channel, TableComparator.instence(), false );
+            Table table = new MMapTable( fileName, channel, TableComparator.instance(), false );
             long id = 0;
             for( Entry<Slice,Slice> entry : table )
             {
@@ -82,7 +82,7 @@ public class TableBuildAndIterateTest
             String fileName = Filename.stableFileName( 0 );
             File file = new File( dbDir + fileName );
             FileChannel channel = new FileInputStream( file ).getChannel();
-            Table table = new MMapTable( fileName, channel, TableComparator.instence(), false );
+            Table table = new MMapTable( fileName, channel, TableComparator.instance(), false );
             ExecutorService ex = Executors.newFixedThreadPool( 2 );
             CountDownLatch latch = new CountDownLatch( 2 );
             ex.execute( new Runnable()

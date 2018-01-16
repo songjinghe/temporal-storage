@@ -72,7 +72,7 @@ public class UnstableLevel implements Level
         this.files = new TreeMap<Long,FileMetaData>();
         this.fileBuffers = new TreeMap<Long,FileBuffer>();
         this.mergeProcess = merge;
-        cache = new TableCache( new File( dbDir ), 5, TableComparator.instence(), false, false );
+        cache = new TableCache( new File( dbDir ), 5, TableComparator.instance(), false, false );
         this.memtableLock = new ReentrantLock( true );
         this.fileMetaDataLock = fileLock;
         this.stLevel = stLevel;
@@ -179,14 +179,14 @@ public class UnstableLevel implements Level
                 FileChannel channel = inputStream.getChannel();
                 Table table;
                 try {
-                    table = new FileChannelTable(tempFileName, channel, TableComparator.instence(), false);
+                    table = new FileChannelTable(tempFileName, channel, TableComparator.instance(), false);
                 }catch (IllegalArgumentException e){
                     throw new RuntimeException(tempFileName+" file size larger than "+Integer.MAX_VALUE+" bytes. Should not happen.",e);
                 }
                 TableIterator iterator = table.iterator();
                 if( iterator.hasNext() )
                 {
-                    this.memTable = new MemTable(TableComparator.instence());
+                    this.memTable = new MemTable(TableComparator.instance());
                     while (iterator.hasNext()) {
                         Entry<Slice, Slice> entry = iterator.next();
                         this.memTable.add(entry.getKey(), entry.getValue());
@@ -213,7 +213,7 @@ public class UnstableLevel implements Level
     }
 
     private void createNewEmptyMemTable() {
-        this.memTable = new MemTable(TableComparator.instence());
+        this.memTable = new MemTable(TableComparator.instance());
         this.memTableBoundary = 0;
         for (Long number : this.files.keySet()) {
             if (this.files.get(number) != null) {
@@ -489,7 +489,7 @@ public class UnstableLevel implements Level
         {
             MemTable temp = this.memTable;
             this.mergeWaitingQueue.offer( temp );
-            this.memTable = new MemTable( TableComparator.instence() );
+            this.memTable = new MemTable( TableComparator.instance() );
         }
         this.memtableLock.unlock();
         return true;
@@ -512,7 +512,7 @@ public class UnstableLevel implements Level
     private void startMergeProcess( MemTable temp ) throws IOException
     {
         SeekingIterator<Slice,Slice> iterator = temp.iterator();
-        this.stableMemTable = new MemTable( TableComparator.instence() );
+        this.stableMemTable = new MemTable( TableComparator.instance() );
         long countBuffer=0, countMerge = 0;
         while( iterator.hasNext() )
         {
@@ -583,11 +583,11 @@ public class UnstableLevel implements Level
                 tempFile.createNewFile();
             FileOutputStream stream = new FileOutputStream( tempFile );
             FileChannel channel = stream.getChannel();
-            TableBuilder builder = new TableBuilder( new Options(), channel, TableComparator.instence() );
+            TableBuilder builder = new TableBuilder( new Options(), channel, TableComparator.instance() );
             List<SeekingIterator<Slice,Slice>> iterators = new ArrayList<SeekingIterator<Slice,Slice>>(2);
-            SeekingIterator<Slice,Slice> iterator = new BufferFileAndTableIterator( buffer.iterator(), table.iterator(), TableComparator.instence() );
+            SeekingIterator<Slice,Slice> iterator = new BufferFileAndTableIterator( buffer.iterator(), table.iterator(), TableComparator.instance() );
             iterators.add( iterator );
-            MergingIterator mergeIterator = new MergingIterator( iterators, TableComparator.instence() );
+            MergingIterator mergeIterator = new MergingIterator( iterators, TableComparator.instance() );
             while( mergeIterator.hasNext() )
             {
                 Entry<Slice,Slice> entry = mergeIterator.next();
@@ -619,7 +619,7 @@ public class UnstableLevel implements Level
                 tempFile.createNewFile();
             FileOutputStream outputStream = new FileOutputStream( tempFile );
             FileChannel channel = outputStream.getChannel();
-            TableBuilder builer = new TableBuilder( new Options(), channel, TableComparator.instence() );
+            TableBuilder builer = new TableBuilder( new Options(), channel, TableComparator.instance() );
             SeekingIterator<Slice,Slice> iterator = this.memTable.iterator();
             while( iterator.hasNext() )
             {
@@ -667,7 +667,7 @@ public class UnstableLevel implements Level
             this.memtableLock.lock();
             MemTable temp = this.memTable;
             this.mergeWaitingQueue.offer(temp);
-            this.memTable = new MemTable(TableComparator.instence());
+            this.memTable = new MemTable(TableComparator.instance());
             waitUntilCurrentMergeComplete();
         }catch (InterruptedException e){
             //FIXME

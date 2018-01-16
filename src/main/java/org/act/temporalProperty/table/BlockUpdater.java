@@ -29,7 +29,7 @@ public class BlockUpdater
         this.data = dataBlock.data;
         this.restartPositions = dataBlock.restartPositions;
         this.dataInput = this.data.input();
-        this.comparator = TableComparator.instence();
+        this.comparator = TableComparator.instance();
         this.restartCount = restartPositions.length()/SIZE_OF_INT;
     }
     

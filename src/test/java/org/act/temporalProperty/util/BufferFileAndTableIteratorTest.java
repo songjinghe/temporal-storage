@@ -48,8 +48,8 @@ public class BufferFileAndTableIteratorTest
             FileChannel bufferChannel = new RandomAccessFile( bufferFile, "rw" ).getChannel();
             FileChannel tableChannel = new RandomAccessFile( tableFile,"rw").getChannel();
             buffer = new FileBuffer( bufferfileName, dbDir + tablefileName );
-            builder = new TableBuilder( new Options(), tableChannel, TableComparator.instence() );
-            memTable = new MemTable( TableComparator.instence() );
+            builder = new TableBuilder( new Options(), tableChannel, TableComparator.instance() );
+            memTable = new MemTable( TableComparator.instance() );
             for( int i = 0; i<DATA_SIZE; i++ )
             {
                 Slice key = new Slice(20);
@@ -68,7 +68,7 @@ public class BufferFileAndTableIteratorTest
                     memTable.add( key, value );
             }
             builder.finish();
-            table = new MMapTable( tablefileName, tableChannel, TableComparator.instence(), false );
+            table = new MMapTable( tablefileName, tableChannel, TableComparator.instance(), false );
         }
         catch( Exception e)
         {
@@ -80,10 +80,10 @@ public class BufferFileAndTableIteratorTest
     public void test()
     {
         List<SeekingIterator<Slice,Slice>> list = new LinkedList<SeekingIterator<Slice,Slice>>(); 
-        BufferFileAndTableIterator iterator = new BufferFileAndTableIterator( buffer.iterator(), table.iterator(), TableComparator.instence() );
+        BufferFileAndTableIterator iterator = new BufferFileAndTableIterator( buffer.iterator(), table.iterator(), TableComparator.instance() );
         list.add( iterator );
         list.add( memTable.iterator() );
-        MergingIterator merge = new MergingIterator( list, TableComparator.instence() );
+        MergingIterator merge = new MergingIterator( list, TableComparator.instance() );
         int expected = 0;
         while( merge.hasNext() )
         {

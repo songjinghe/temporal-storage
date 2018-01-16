@@ -16,7 +16,7 @@ public class TableComparator implements UserComparator
         this.userComparator = c;
     }
     
-    public static synchronized TableComparator instence()
+    public static synchronized TableComparator instance()
     {
         if( null == instence )
         {

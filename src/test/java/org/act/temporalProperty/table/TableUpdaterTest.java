@@ -38,7 +38,7 @@ public class TableUpdaterTest
             file.createNewFile();
             RandomAccessFile randomFile = new RandomAccessFile( file, "rw" );
             FileChannel channel = randomFile.getChannel();
-            TableBuilder builder = new TableBuilder( new Options(), channel, TableComparator.instence() );      
+            TableBuilder builder = new TableBuilder( new Options(), channel, TableComparator.instance() );
             for( long i = 0; i<ID_NUMS; i++ )
             {
                 for( int p = 0; p<PRO_NUMS; p++ )
@@ -60,7 +60,7 @@ public class TableUpdaterTest
             }
             builder.finish();
             channel.force( true );
-            table = new MMapTable( fileName, channel, TableComparator.instence(), false );
+            table = new MMapTable( fileName, channel, TableComparator.instance(), false );
         }
         catch( IOException e ){}
     }
