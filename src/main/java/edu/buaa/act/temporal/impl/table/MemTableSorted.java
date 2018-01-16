@@ -10,11 +10,9 @@ import com.google.common.primitives.Bytes;
 import edu.buaa.act.temporal.*;
 import edu.buaa.act.temporal.exception.TPSException;
 import edu.buaa.act.temporal.exception.TPSRuntimeException;
-import edu.buaa.act.temporal.helper.PointToIntervalIterator;
 import edu.buaa.act.temporal.impl.TimePointValueEntry;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -174,7 +172,7 @@ public class MemTableSorted
             long eid = in.getLong();
             TimePoint time = TimePoint.IO.decode(in);
             int vLen = in.getInt();
-            ValueAtTime value = ValueAtTime.decode(in, vLen);
+            ValueAtTime value = ValueAtTime.decode(in);
             PETKey key = new PETKey(pid, eid, time);
             data.put(key, value);
             currentSize+=value.length();

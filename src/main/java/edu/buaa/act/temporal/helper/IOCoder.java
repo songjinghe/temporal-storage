@@ -12,9 +12,8 @@ public interface IOCoder<T>
     int rawSize();
     T decode(byte[] src);
     T decode(DataInput in) throws IOException;
+    T decode(ByteBuffer in, int start);
     T decode(ByteBuffer in);
     byte[] encode(T t);
-
-
 
 }

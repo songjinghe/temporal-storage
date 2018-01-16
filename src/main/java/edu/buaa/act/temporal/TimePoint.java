@@ -44,6 +44,12 @@ public class TimePoint implements Comparable<TimePoint>
         }
 
         @Override
+        public TimePoint decode(ByteBuffer in, int start)
+        {
+            return new TimePoint(in.getInt(start));
+        }
+
+        @Override
         public TimePoint decode(ByteBuffer in)
         {
             return new TimePoint(in.getInt());
@@ -145,6 +151,10 @@ public class TimePoint implements Comparable<TimePoint>
 
     public TimePoint copy(){
         return new TimePoint(this.time);
+    }
+
+    public byte[] encode(){
+        return IO.encode(this);
     }
 
     @Override

@@ -5,6 +5,7 @@ import edu.buaa.act.temporal.TimePoint;
 import edu.buaa.act.temporal.TimeValueEntry;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -16,7 +17,7 @@ public class DataEntryUtils
     public static List<TimeValueEntry> mergeList(List<TimeValueEntry> high, List<TimeValueEntry> low)
     {
         List<TimeValueEntry> result = new ArrayList<TimeValueEntry>(high.size() + low.size());
-        TimePoint.TimePointComparatorASC cp = TimePoint.ComparatorASC;
+        Comparator<TimePoint> cp = TimePoint.ComparatorASC;
 
         int h=0, l=0;
         while(h<high.size() && l<low.size())
@@ -34,7 +35,7 @@ public class DataEntryUtils
                     result.add(lItem);
                     l++;
                 }else{
-                    TimeValueEntry lItemNew = lItem.clone();
+                    TimeValueEntry lItemNew = lItem.copy();
                     lItemNew.getTime().setEnd(ht.getStart().pre());
                     result.add(lItemNew);
                     l++;

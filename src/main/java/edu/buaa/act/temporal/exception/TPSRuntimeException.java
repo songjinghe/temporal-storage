@@ -9,4 +9,9 @@ public class TPSRuntimeException extends RuntimeException
     {
         super(msg);
     }
+
+    public TPSRuntimeException(Throwable e)
+    {
+        super(e);
+    }
 }
