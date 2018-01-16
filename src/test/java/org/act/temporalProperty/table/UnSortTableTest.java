@@ -43,7 +43,7 @@ public class UnSortTableTest
     @Test
     public void test()
     {
-        MemTable memtable = new MemTable( TableComparator.instence() );
+        MemTable memtable = new MemTable( TableComparator.instance() );
         try
         {
             table.initFromFile( memtable );

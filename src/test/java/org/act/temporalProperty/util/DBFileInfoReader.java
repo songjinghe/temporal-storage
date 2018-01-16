@@ -103,7 +103,7 @@ public class DBFileInfoReader
         System.out.println("################## "+fileName+" #################");
         FileInputStream inputStream = new FileInputStream( new File( this.dbDir + "/" + fileName ) );
         FileChannel channel = inputStream.getChannel();
-        Table table = new FileChannelTable( fileName, channel, TableComparator.instence(), false );
+        Table table = new FileChannelTable( fileName, channel, TableComparator.instance(), false );
         TableIterator iterator = table.iterator();
         if( !iterator.hasNext() )
         {

@@ -66,7 +66,7 @@ public class StableLevel implements Level, StableLevelAddFile
         this.dbDir = dbDir;
         this.files = new TreeMap<Long,FileMetaData>();
         this.fileBuffers = new TreeMap<Long,FileBuffer>();
-        this.cache = new TableCache( new File( dbDir ), 20, TableComparator.instence(), false, true );
+        this.cache = new TableCache( new File( dbDir ), 20, TableComparator.instance(), false, true );
         this.fileMetaLock = fileLock;
         this.rangeQueryIndex = new RangeQueryIndex(dbDir);
     }
@@ -290,7 +290,7 @@ public class StableLevel implements Level, StableLevelAddFile
                     }
                 	if( hasUpdate ){
                 		 
-                		SeekingIterator<Slice, Slice> iterator = new BufferFileAndTableIterator(buffer.iterator(), this.cache.newIterator(metaData), TableComparator.instence() );
+                		SeekingIterator<Slice, Slice> iterator = new BufferFileAndTableIterator(buffer.iterator(), this.cache.newIterator(metaData), TableComparator.instance() );
                 		iterator.seek( searchKey.encode() );
                 		int count = 0;
                         Slice max = null;
@@ -313,7 +313,7 @@ public class StableLevel implements Level, StableLevelAddFile
                             File indexFile = new File(this.dbDir + "/index" + metaData.getNumber() );
                             FileOutputStream stream = new FileOutputStream(indexFile);
                             FileChannel channel = stream.getChannel();
-							Table indexTable = new FileChannelTable(this.dbDir + "/index" + metaData.getNumber(), channel, TableComparator.instence(), false);
+							Table indexTable = new FileChannelTable(this.dbDir + "/index" + metaData.getNumber(), channel, TableComparator.instance(), false);
 							TableUpdater updater = new TableUpdater(indexTable);
 							Slice countSlice = new Slice(4);
 							countSlice.setInt(0, count);
@@ -481,7 +481,7 @@ public class StableLevel implements Level, StableLevelAddFile
             if( this.fileBuffers.get( (long)this.files.size()-1 ) != null )
             {
                 MemTableIterator buffer = this.fileBuffers.get( (long)this.files.size()-1 ).iterator();
-                table = new BufferFileAndTableIterator( buffer, table, TableComparator.instence() );
+                table = new BufferFileAndTableIterator( buffer, table, TableComparator.instance() );
             }
             return new TableLatestValueIterator( table );
         }
@@ -522,12 +522,12 @@ public class StableLevel implements Level, StableLevelAddFile
             FileOutputStream stream = new FileOutputStream( tempFile );
             FileChannel indexChannel = indexStream.getChannel();
             FileChannel channel = stream.getChannel();
-            TableBuilder builder = new TableBuilder( new Options(), channel, TableComparator.instence() );
-            TableBuilder indexBuilder = new TableBuilder(new Options(), indexChannel, TableComparator.instence() );
+            TableBuilder builder = new TableBuilder( new Options(), channel, TableComparator.instance() );
+            TableBuilder indexBuilder = new TableBuilder(new Options(), indexChannel, TableComparator.instance() );
             List<SeekingIterator<Slice,Slice>> iterators = new ArrayList<SeekingIterator<Slice,Slice>>(2);
-            SeekingIterator<Slice,Slice> iterator = new BufferFileAndTableIterator( buffer.iterator(), table.iterator(), TableComparator.instence() );
+            SeekingIterator<Slice,Slice> iterator = new BufferFileAndTableIterator( buffer.iterator(), table.iterator(), TableComparator.instance() );
             iterators.add( iterator );
-            MergingIterator mergeIterator = new MergingIterator( iterators, TableComparator.instence() );
+            MergingIterator mergeIterator = new MergingIterator( iterators, TableComparator.instance() );
             InternalKey lastKey = null;
             int count = 0;
             Slice max = null;

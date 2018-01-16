@@ -14,7 +14,7 @@ public class RangeQueryIndex {
 	
 	public RangeQueryIndex(String dbDir){
 		this.dbDir = dbDir;
-		this.tableCache = new IndexTableCache(new File(dbDir), 1, TableComparator.instence(), false);
+		this.tableCache = new IndexTableCache(new File(dbDir), 1, TableComparator.instance(), false);
 	}
 	
 	

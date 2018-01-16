@@ -32,7 +32,7 @@ public class FileBuffer implements Closeable
      */
     public FileBuffer(String filename, String UnSortedTableAbsolutName ) throws IOException
     {
-        this.memTable = new MemTable( TableComparator.instence() );
+        this.memTable = new MemTable( TableComparator.instance() );
         File tableFile = new File( UnSortedTableAbsolutName );
         if( !tableFile.exists() )
         {
