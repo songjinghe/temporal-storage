@@ -298,7 +298,7 @@ public class LogReader
         return chunkType;
     }
 
-    public boolean readNextBlock()
+    private boolean readNextBlock()
     {
         if (eof) {
             return false;

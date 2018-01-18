@@ -169,59 +169,10 @@ public class UnstableLevel implements Level
      */
     public void restoreMemTable()
     {
-        try
-        {
-            String tempFileName = Filename.tempFileName(0);
-            File tempFile = new File( this.dbDir + "/" + tempFileName );
-            if( tempFile.exists() && (tempFile.length() >= Footer.ENCODED_LENGTH))
-            {
-                FileInputStream inputStream = new FileInputStream(tempFile);
-                FileChannel channel = inputStream.getChannel();
-                Table table;
-                try {
-                    table = new FileChannelTable(tempFileName, channel, TableComparator.instance(), false);
-                }catch (IllegalArgumentException e){
-                    throw new RuntimeException(tempFileName+" file size larger than "+Integer.MAX_VALUE+" bytes. Should not happen.",e);
-                }
-                TableIterator iterator = table.iterator();
-                if( iterator.hasNext() )
-                {
-                    this.memTable = new MemTable(TableComparator.instance());
-                    while (iterator.hasNext()) {
-                        Entry<Slice, Slice> entry = iterator.next();
-                        this.memTable.add(entry.getKey(), entry.getValue());
-                    }
-                    this.memTableBoundary = this.memTable.getStartTime();
-                }
-                else
-                {
-                    this.createNewEmptyMemTable();
-                }
-                channel.close();
-                inputStream.close();
-                Files.delete(tempFile.toPath());
-            }
-            else
-            {
-                this.createNewEmptyMemTable();
-            }
-        }
-        catch( IOException e )
-        {
-            log.error( "Restore MemTable Failed!", e );
-        }
+
     }
 
-    private void createNewEmptyMemTable() {
-        this.memTable = new MemTable(TableComparator.instance());
-        this.memTableBoundary = 0;
-        for (Long number : this.files.keySet()) {
-            if (this.files.get(number) != null) {
-                this.memTableBoundary = this.files.get(number).getLargest() + 1;
-                break;
-            }
-        }
-    }
+
 
     /**
      * 时间点查询
@@ -229,38 +180,7 @@ public class UnstableLevel implements Level
     @Override
     public Slice getPointValue( Slice idSlice, int time )
     {
-        InternalKey searchKey = new InternalKey( idSlice, time, 0, ValueType.VALUE );
-        this.fileMetaDataLock.readLock().lock();
-        List<Entry<Slice,Slice>> candidates = new LinkedList<Entry<Slice,Slice>>();
-        {
-            try
-            {
-                SeekingIterator<Slice,Slice> iterator = this.memTable.iterator();
-                iterator.seek( searchKey.encode() );
-                Entry<Slice,Slice> entry = iterator.next();
-                InternalKey answerKey = new InternalKey( entry.getKey() );
-                if( answerKey.getId().equals( idSlice ) && answerKey.getValueType().getPersistentId() != ValueType.DELETION.getPersistentId()  )
-                {
-                    candidates.add( entry );
-                }
-            }
-            catch( NoSuchElementException e){}
-            try
-            {
-                if( this.stableMemTable != null )
-                {
-                    SeekingIterator<Slice,Slice> iterator = this.stableMemTable.iterator();
-                    iterator.seek( searchKey.encode() );
-                    Entry<Slice,Slice> entry = iterator.next();
-                    InternalKey answerKey = new InternalKey( entry.getKey() );
-                    if( answerKey.getId().equals( idSlice ) && answerKey.getValueType().getPersistentId() != ValueType.DELETION.getPersistentId()  )
-                    {
-                        candidates.add( entry );
-                    }
-                }
-            }
-            catch( NoSuchElementException e){}
-        }
+
         {
             for( Long fileNumber = 0L; fileNumber < 5; fileNumber++ )
             {
@@ -607,34 +527,7 @@ public class UnstableLevel implements Level
         }
     }
 
-    /**
-     * 在系统关闭时，将MemTable中的数据写入磁盘
-     */
-    public void dumpMemTable2disc()
-    {
-        try
-        {
-            File tempFile = new File( this.dbDir + "/" + Filename.tempFileName( 0 ));
-            if( !tempFile.exists() )
-                tempFile.createNewFile();
-            FileOutputStream outputStream = new FileOutputStream( tempFile );
-            FileChannel channel = outputStream.getChannel();
-            TableBuilder builer = new TableBuilder( new Options(), channel, TableComparator.instance() );
-            SeekingIterator<Slice,Slice> iterator = this.memTable.iterator();
-            while( iterator.hasNext() )
-            {
-                Entry<Slice,Slice> entry = iterator.next();
-                builer.add( entry.getKey(), entry.getValue() );
-            }
-            builer.finish();
-            channel.close();
-            outputStream.close();
-        }
-        catch( IOException e )
-        {
-            e.printStackTrace();
-        }
-    }
+
 
     /**
      * 在系统关闭时，将所有UnStableFile的元数据写入磁盘

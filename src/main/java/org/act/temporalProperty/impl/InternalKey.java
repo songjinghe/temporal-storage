@@ -15,6 +15,14 @@ import static org.act.temporalProperty.util.SizeOf.SIZE_OF_LONG;
  */
 public class InternalKey
 {
+    /**
+     * 属性id
+     */
+	private final int propertyId;
+    /**
+     * 点/边id
+     */
+	private final long entityId;
 	/**
 	 * 点/边id，和属性id的编码，用于确定一个动态属性
 	 */
@@ -31,8 +39,6 @@ public class InternalKey
      * 此key对应的record类型
      */
     private final ValueType valueType;
-
-    
     /**
      * 新建一个InternalKey，将相关信息传入，用于编码后生成一个Slice
      * @param Id
@@ -48,6 +54,8 @@ public class InternalKey
         Preconditions.checkArgument( valueLength >= 0 , "valueLength is nagative" );
 
         this.Id = Id;
+        this.propertyId = Id.getInt(0);
+        this.entityId = Id.getLong(4);
         this.startTime = startTime;
         this.valueType = valueType;
         this.valueLength = valueLength;
@@ -62,6 +70,8 @@ public class InternalKey
         Preconditions.checkNotNull(data, "data is null");
         Preconditions.checkArgument(data.length() >= SIZE_OF_LONG, "data must be at least %s bytes", SIZE_OF_LONG);
         this.Id = getId( data );
+        this.propertyId = data.getInt(0);
+        this.entityId = data.getLong(4);
         long packedSequenceAndType = data.getLong( data.length() - SIZE_OF_LONG );
         this.startTime = (int)SequenceNumber.unpackTime(packedSequenceAndType);
         this.valueType = SequenceNumber.unpackValueType(packedSequenceAndType);
@@ -84,6 +94,16 @@ public class InternalKey
     public Slice getId()
     {
         return Id;
+    }
+
+    public int getPropertyId()
+    {
+        return propertyId;
+    }
+
+    public long getEntityId()
+    {
+        return entityId;
     }
 
     /**
