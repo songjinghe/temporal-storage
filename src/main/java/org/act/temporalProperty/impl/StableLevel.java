@@ -17,6 +17,7 @@ import java.util.concurrent.locks.ReadWriteLock;
 
 import org.act.temporalProperty.Level;
 import org.act.temporalProperty.impl.MemTable.MemTableIterator;
+import org.act.temporalProperty.index.IndexBuilderCallback;
 import org.act.temporalProperty.table.BufferFileAndTableIterator;
 import org.act.temporalProperty.table.FileChannelTable;
 import org.act.temporalProperty.table.Table;
@@ -288,7 +289,7 @@ public class StableLevel implements Level, StableLevelAddFile
                                 break;
                         }
                     }
-                	if( hasUpdate ){
+                	if( true ){//hasUpdate
                 		 
                 		SeekingIterator<Slice, Slice> iterator = new BufferFileAndTableIterator(buffer.iterator(), this.cache.newIterator(metaData), TableComparator.instance() );
                 		iterator.seek( searchKey.encode() );
@@ -327,8 +328,8 @@ public class StableLevel implements Level, StableLevelAddFile
                 		
                 	}
                 	else{ 
-	                	Slice value = this.rangeQueryIndex.get(metaData.getNumber(), callback.getType(), idSlice);
-	                	callback.onCallBatch(value);
+//	                	Slice value = this.rangeQueryIndex.get(metaData.getNumber(), callback.getType(), idSlice);
+//	                	callback.onCallBatch(value);
                 	}
                 	continue;
                 }
@@ -590,4 +591,56 @@ public class StableLevel implements Level, StableLevelAddFile
         }
     }
 
+
+
+    public void getRangeValue( int proId, int startTime, int endTime, IndexBuilderCallback callback )
+    {
+        this.fileMetaLock.readLock().lock();
+        for( FileMetaData metaData : this.files.values() )
+        {
+            if( null == metaData )
+                continue;
+            if( metaData.getSmallest() > endTime )
+                break;//return
+            if( TimeIntervalUtil.Union( startTime, endTime, metaData.getSmallest(), metaData.getLargest() ) )
+            {
+                int start = Math.max( startTime, metaData.getSmallest() );
+                int end = Math.min( endTime, metaData.getLargest() );
+                FileBuffer buffer = this.fileBuffers.get( metaData.getNumber() );
+                SeekingIterator<Slice, Slice> iterator;
+                if(buffer==null){
+                    iterator = this.cache.newIterator( metaData.getNumber() );
+                }else{
+                    iterator = new BufferFileAndTableIterator(buffer.iterator(), this.cache.newIterator(metaData), TableComparator.instance() );
+                }
+                iterator.seekToFirst();
+                while( iterator.hasNext() )
+                {
+                    Entry<Slice,Slice> entry = iterator.next();
+                    InternalKey key = new InternalKey( entry.getKey() );
+                    if( key.getPropertyId()==proId && key.getStartTime() <= end && key.getValueType().getPersistentId() != ValueType.DELETION.getPersistentId() )
+                    {
+                        callback.onCall(key.getEntityId(), key.getStartTime(), entry.getValue() );
+                    }
+                }
+                if( null != buffer )
+                {
+                    MemTableIterator bufferiterator = buffer.iterator();
+                    bufferiterator.seekToFirst();
+                    while( bufferiterator.hasNext() )
+                    {
+                        Entry<Slice,Slice> entry = bufferiterator.next();
+                        InternalKey key = new InternalKey( entry.getKey() );
+                        if( key.getPropertyId()==proId && key.getStartTime() <= end
+                                && key.getValueType().getPersistentId() != ValueType.INVALID.getPersistentId()
+                                && key.getValueType().getPersistentId() != ValueType.DELETION.getPersistentId())
+                        {
+                            callback.onCall(key.getEntityId(), key.getStartTime(), entry.getValue() );
+                        }
+                    }
+                }
+            }
+        }
+        this.fileMetaLock.readLock().unlock();
+    }
 }

@@ -12,8 +12,11 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import com.google.common.collect.PeekingIterator;
 import org.act.temporalProperty.Level;
 import org.act.temporalProperty.impl.MemTable.MemTableIterator;
+import org.act.temporalProperty.index.*;
+import org.act.temporalProperty.index.rtree.IndexEntryOperator;
 import org.act.temporalProperty.table.*;
 import org.act.temporalProperty.util.MergingIterator;
 import org.act.temporalProperty.util.Slice;
@@ -65,7 +68,9 @@ public class UnstableLevel implements Level
      */
     private ReadWriteLock fileMetaDataLock;
     private StableLevel stLevel;
-    
+
+    // indexTable
+    private IndexTable indexTable;
     UnstableLevel( String dbDir, MergeProcess merge, ReadWriteLock fileLock, StableLevel stLevel )
     {
         this.dbDir = dbDir;
@@ -717,5 +722,143 @@ public class UnstableLevel implements Level
         }
     }
 
+    private IndexTable index;
+    public void createValueIndex(int start, int end, List<Integer> proIds, List<IndexValueType> types){
+        if(proIds.size()>1) throw new TGraphNotImplementedException();
+        if(proIds.isEmpty()) throw new RuntimeException("should have at least one proId");
+        try {
+            this.memtableLock.lock();
+            waitUntilCurrentMergeComplete();
+            //
+            int proId = proIds.get(0);
+            IndexBuilderCallback indexBuilderCallback = new IndexBuilderCallback();
+            if( start < this.stLevel.getTimeBoundary() ) {
+                int stEnd = Math.min((int) this.stLevel.getTimeBoundary(), end);
+                this.stLevel.getRangeValue(proId, start, stEnd, indexBuilderCallback);
+            }
+            if( end >= this.stLevel.getTimeBoundary() ) {
+                int unStart = Math.max((int) this.stLevel.getTimeBoundary(), start);
+                getRangeValue(proId, unStart, end, indexBuilderCallback);
+            }
+            //
+            PeekingIterator<IndexIntervalEntry> data = indexBuilderCallback.getIterator(end);
+            IndexEntryOperator op = new IndexEntryOperator(types,4096);
 
+            FileChannel channel = new FileOutputStream(new File(this.dbDir, "index")).getChannel();
+
+            IndexTableWriter writer = new IndexTableWriter(channel, op);
+            //
+            while(data.hasNext()){
+                writer.add(op.toSlice(data.next()));
+            }
+            writer.finish();
+            channel.close();
+            channel = new RandomAccessFile(new File(this.dbDir, "index"), "r").getChannel();
+            this.index = new IndexTable(channel);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            this.memtableLock.unlock();
+        }
+
+    }
+
+    private void getRangeValue(int proId, int startTime, int endTime, IndexBuilderCallback callback){
+        this.fileMetaDataLock.readLock().lock();
+        for( int i = 4; i >=0; i-- )
+        {
+            FileMetaData metaData = this.files.get( (long)i );
+            if( null == metaData )
+                continue;
+            if( metaData.getSmallest() > endTime )
+                break;
+            if( TimeIntervalUtil.Union( startTime, endTime, metaData.getSmallest(), metaData.getLargest() ) )
+            {
+                int start = Math.max( startTime, metaData.getSmallest() );
+                int end = Math.min( endTime, metaData.getLargest() );
+                SeekingIterator<Slice,Slice> iterator = this.cache.newIterator( metaData.getNumber() );
+                iterator.seekToFirst();
+                while( iterator.hasNext() )
+                {
+                    Entry<Slice,Slice> entry = iterator.next();
+                    InternalKey key = new InternalKey( entry.getKey() );
+                    if( key.getPropertyId()==proId && key.getStartTime() <= end && key.getValueType().getPersistentId() != ValueType.INVALID.getPersistentId() )
+                    {
+                        callback.onCall(key.getEntityId(), key.getStartTime(), entry.getValue());
+                    }
+                }
+                FileBuffer buffer = this.fileBuffers.get( metaData.getNumber() );
+                if( null != buffer )
+                {
+                    MemTableIterator bufferiterator = buffer.iterator();
+                    bufferiterator.seekToFirst();
+                    while( bufferiterator.hasNext() )
+                    {
+                        Entry<Slice,Slice> entry = bufferiterator.next();
+                        InternalKey key = new InternalKey( entry.getKey() );
+                        if( key.getPropertyId()==proId && key.getStartTime() <= end
+                                && key.getValueType().getPersistentId() != ValueType.INVALID.getPersistentId()
+                                && key.getValueType().getPersistentId() != ValueType.DELETION.getPersistentId())
+                        {
+                            callback.onCall(key.getEntityId(), key.getStartTime(), entry.getValue());
+                        }
+                    }
+                }
+            }
+        }
+        MemTableIterator bufferiterator = this.memTable.iterator();
+        bufferiterator.seekToFirst();
+        while( bufferiterator.hasNext() )
+        {
+            Entry<Slice,Slice> entry = bufferiterator.next();
+            InternalKey key = new InternalKey( entry.getKey() );
+            if( key.getPropertyId()==proId && key.getStartTime() <= endTime
+                    && key.getValueType().getPersistentId() != ValueType.INVALID.getPersistentId()
+                    && key.getValueType().getPersistentId() != ValueType.DELETION.getPersistentId())
+            {
+                callback.onCall(key.getEntityId(), key.getStartTime(), entry.getValue());
+            }
+        }
+        if( this.stableMemTable != null )
+        {
+            MemTableIterator stableIterator = this.stableMemTable.iterator();
+            stableIterator.seekToFirst();
+            while( stableIterator.hasNext() )
+            {
+                Entry<Slice,Slice> entry = stableIterator.next();
+                InternalKey key = new InternalKey( entry.getKey() );
+                if( key.getPropertyId()==proId && key.getStartTime() <= endTime
+                        && key.getValueType().getPersistentId() != ValueType.INVALID.getPersistentId()
+                        && key.getValueType().getPersistentId() != ValueType.DELETION.getPersistentId())
+                {
+                    callback.onCall(key.getEntityId(), key.getStartTime(), entry.getValue());
+                }
+            }
+        }
+        this.fileMetaDataLock.readLock().unlock();
+    }
+
+
+
+    public List<Long> valueIndexQuery(IndexQueryRegion condition) throws IOException {
+        Iterator<Slice> iter = this.index.iterator(condition);
+        IndexEntryOperator op = extractOperator(condition);
+        List<Long> result = new ArrayList<>();
+        while(iter.hasNext()){
+            result.add(op.getEntityId(iter.next()));
+        }
+        return result;
+    }
+
+    private IndexEntryOperator extractOperator(IndexQueryRegion regions) {
+        List<IndexValueType> types = new ArrayList<>();
+        for(PropertyValueInterval p : regions.getPropertyValueIntervals()){
+            types.add(p.getType());
+        }
+        return new IndexEntryOperator(types, 4096);
+    }
 }

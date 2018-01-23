@@ -10,6 +10,9 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.act.temporalProperty.TemporalPropertyStore;
+import org.act.temporalProperty.index.IndexQueryRegion;
+import org.act.temporalProperty.index.IndexValueType;
+import org.act.temporalProperty.index.TemporalValueIndex;
 import org.act.temporalProperty.table.MergeProcess;
 import org.act.temporalProperty.util.Slice;
 import org.slf4j.Logger;
@@ -24,6 +27,7 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
     private StableLevel stlevel;
     private MergeProcess mergeProcess;
     private String dbDir;
+    private TemporalValueIndex index;
     private Logger log = LoggerFactory.getLogger( TemporalPropertyStoreImpl.class );
     
     /**
@@ -204,6 +208,27 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
         // TODO Auto-generated method stub
         return false;
     }
+
+    @Override
+    public void createValueIndex(int start, int end, List<Integer> proIds, List<IndexValueType> types) {
+        unLevel.createValueIndex(start, end, proIds, types);
+    }
+
+    @Override
+    public List<Long> getEntities(IndexQueryRegion condition) {
+        try {
+            return unLevel.valueIndexQuery(condition);
+        } catch (IOException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+//        if(index.contains(condition)){
+//            return index.query(condition);
+//        }else {
+//            return null;
+//        }
+    }
+
 
     /**
      * @Author Sjh
