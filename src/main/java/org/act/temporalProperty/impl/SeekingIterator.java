@@ -30,7 +30,19 @@ public interface SeekingIterator<K, V>
     void seekToFirst();
 
     /**
+     * edit description by sjh @2018-01-25
+     * Origin description:
      * Repositions the iterator so the key of the next BlockElement returned greater than or equal to the specified targetKey.
+     * New description:  (similar to FLOOR operator)
+     * if data key is 1, 3, 5, then
+     * |seek | peek() and next() returns |
+     * |  0  |  1  | ? not for sure
+     * |  1  |  1  |
+     * |  2  |  1  |
+     * |  3  |  3  |
+     * |  4  |  3  |
+     * |  5  |  5  |
+     * |  6  |  5  |
      */
     void seek(K targetKey);
 }

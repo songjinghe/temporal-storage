@@ -13,6 +13,7 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import com.google.common.collect.PeekingIterator;
+import org.act.temporalProperty.EPEntryIterator;
 import org.act.temporalProperty.Level;
 import org.act.temporalProperty.impl.MemTable.MemTableIterator;
 import org.act.temporalProperty.index.*;
@@ -394,7 +395,7 @@ public class UnstableLevel implements Level
                 continue;
             if( metaData.getSmallest() > endTime )
                 break;
-            if( TimeIntervalUtil.Union( startTime, endTime, metaData.getSmallest(), metaData.getLargest() ) )
+            if( TimeIntervalUtil.overlap( startTime, endTime, metaData.getSmallest(), metaData.getLargest() ) )
             {
                 int start = Math.max( startTime, metaData.getSmallest() );
                 int end = Math.min( endTime, metaData.getLargest() );
@@ -465,6 +466,32 @@ public class UnstableLevel implements Level
             }
         }
         this.fileMetaDataLock.readLock().unlock();
+    }
+
+    public EPAppendIterator getRangeValueIter(Slice idSlice, int startTime, int endTime)
+    {
+        EPAppendIterator unstableIter = new EPAppendIterator(idSlice);
+        for( int i = 4; i >= 0; i-- ) {
+            FileMetaData meta = this.files.get((long) i);
+            if (meta != null && TimeIntervalUtil.overlap(startTime, endTime, meta.getSmallest(), meta.getLargest())) {
+                SeekingIterator<Slice, Slice> iterator = this.cache.newIterator(meta.getNumber());
+                FileBuffer buffer = this.fileBuffers.get( meta.getNumber() );
+                if( null != buffer ){
+                    unstableIter.append(new BufferFileAndTableIterator(buffer.iterator(), iterator, TableComparator.instance()));
+                }else {
+                    unstableIter.append(iterator);
+                }
+            }
+        }
+        return unstableIter;
+    }
+
+    public SeekingIterator<Slice,Slice> getMemTableIter(Slice idSlice){
+        if(this.stableMemTable != null) {
+            return new EPMergeIterator(idSlice, stableMemTable.iterator(), memTable.iterator());
+        }else{
+            return new EPEntryIterator(idSlice, memTable.iterator());
+        }
     }
 
     /**
@@ -776,7 +803,7 @@ public class UnstableLevel implements Level
                 continue;
             if( metaData.getSmallest() > endTime )
                 break;
-            if( TimeIntervalUtil.Union( startTime, endTime, metaData.getSmallest(), metaData.getLargest() ) )
+            if( TimeIntervalUtil.overlap( startTime, endTime, metaData.getSmallest(), metaData.getLargest() ) )
             {
                 int start = Math.max( startTime, metaData.getSmallest() );
                 int end = Math.min( endTime, metaData.getLargest() );

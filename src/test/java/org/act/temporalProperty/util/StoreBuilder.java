@@ -21,16 +21,10 @@ import java.util.*;
 public class StoreBuilder {
     private static Logger log = LoggerFactory.getLogger(StoreBuilder.class);
 
-    private final File dataPath;
     private final File dbDir;
-    private final Map<String, Long> roadIdMap = new HashMap<>();
     private final TemporalPropertyStore store;
 
-    private int minTime;
-    private int maxTime;
-
-    public StoreBuilder(String dataPath, String storePath, int inputFileCount, boolean fromScratch) throws Throwable {
-        this.dataPath = new File(dataPath);
+    public StoreBuilder(String storePath, boolean fromScratch) throws Throwable {
         this.dbDir = new File(storePath);
         if(fromScratch){
             if(dbDir.exists()) {
@@ -38,7 +32,6 @@ public class StoreBuilder {
             }
             dbDir.mkdir();
             store = TemporalPropertyStoreFactory.newPropertyStore(dbDir.getAbsolutePath());
-            inputData(inputFileCount);
         }else{
             store = TemporalPropertyStoreFactory.newPropertyStore(dbDir.getAbsolutePath());
         }
@@ -48,124 +41,17 @@ public class StoreBuilder {
         return this.store;
     }
 
-    public Map<String, Long> getRoadIdMap(){
-        return roadIdMap;
-    }
-
-    public int getMinTime(){
-        return minTime;
-    }
-
-    public int getMaxTime(){
-        return maxTime;
-    }
-
-    private void inputData(int inputFileCount) throws IOException {
-        List<File> dataFileList = new ArrayList<>();
-        getFileRecursive(dataPath, dataFileList, 5);
-        dataFileList.sort((Comparator.comparing(File::getName)));
-
-        for (int i = 0; i < dataFileList.size() && i<inputFileCount; i++) {
-            File file = dataFileList.get(i);
-            int time = timeStr2int(file.getName().substring(9, 21)) - 1288800000;
-            if(minTime>time) minTime = time;
-            if(maxTime<time) maxTime = time;
-            try(BufferedReader br = new BufferedReader(new FileReader(file))) {
-                String line;
-                for (int lineCount = 0; (line = br.readLine()) != null; lineCount++) {
-                    if (lineCount == 0) continue;
-                    input(time, line);
-                }
-            }
-//            log.info("input files done {} {}", file.getName(), time);
-        }
-        log.info("input files done");
-    }
-
-    private static void getFileRecursive(File dir, List<File> fileList, int level){
-        if(dir.isDirectory()){
-            for (File file : dir.listFiles()) {
-                if(!file.isDirectory() && file.getName().startsWith("TJamData_201") && file.getName().endsWith(".csv")){
-                    fileList.add(file);
-                }
-            }
-            if(level>0) {
-                for (File file : dir.listFiles()) {
-                    if (file.isDirectory()) {
-                        getFileRecursive(file, fileList, level - 1);
-                    }
-                }
-            }
-        }
-    }
-
-    private void input(int time, String line) {
-        String[] fields = line.split(",");
-//        int index = Integer.valueOf(fields[0]);
-        String gridId = fields[1];
-        String chainId = fields[2];
-//        int ignore = Integer.valueOf(fields[3]);
-//        type = Integer.valueOf(fields[4]);
-//        length = Integer.valueOf(fields[5]);
-        int travelTime = Integer.valueOf(fields[6]);
-        int fullStatus = Integer.valueOf(fields[7]);
-        int vehicleCount = Integer.valueOf(fields[8]);
-        int segmentCount = Integer.valueOf(fields[9]);
-
-        long roadId = getId(gridId, chainId);
-//        log.debug("eid({}), time({}), travelTime({})", roadId, time, travelTime);
-        setIntProperty(time, roadId, 1, travelTime);
-        setIntProperty(time, roadId, 2, fullStatus);
-        setIntProperty(time, roadId, 3, vehicleCount);
-        setIntProperty(time, roadId, 4, segmentCount);
-    }
-
-    private void setIntProperty(int time, long roadId, int propertyId, int value) {
-        Slice id = getIdSlice(roadId, propertyId);
+    public static void setIntProperty(TemporalPropertyStore store, int time, long entityId, int propertyId, int value) {
+        Slice id = getIdSlice(entityId, propertyId);
         InternalKey key = new InternalKey(id, time, 4, ValueType.VALUE);
         store.setProperty(key.encode(), ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(value).array());
     }
 
-    private static Slice getIdSlice(long roadId, int propertyId) {
+    private static Slice getIdSlice(long entityId, int propertyId) {
         Slice result = new Slice(12);
-        result.setLong(0, roadId);
+        result.setLong(0, entityId);
         result.setInt(8, propertyId);
         return result;
-    }
-
-    private long getId(String gridId, String chainId) {
-        String strKey = gridId+":"+chainId;
-        if(roadIdMap.containsKey(strKey)){
-            return roadIdMap.get(strKey);
-        }else{
-            long nextId = roadIdMap.size();
-            roadIdMap.put(strKey, nextId);
-            return nextId;
-        }
-    }
-
-    private static int timeStr2int(String tStr){
-        String yearStr = tStr.substring(0,4);
-        String monthStr = tStr.substring(4,6);
-        String dayStr = tStr.substring(6,8);
-        String hourStr = tStr.substring(8,10);
-        String minuteStr = tStr.substring(10, 12);
-//        System.out.println(yearStr+" "+monthStr+" "+dayStr+" "+hourStr+" "+minuteStr);
-        int year = Integer.parseInt(yearStr);
-        int month = Integer.parseInt(monthStr)-1;//month count from 0 to 11, no 12
-        int day = Integer.parseInt(dayStr);
-        int hour = Integer.parseInt(hourStr);
-        int minute = Integer.parseInt(minuteStr);
-//        System.out.println(year+" "+month+" "+day+" "+hour+" "+minute);
-        Calendar ca= Calendar.getInstance();
-        ca.set(year, month, day, hour, minute, 0); //seconds set to 0
-        long timestamp = ca.getTimeInMillis();
-//        System.out.println(timestamp);
-        if(timestamp/1000<Integer.MAX_VALUE){
-            return (int) (timestamp/1000);
-        }else {
-            throw new RuntimeException("timestamp larger than Integer.MAX_VALUE, this should not happen");
-        }
     }
 
     private static void deleteAllFilesOfDir(File path) {

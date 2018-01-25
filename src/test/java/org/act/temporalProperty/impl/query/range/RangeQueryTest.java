@@ -4,6 +4,7 @@ import org.act.temporalProperty.TemporalPropertyStore;
 import org.act.temporalProperty.impl.RangeQueryCallBack;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.StoreBuilder;
+import org.act.temporalProperty.util.TrafficDataImporter;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,13 +21,31 @@ public class RangeQueryTest {
     private static String dataPath = "/home/song/tmp/road data";
     private static String dbDir = "/tmp/temporal.property.test";
     private TemporalPropertyStore store;
+    private TrafficDataImporter importer;
+
+    @Test
+    public void test2fail() throws Throwable {
+        StoreBuilder stBuilder = new StoreBuilder(dbDir, false);
+        this.store = stBuilder.store();
+//        for(int version=1; version<5; version++){
+//            for(int time=0; time<Integer.MAX_VALUE/1000-6; time+=1){
+//                StoreBuilder.setIntProperty(store, time, 0, 0, version);
+//            }
+//            log.debug("version {} write finish", version);
+//        }
+        EntityIdCallBack callback = new EntityIdCallBack(0, Integer.MAX_VALUE / 1000 - 6);
+        this.store.getRangeValue(0,0,0,Integer.MAX_VALUE/1000-6, callback);
+        log.info("onCall called {} times", callback.i);
+        store.shutDown();
+    }
 
     @Test
     public void main() throws Throwable {
-        StoreBuilder stBuilder = new StoreBuilder(dataPath, dbDir, 100, true);
+        StoreBuilder stBuilder = new StoreBuilder(dbDir, true);
         this.store = stBuilder.store();
-        int timeMin = stBuilder.getMinTime();
-        int timeMax = stBuilder.getMaxTime();
+        importer = new TrafficDataImporter(store, dataPath, 100);
+        int timeMin = importer.getMinTime();
+        int timeMax = importer.getMaxTime();
         log.info("time: {} - {}", timeMin, timeMax);
         EntityIdCallBack callback = new EntityIdCallBack(timeMin, timeMax);
         store.getRangeValue(1, 1, timeMin, timeMax, callback);
@@ -41,6 +60,8 @@ public class RangeQueryTest {
         private int timeMin, timeMax, lastTime = -1;
         private boolean first = true;
         private List<Integer> timeList = new ArrayList<>();
+        private int i = 0;
+        private StringBuilder stringBuilder = new StringBuilder();
 
         public EntityIdCallBack(int timeMin, int timeMax) {
             this.timeMin = timeMin;
@@ -58,15 +79,23 @@ public class RangeQueryTest {
         public void onCall(int time, Slice value) {
             this.timeList.add(time);
             int val = value.getInt(0);
+            i++;
+//            stringBuilder.append(String.format("(%07d,%d) ", time, val));
+//            if(i%16==0) stringBuilder.append('\n');
+            if(val!=4){
+                log.info("value not latest, get "+ val+" at time "+ time);
+            }
             if(first){
                 first=false;
-                lastTime = val;
             }else{
-                if(lastTime>=time) throw new RuntimeException("time not inc: last("+lastTime+") cur("+time+")");
-                if(overlap(lastTime, time, timeMin, timeMax)){
-
+                if(lastTime>=time){
+                    log.info("time not inc: last("+lastTime+") cur("+time+")");
                 }
+//                if(overlap(lastTime, time, timeMin, timeMax)){
+//                    log.info("time ")
+//                }
             }
+            lastTime = time;
         }
         public void setValueType(String valueType) {
             log.info("setValueType called");

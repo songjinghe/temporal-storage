@@ -10,9 +10,7 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.act.temporalProperty.TemporalPropertyStore;
-import org.act.temporalProperty.index.IndexQueryRegion;
-import org.act.temporalProperty.index.IndexValueType;
-import org.act.temporalProperty.index.TemporalValueIndex;
+import org.act.temporalProperty.index.*;
 import org.act.temporalProperty.table.MergeProcess;
 import org.act.temporalProperty.util.Slice;
 import org.slf4j.Logger;
@@ -28,6 +26,7 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
     private MergeProcess mergeProcess;
     private String dbDir;
     private TemporalValueIndex index;
+    private ReadWriteLock fileMetaLock;
     private Logger log = LoggerFactory.getLogger( TemporalPropertyStoreImpl.class );
     
     /**
@@ -37,7 +36,7 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
     public TemporalPropertyStoreImpl(String dbDir ) throws Throwable
     {
         this.dbDir = dbDir;
-        ReadWriteLock fileMetaLock = new ReentrantReadWriteLock( true );
+        this.fileMetaLock = new ReentrantReadWriteLock( true );
         this.stlevel = new StableLevel( dbDir,fileMetaLock );
         this.mergeProcess = new MergeProcess( dbDir, this.stlevel,fileMetaLock );
         this.unLevel = new UnstableLevel( dbDir, this.mergeProcess,fileMetaLock, this.stlevel );
@@ -180,13 +179,36 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
     @Override
     public Object getRangeValue( long id, int proId, int startTime, int endTime, RangeQueryCallBack callback )
     {
+        this.fileMetaLock.readLock().lock();
         Slice idSlice = new Slice( 12 );
         idSlice.setLong( 0, id );
         idSlice.setInt( 8, proId );
-        if( startTime < this.stlevel.getTimeBoundary() )
-            this.stlevel.getRangeValue( idSlice, startTime, Math.min( (int)this.stlevel.getTimeBoundary(), endTime ), callback );
-        if( endTime >= this.stlevel.getTimeBoundary() )
-            this.unLevel.getRangeValue( idSlice, Math.max( (int)this.stlevel.getTimeBoundary(), startTime ), endTime, callback );
+
+        EPAppendIterator diskFileIter = new EPAppendIterator(idSlice);
+        if( startTime < this.stlevel.getTimeBoundary() ) {
+            diskFileIter.append(this.stlevel.getRangeValueIter(idSlice, startTime, Math.min((int) this.stlevel.getTimeBoundary(), endTime)));
+        }
+        if( endTime >= this.stlevel.getTimeBoundary() ) {
+            diskFileIter.append(this.unLevel.getRangeValueIter(idSlice, Math.max((int) this.stlevel.getTimeBoundary(), startTime), endTime));
+        }
+
+        SeekingIterator<Slice,Slice> mergedIterator;
+        if(diskFileIter.size()>0){
+            mergedIterator = new EPMergeIterator(idSlice, diskFileIter, this.unLevel.getMemTableIter(idSlice));
+        }else{
+            mergedIterator = this.unLevel.getMemTableIter(idSlice);
+        }
+
+        InternalKey searchKey = new InternalKey( idSlice, startTime, 0, ValueType.VALUE );
+        mergedIterator.seek(searchKey.encode());
+        while(mergedIterator.hasNext()){
+            Entry<Slice,Slice> entry = mergedIterator.next();
+            InternalKey key = new InternalKey( entry.getKey() );
+            if( key.getStartTime() <= endTime && key.getValueType() == ValueType.VALUE){
+                callback.onCall(key.getStartTime(), entry.getValue());
+            }else break;
+        }
+        this.fileMetaLock.readLock().unlock();
         return callback.onReturn();
     }
 

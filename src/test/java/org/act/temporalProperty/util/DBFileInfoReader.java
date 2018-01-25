@@ -19,7 +19,7 @@ import java.util.Map;
  */
 public class DBFileInfoReader
 {
-    private String dbDir="/tmp/amitabha/dynNode";
+    private String dbDir="/tmp/temporal.property.test";
 
     @Test
     public void unStableFileInfo() throws IOException {

@@ -10,6 +10,7 @@ import org.act.temporalProperty.index.IndexValueType;
 import org.act.temporalProperty.index.PropertyValueInterval;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.StoreBuilder;
+import org.act.temporalProperty.util.TrafficDataImporter;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -32,11 +33,13 @@ public class BuildAndQueryTest {
     private static String dbDir = "/tmp/temporal.property.test";
     private static TemporalPropertyStore store;
     private static StoreBuilder stBuilder;
+    private static TrafficDataImporter importer;
 
     @BeforeClass
     public static void initDB() throws Throwable {
         boolean fromScratch = true;
-        stBuilder = new StoreBuilder(dataPath, dbDir, 100, true);
+        stBuilder = new StoreBuilder(dbDir, true);
+        importer = new TrafficDataImporter(store, dataPath, 100);
         store = stBuilder.store();
     }
 
@@ -78,7 +81,7 @@ public class BuildAndQueryTest {
 
     private List<Long> queryByIter(int timeMin, int timeMax, int valueMin, int valueMax){
         List<Long> result = new ArrayList<>();
-        for(Long entityId : stBuilder.getRoadIdMap().values()){
+        for(Long entityId : importer.getRoadIdMap().values()){
             try {
                 store.getRangeValue(entityId, 1, timeMin, timeMax, new EntityIdCallBack(timeMin, timeMax, valueMin, valueMax));
             }catch (StopLoopException e){

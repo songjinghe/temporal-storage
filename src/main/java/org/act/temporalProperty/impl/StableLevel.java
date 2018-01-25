@@ -17,6 +17,8 @@ import java.util.concurrent.locks.ReadWriteLock;
 
 import org.act.temporalProperty.Level;
 import org.act.temporalProperty.impl.MemTable.MemTableIterator;
+import org.act.temporalProperty.index.EPAppendIterator;
+import org.act.temporalProperty.index.EPMergeIterator;
 import org.act.temporalProperty.index.IndexBuilderCallback;
 import org.act.temporalProperty.table.BufferFileAndTableIterator;
 import org.act.temporalProperty.table.FileChannelTable;
@@ -264,7 +266,7 @@ public class StableLevel implements Level, StableLevelAddFile
                 continue;
             if( metaData.getSmallest() > endTime )
                 break;
-            if( TimeIntervalUtil.Union( startTime, endTime, metaData.getSmallest(), metaData.getLargest() ) )
+            if( TimeIntervalUtil.overlap( startTime, endTime, metaData.getSmallest(), metaData.getLargest() ) )
             {
                 int start = Math.max( startTime, metaData.getSmallest() );
                 int end = Math.min( endTime, metaData.getLargest() );
@@ -289,7 +291,7 @@ public class StableLevel implements Level, StableLevelAddFile
                                 break;
                         }
                     }
-                	if( true ){//hasUpdate
+                	if( hasUpdate ){//hasUpdate
                 		 
                 		SeekingIterator<Slice, Slice> iterator = new BufferFileAndTableIterator(buffer.iterator(), this.cache.newIterator(metaData), TableComparator.instance() );
                 		iterator.seek( searchKey.encode() );
@@ -328,8 +330,8 @@ public class StableLevel implements Level, StableLevelAddFile
                 		
                 	}
                 	else{ 
-//	                	Slice value = this.rangeQueryIndex.get(metaData.getNumber(), callback.getType(), idSlice);
-//	                	callback.onCallBatch(value);
+	                	Slice value = this.rangeQueryIndex.get(metaData.getNumber(), callback.getType(), idSlice);
+	                	callback.onCallBatch(value);
                 	}
                 	continue;
                 }
@@ -369,6 +371,24 @@ public class StableLevel implements Level, StableLevelAddFile
             }
         }
         this.fileMetaLock.readLock().unlock();
+    }
+
+    public EPAppendIterator getRangeValueIter(Slice idSlice, int startTime, int endTime)
+    {
+        EPAppendIterator appendIterator = new EPAppendIterator(idSlice);
+        for( FileMetaData metaData : this.files.values() ){
+            if( null == metaData ) throw new RuntimeException("SNH: null value in collections");
+            if( metaData.getSmallest() > endTime ) break;
+            if( TimeIntervalUtil.overlap( startTime, endTime, metaData.getSmallest(), metaData.getLargest() ) ){
+                SeekingIterator<Slice,Slice> mergedIterator = this.cache.newIterator( metaData.getNumber() );
+                FileBuffer buffer = this.fileBuffers.get( metaData.getNumber() );
+                if( null != buffer ) {
+                    mergedIterator = new EPMergeIterator(idSlice, mergedIterator, buffer.iterator());
+                }
+                appendIterator.append(mergedIterator);
+            }
+        }
+        return appendIterator;
     }
     /**
      * 进行写入
@@ -602,7 +622,7 @@ public class StableLevel implements Level, StableLevelAddFile
                 continue;
             if( metaData.getSmallest() > endTime )
                 break;//return
-            if( TimeIntervalUtil.Union( startTime, endTime, metaData.getSmallest(), metaData.getLargest() ) )
+            if( TimeIntervalUtil.overlap( startTime, endTime, metaData.getSmallest(), metaData.getLargest() ) )
             {
                 int start = Math.max( startTime, metaData.getSmallest() );
                 int end = Math.min( endTime, metaData.getLargest() );
