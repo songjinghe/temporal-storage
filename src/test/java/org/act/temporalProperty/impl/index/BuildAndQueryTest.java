@@ -37,9 +37,9 @@ public class BuildAndQueryTest {
 
     @BeforeClass
     public static void initDB() throws Throwable {
-        boolean fromScratch = true;
         stBuilder = new StoreBuilder(dbDir, true);
-        importer = new TrafficDataImporter(store, dataPath, 100);
+        importer = new TrafficDataImporter(stBuilder.store(), dataPath, 100);
+        log.info("time: {} - {}", importer.getMinTime(), importer.getMaxTime());
         store = stBuilder.store();
     }
 
@@ -57,14 +57,18 @@ public class BuildAndQueryTest {
 
     @Test
     public void main() throws Throwable {
-        queryByIndex(18300, 27000, 0, 200);
-        queryByIter( 18300, 27000, 0, 200);
+        testRangeQuery(store);
+        List<Long> iterResult = queryByIter( 18300, 27000, 0, 200);
+
+        List<Long> indexResult = queryByIndex(18300, 27000, 0, 200);
+
 
 //        for(int time=0; time<=18300; time+=100){
 //            for(int value=0; value<=400; value+=20){
 //
 //            }
 //        }
+        store.shutDown();
     }
 
     private List<Long> queryByIndex(int timeMin, int timeMax, int valueMin, int valueMax){
@@ -75,7 +79,7 @@ public class BuildAndQueryTest {
         maxValue.setInt(0, valueMax);
         condition.add(new PropertyValueInterval(1, minValue, maxValue, IndexValueType.INT));
         List<Long> result = store.getEntities(condition);
-        log.info("{}", result.size());
+        log.info("index result count {}", result.size());
         return result;
     }
 
@@ -91,7 +95,7 @@ public class BuildAndQueryTest {
                 result.add(entityId);
             }
         }
-        log.info("{}", result.size());
+        log.info("iterate result count {}", result.size());
         return result;
     }
 
@@ -135,16 +139,17 @@ public class BuildAndQueryTest {
             int val = value.getInt(0);
             if(first){
                 first=false;
-                lastTime = val;
             }else{
                 if(lastTime>=time){
-                    throw new RuntimeException("time not inc: last("+lastTime+") cur("+time+")");
+                    log.trace("time not inc: last("+lastTime+") cur("+time+")");
+//                    throw new RuntimeException("time not inc: last("+lastTime+") cur("+time+")");
                 }
                 if(overlap(lastTime, time, timeMin, timeMax) &&
                         (valueMin <= val && val <= valueMax)){
-//                    throw new StopLoopException();
+                    throw new StopLoopException();
                 }
             }
+            lastTime = time;
         }
         public void setValueType(String valueType) {}
         public void onCallBatch(Slice batchValue) {}

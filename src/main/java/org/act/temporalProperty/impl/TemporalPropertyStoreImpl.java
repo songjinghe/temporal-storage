@@ -4,13 +4,16 @@ import java.io.*;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.act.temporalProperty.TemporalPropertyStore;
 import org.act.temporalProperty.index.*;
+import org.act.temporalProperty.index.rtree.IndexEntry;
 import org.act.temporalProperty.table.MergeProcess;
 import org.act.temporalProperty.util.Slice;
 import org.slf4j.Logger;
@@ -238,17 +241,22 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
 
     @Override
     public List<Long> getEntities(IndexQueryRegion condition) {
+        List<IndexEntry> result = getEntries(condition);
+        Set<Long> set = new HashSet<>();
+        for(IndexEntry entry : result){
+            set.add(entry.getEntityId());
+        }
+        return new ArrayList<>(set);
+    }
+
+    @Override
+    public List<IndexEntry> getEntries(IndexQueryRegion condition) {
         try {
             return unLevel.valueIndexQuery(condition);
         } catch (IOException e) {
             e.printStackTrace();
             throw new RuntimeException(e);
         }
-//        if(index.contains(condition)){
-//            return index.query(condition);
-//        }else {
-//            return null;
-//        }
     }
 
 

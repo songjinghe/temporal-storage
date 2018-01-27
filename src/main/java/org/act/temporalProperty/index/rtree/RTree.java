@@ -1,7 +1,6 @@
 package org.act.temporalProperty.index.rtree;
 
 import com.google.common.base.Preconditions;
-import org.act.temporalProperty.util.Slice;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -20,7 +19,7 @@ public class RTree {
     private final int bIndex;
     private final List<List<RTreeNode>> levels = new ArrayList<>();
 
-    public RTree(List<Slice> data, IndexEntryOperator op){
+    public RTree(List<IndexEntry> data, IndexEntryOperator op){
         this.op = op;
         this.bData = op.dataBlockCapacity();
         this.bIndex = op.indexBlockCapacity();
@@ -35,7 +34,7 @@ public class RTree {
         return levels;
     }
 
-    private List<RTreeNode> packData(List<Slice> data){
+    private List<RTreeNode> packData(List<IndexEntry> data){
         this.sortData(data);
         List<RTreeNode> dataLevel = new ArrayList<>();
         for(int i = 0; i<data.size(); i+= bData){
@@ -92,12 +91,12 @@ public class RTree {
         return (o1, o2) -> op.compareRange(o1.getBound(), o2.getBound(), dimIndex);
     }
 
-    //------ utils for data(Slice)---------
-    private void sortData(List<Slice> data) {
+    //------ utils for data(IndexEntry)---------
+    private void sortData(List<IndexEntry> data) {
         dataRecursiveSort(data, 0, data.size(), 0, this.op.dimensionCount());
     }
 
-    private void dataRecursiveSort(List<Slice> data, int left, int right, int corIndex, int k) {
+    private void dataRecursiveSort(List<IndexEntry> data, int left, int right, int corIndex, int k) {
         data.subList(left, right).sort(sliceComparator(this.op, corIndex));
         if(k>1) {
             int r = right - left;
@@ -112,7 +111,7 @@ public class RTree {
         }
     }
 
-    private Comparator<Slice> sliceComparator(IndexEntryOperator op, int dimIndex) {
+    private Comparator<IndexEntry> sliceComparator(IndexEntryOperator op, int dimIndex) {
         Preconditions.checkArgument(dimIndex<op.dimensionCount());
         return (o1, o2) -> op.compare(o1, o2, dimIndex);
     }

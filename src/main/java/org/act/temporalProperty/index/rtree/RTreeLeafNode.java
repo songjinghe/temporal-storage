@@ -13,14 +13,14 @@ import java.util.List;
  * This class is a simple wrapper of Slice
  */
 public class RTreeLeafNode extends RTreeNode {
-    private List<Slice> entry;
+    private List<IndexEntry> entry;
 
-    public RTreeLeafNode(List<Slice> entry, IndexEntryOperator op) {
+    public RTreeLeafNode(List<IndexEntry> entry, IndexEntryOperator op) {
         this.entry = entry;
         this.updateBound(op);
     }
 
-    public RTreeLeafNode(List<Slice> data) {
+    public RTreeLeafNode(List<IndexEntry> data) {
         this.entry = data;
     }
 
@@ -30,27 +30,24 @@ public class RTreeLeafNode extends RTreeNode {
     }
 
     @Override
-    public List<Slice> getEntries() {
+    public List<IndexEntry> getEntries() {
         return entry;
     }
 
     @Override
     public void encode(SliceOutput out) {
-        List<Slice> data = this.getEntries();
+        List<IndexEntry> data = this.getEntries();
         out.writeInt(data.size());
-        for(Slice entry: data){
-            out.writeInt(entry.length());
-            out.writeBytes(entry);
+        for(IndexEntry entry: data){
+            entry.encode(out, true);
         }
     }
 
     public static RTreeLeafNode decode(SliceInput in){
         int count = in.readInt();
-        List<Slice> data = new ArrayList<>();
+        List<IndexEntry> data = new ArrayList<>();
         for(int i=0; i<count; i++){
-            int len = in.readInt();
-            Slice content = in.readSlice(len);
-            data.add(content);
+            data.add(new IndexEntry(in));
         }
         return new RTreeLeafNode(data);
     }

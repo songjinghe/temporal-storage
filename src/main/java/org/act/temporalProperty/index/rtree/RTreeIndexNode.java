@@ -5,7 +5,6 @@ import org.act.temporalProperty.util.SliceInput;
 import org.act.temporalProperty.util.SliceOutput;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 /**
@@ -35,10 +34,7 @@ public class RTreeIndexNode extends RTreeNode {
         out.writeInt(data.size());
         for (RTreeNode entry : data) {
             out.writeInt(entry.getPos());
-            out.writeInt(entry.getBound().getMin().length());
-            out.writeBytes(entry.getBound().getMin());
-            out.writeInt(entry.getBound().getMax().length());
-            out.writeBytes(entry.getBound().getMax());
+            entry.getBound().encode(out);
         }
     }
 
@@ -47,11 +43,8 @@ public class RTreeIndexNode extends RTreeNode {
         List<RTreeNode> data = new ArrayList<>();
         for(int i=0; i<count; i++){
             int pos = in.readInt();
-            int len = in.readInt();
-            Slice min = in.readSlice(len);
-            len = in.readInt();
-            Slice max = in.readSlice(len);
-            data.add(new RTreeDiskNode(pos, new RTreeRange(min, max, op)));
+            RTreeRange range = RTreeRange.decode(in, op);
+            data.add(new RTreeDiskNode(pos, range));
         }
         return new RTreeIndexNode(data);
     }
@@ -63,7 +56,7 @@ public class RTreeIndexNode extends RTreeNode {
 
     private void updateBound(IndexEntryOperator op){
         if(this.getChildren().size()>0) {
-            List<Slice> bounds = new ArrayList<>();
+            List<IndexEntry> bounds = new ArrayList<>();
             for(RTreeNode node : this.getChildren()){
                 bounds.add(node.getBound().getMin());
                 bounds.add(node.getBound().getMax());
@@ -73,7 +66,7 @@ public class RTreeIndexNode extends RTreeNode {
     }
 
     @Override
-    public List<Slice> getEntries() {
+    public List<IndexEntry> getEntries() {
         throw new RuntimeException("SNH: unsupported method");
     }
 

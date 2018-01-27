@@ -2,11 +2,7 @@ package org.act.temporalProperty.index;
 
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.PeekingIterator;
-import org.act.temporalProperty.index.rtree.IndexEntryOperator;
-import org.act.temporalProperty.index.rtree.RTreeNode;
-import org.act.temporalProperty.index.rtree.RTreeNodeBlock;
-import org.act.temporalProperty.index.rtree.RTreeRange;
-import org.act.temporalProperty.util.Slice;
+import org.act.temporalProperty.index.rtree.*;
 
 import java.io.IOException;
 import java.nio.ByteOrder;
@@ -18,7 +14,7 @@ import java.util.List;
 /**
  * Created by song on 2018-01-19.
  */
-public class IndexTableIterator extends AbstractIterator<Slice> implements PeekingIterator<Slice> {
+public class IndexTableIterator extends AbstractIterator<IndexEntry> implements PeekingIterator<IndexEntry> {
 
     private final IndexEntryOperator op;
     private final LinkedList<RTreeNode> nodeStack = new LinkedList<>();
@@ -37,21 +33,11 @@ public class IndexTableIterator extends AbstractIterator<Slice> implements Peeki
 //        System.out.println(map.limit()+" "+map.position()+" "+map.remaining());
         this.rootPos = map.getInt();
 //        System.out.println(rootPos);
-        this.rootBound = this.readRootRange();
+        this.rootBound = RTreeRange.decode(map, op);
         this.queryBound = op.toRTreeRange(regions);
 
         this.nodeStack.push(getNode(rootPos, rootBound));
         this.indexStack.push(0);
-    }
-
-    private RTreeRange readRootRange() {
-        int len = map.getInt();
-        byte[] min = new byte[len];
-        map.get(min);
-        len = map.getInt();
-        byte[] max = new byte[len];
-        map.get(max);
-        return new RTreeRange(new Slice(min), new Slice(max), op);
     }
 
     private RTreeNode getNode(int pos, RTreeRange bound) {
@@ -63,7 +49,7 @@ public class IndexTableIterator extends AbstractIterator<Slice> implements Peeki
     }
 
     @Override
-    protected Slice computeNext() {
+    protected IndexEntry computeNext() {
         while(nodeStack.peek()!=null){
             RTreeNode cur = nodeStack.peek();
             int curIndex = indexStack.peek();
@@ -84,9 +70,9 @@ public class IndexTableIterator extends AbstractIterator<Slice> implements Peeki
                     if(!indexStack.isEmpty()) incLast(indexStack);
                 }
             }else{
-                List<Slice> data = cur.getEntries();
+                List<IndexEntry> data = cur.getEntries();
                 if(curIndex<data.size()){
-                    Slice entry = data.get(curIndex);
+                    IndexEntry entry = data.get(curIndex);
                     if(queryBound.contains(entry)) {
                         incLast(indexStack);
                         return entry;

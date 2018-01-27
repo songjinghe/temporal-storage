@@ -17,16 +17,16 @@ import org.act.temporalProperty.util.Slice;
 public class BufferFileAndTableIterator implements SeekingIterator<Slice,Slice>
 {
 
-    private MemTableIterator memIterator;
+    private SeekingIterator<Slice,Slice> memIterator;
     private SeekingIterator<Slice,Slice> tableIterator;
     private Entry<Slice,Slice> next;
     private Comparator<Slice> comparator;
     
-    public BufferFileAndTableIterator( MemTableIterator mem, SeekingIterator<Slice,Slice> table, Comparator<Slice> comparator )
+    public BufferFileAndTableIterator( SeekingIterator<Slice,Slice> latest, SeekingIterator<Slice,Slice> old, Comparator<Slice> comparator )
     {
-        this.memIterator = mem;
-        this.tableIterator = table;
-        next = null;
+        this.memIterator = latest;
+        this.tableIterator = old;
+        this.next = null;
         this.comparator = comparator;
     }
     

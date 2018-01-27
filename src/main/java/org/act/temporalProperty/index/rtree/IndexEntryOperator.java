@@ -1,12 +1,9 @@
 package org.act.temporalProperty.index.rtree;
 
 import com.google.common.base.Preconditions;
-import org.act.temporalProperty.index.IndexIntervalEntry;
-import org.act.temporalProperty.index.IndexQueryRegion;
-import org.act.temporalProperty.index.IndexValueType;
-import org.act.temporalProperty.index.PropertyValueInterval;
-import org.act.temporalProperty.util.DynamicSliceOutput;
+import org.act.temporalProperty.index.*;
 import org.act.temporalProperty.util.Slice;
+import org.act.temporalProperty.util.SliceInput;
 
 import java.util.List;
 
@@ -48,82 +45,6 @@ public class IndexEntryOperator {
         return size;
     }
 
-    public int dimensionCount() {
-        return values.size()+ defaultIndexFieldCount;
-    }
-
-    public int compare(Slice entry1, Slice entry2, int dimIndex) {
-        IndexValueType type = getType(dimIndex);
-        return type.compare(getField(dimIndex, entry1), getField(dimIndex, entry2));
-    }
-
-    private IndexValueType getType(int dimIndex){
-        switch (dimIndex){
-            case 0:
-            case 1: return IndexValueType.INT;
-            default:
-                Preconditions.checkArgument(defaultIndexFieldCount <=dimIndex && dimIndex<dimensionCount());
-                int customValIndex = dimIndex - defaultIndexFieldCount;
-                return values.get(customValIndex);
-        }
-    }
-
-    private Slice getField(int dimIndex, Slice entry){
-        switch (dimIndex){
-            case 0: return entry.slice(8,4);//start
-            case 1: return entry.slice(12, 4);//end
-            default:
-            {
-                Preconditions.checkArgument(defaultIndexFieldCount <=dimIndex && dimIndex<dimensionCount());
-                int customValIndex = dimIndex - defaultIndexFieldCount;
-                int readStart=16; // 16=8(entity id)+4(start time)+4(end time)
-                for(int i=0; i<customValIndex; i++){
-                    IndexValueType type = values.get(i);
-                    switch (type){
-                        case STRING:
-                            readStart += (4+entry.getInt(readStart));// str length;
-                            break;
-                        case INT:
-                        case FLOAT:
-                            readStart += 4;
-                        case LONG:
-                        case DOUBLE:
-                            readStart += 8;
-                    }
-                }
-                IndexValueType type = values.get(customValIndex);
-                switch (type){
-                    case INT:
-                    case FLOAT:
-                        return entry.slice(readStart, 4);
-                    case LONG:
-                    case DOUBLE:
-                        return entry.slice(readStart, 8);
-                    case STRING:
-                    default:
-                        int len = entry.getInt(readStart);
-                        return entry.slice(readStart+4, len);
-                }
-            }
-        }
-    }
-
-    public int compareRange(RTreeRange bound1, RTreeRange bound2, int dimIndex) {
-        if(!bound1.overlap(bound2, dimIndex)){
-            return compare(bound1.getMin(), bound2.getMin(), dimIndex);
-        }else{
-            Slice min1 = getField(dimIndex, bound1.getMin().slice());
-            Slice max1 = getField(dimIndex, bound1.getMax().slice());
-            Slice min2 = getField(dimIndex, bound2.getMin().slice());
-            Slice max2 = getField(dimIndex, bound2.getMax().slice());
-            return getType(dimIndex).compareRange(min1, max1, min2, max2);
-        }
-    }
-
-    public long getEntityId(Slice entry){
-        return entry.getLong(0);
-    }
-
     public int dataBlockCapacity() {
         return dataBlockCapacity;
     }
@@ -132,59 +53,105 @@ public class IndexEntryOperator {
         return indexBlockCapacity;
     }
 
+    public int dimensionCount() {
+        return values.size()+ defaultIndexFieldCount;
+    }
+
+    private int toValueIndex(int dimIndex){
+        Preconditions.checkArgument(defaultIndexFieldCount <= dimIndex && dimIndex < dimensionCount());
+        return dimIndex - defaultIndexFieldCount;
+    }
+
+    public int compare(IndexEntry entry1, IndexEntry entry2, int dimIndex) {
+        switch (dimIndex) {
+            case 0:
+                return Integer.compare(entry1.getStart(), entry2.getStart());
+            case 1:
+                return Integer.compare(entry1.getEnd(), entry2.getEnd());
+            default:
+                int valIndex = toValueIndex(dimIndex);
+                return values.get(valIndex).compare(
+                        entry1.getValue(valIndex),
+                        entry2.getValue(valIndex));
+        }
+    }
+
+    public int compareRange(RTreeRange bound1, RTreeRange bound2, int dimIndex) {
+        if(!bound1.overlap(bound2, dimIndex)){
+            return compare(bound1.getMin(), bound2.getMin(), dimIndex);
+        }else{
+            if(dimIndex==0){
+                int min1 = bound1.getMin().getStart();
+                int max1 = bound1.getMax().getStart();
+                int min2 = bound2.getMin().getStart();
+                int max2 = bound2.getMax().getStart();
+                return compareRange(min1, max1, min2, max2);
+            }else if(dimIndex==1) {
+                int min1 = bound1.getMin().getEnd();
+                int max1 = bound1.getMax().getEnd();
+                int min2 = bound2.getMin().getEnd();
+                int max2 = bound2.getMax().getEnd();
+                return compareRange(min1, max1, min2, max2);
+            }else{
+                int valIndex = toValueIndex(dimIndex);
+                Slice min1 = bound1.getMin().getValue(valIndex);
+                Slice max1 = bound1.getMax().getValue(valIndex);
+                Slice min2 = bound2.getMin().getValue(valIndex);
+                Slice max2 = bound2.getMax().getValue(valIndex);
+                return values.get(dimIndex).compareRange(min1, max1, min2, max2);
+            }
+        }
+    }
+
+    private int compareRange(int min1, int max1, int min2, int max2){
+        long tmp1 = min1;
+        tmp1 += max1;
+        long tmp2 = min2;
+        tmp2 += max2;
+        return Long.compare(tmp1, tmp2);
+    }
+
     public RTreeRange toRTreeRange(IndexQueryRegion regions) {
-        DynamicSliceOutput min = new DynamicSliceOutput(64);
-        min.writeLong(0); // entity id, however it is no use, only as placeholder
-        min.writeInt(0); // start time, time for minStart, minEnd, maxStart, maxEnd needs special care.
-        min.writeInt(regions.getTimeMin());// end time
-
-        DynamicSliceOutput max = new DynamicSliceOutput(64);
-        max.writeLong(Long.MAX_VALUE);  // entity id, however it is no use, only as placeholder
-        max.writeInt(regions.getTimeMax()); // start time
-        max.writeInt(Integer.MAX_VALUE);// end time
-
         List<PropertyValueInterval> vList =  regions.getPropertyValueIntervals();
+        Slice[] minVal = new Slice[vList.size()];
+        Slice[] maxVal = new Slice[vList.size()];
         for(int i=0; i<vList.size(); i++){
             PropertyValueInterval p = vList.get(i);
             IndexValueType type = p.getType();
             if(this.values.get(i)!= type) throw new RuntimeException("incorrect value order");
-            min.writeBytes(p.getValueMin());
-            max.writeBytes(p.getValueMax());
+            minVal[i] = p.getValueMin();
+            maxVal[i] = p.getValueMax();
         }
-        return new RTreeRange(min.slice(), max.slice(), this);
+
+        IndexEntry min = new IndexEntry(0, regions.getTimeMin(), minVal);
+        IndexEntry max = new IndexEntry(regions.getTimeMax(), Integer.MAX_VALUE, maxVal);
+
+        return new RTreeRange(min, max, this);
     }
 
-    public Slice toSlice(IndexIntervalEntry entry) {
-        DynamicSliceOutput out = new DynamicSliceOutput(20);
-        out.writeLong(entry.getEntityId());
-        out.writeInt(entry.getStart());
-        out.writeInt(entry.getEnd());
-        out.writeBytes(entry.getValue());
-        return out.slice();
-    }
-
-    public Slice[] calcMinMax(List<Slice> entries) {
-        DynamicSliceOutput min = new DynamicSliceOutput(20);
-        DynamicSliceOutput max = new DynamicSliceOutput(20);
-        min.writeLong(0); // entity id, however it is no use, only as placeholder
-        max.writeLong(Long.MAX_VALUE); // entity id, however it is no use, only as placeholder
-        for(int i=0;i<dimensionCount();i++){
-            Slice[] minmax = calcMinMaxField(entries, i);
-            min.writeBytes(minmax[0]);
-            max.writeBytes(minmax[1]);
+    public IndexEntry[] calcMinMax(List<IndexEntry> entries) {
+        Slice[] minVal = new Slice[values.size()];
+        Slice[] maxVal = new Slice[values.size()];
+        for(int i=0;i<values.size();i++){
+            Slice[] minmax = calcMinMaxValue(entries, i);
+            minVal[i] = minmax[0];
+            maxVal[i] = minmax[1];
         }
-        return new Slice[]{min.slice(), max.slice()};
+        int[] t = calcMinMaxTime(entries);
+        IndexEntry min = new IndexEntry(t[0], t[1], minVal);
+        IndexEntry max = new IndexEntry(t[2], t[3], maxVal);
+        return new IndexEntry[]{min, max};
     }
 
-    private Slice[] calcMinMaxField(List<Slice> entries, int dimIndex) {
-        IndexValueType type = getType(dimIndex);
+    private Slice[] calcMinMaxValue(List<IndexEntry> entries, int valIndex) {
+        IndexValueType type = values.get(valIndex);
         Slice min=null, max=null;
         for(int i=0; i<entries.size(); i++){
-            Slice entry = entries.get(i);
+            IndexEntry entry = entries.get(i);
             if(i==0){
-                min=max=getField(dimIndex, entry);
+                min=max=entry.getValue(valIndex);
             }else {
-                Slice field = getField(dimIndex, entry);
+                Slice field = entry.getValue(valIndex);
                 if(type.compare(field, min)<0) min = field;
                 if(type.compare(field, max)>0) max = field;
             }
@@ -192,16 +159,41 @@ public class IndexEntryOperator {
         return new Slice[]{min, max};
     }
 
-    public String toString(Slice entry) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("IndexEntity(eid=").append(entry.getLong(0)).append(",");
-        sb.append("start=").append(entry.getInt(8)).append(",");
-        sb.append("end=").append(entry.getInt(12)).append(",");
-        if(entry.length()>=20) {
-            sb.append("val1=").append(entry.getInt(16)).append(")");
-        }else{
-            sb.append("val1=").append("?").append(")");
+    private int[] calcMinMaxTime(List<IndexEntry> entries) {
+        int minStart = 0, maxStart = 0, minEnd = 0, maxEnd = 0;
+        for(int i=0; i<entries.size(); i++){
+            IndexEntry entry = entries.get(i);
+            if(i==0){
+                minStart=maxStart=entry.getStart();
+                minEnd = maxEnd = entry.getEnd();
+            }else {
+                int start = entry.getStart();
+                int end = entry.getEnd();
+                if(start<minStart) minStart = start;
+                if(start>maxStart) maxStart = start;
+                if(end<minEnd) minEnd = end;
+                if(end>maxEnd) maxEnd = end;
+            }
         }
+        return new int[]{minStart, minEnd, maxStart, maxEnd};
+    }
+
+    public String toString(IndexEntry entry) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("IndexEntity(eid=").append(entry.getEntityId()).append(",");
+        for(int i=0; i<dimensionCount(); i++) {
+            if(i==0){
+                sb.append("start=").append(entry.getStart()).append(',');
+            }else if(i==1){
+                sb.append("end=").append(entry.getEnd()).append(',');
+            }else{
+                sb.append("val").append(toValueIndex(i));
+                sb.append('=').append(values.get(i).toString(entry.getValue(toValueIndex(i))));
+            }
+        }
+        sb.append(")");
         return sb.toString();
     }
+
+
 }

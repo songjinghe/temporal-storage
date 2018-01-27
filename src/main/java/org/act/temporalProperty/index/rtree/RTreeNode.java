@@ -1,6 +1,5 @@
 package org.act.temporalProperty.index.rtree;
 
-import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.SliceOutput;
 
 import java.util.List;
@@ -39,5 +38,5 @@ public abstract class RTreeNode
     public abstract List<RTreeNode> getChildren();
 
     // method only for leaf nodes ================
-    public abstract List<Slice> getEntries();
+    public abstract List<IndexEntry> getEntries();
 }

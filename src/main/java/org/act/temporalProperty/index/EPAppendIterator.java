@@ -1,8 +1,8 @@
 package org.act.temporalProperty.index;
 
-import org.act.temporalProperty.EPEntryIterator;
 import org.act.temporalProperty.impl.InternalKey;
 import org.act.temporalProperty.impl.SeekingIterator;
+import org.act.temporalProperty.util.AbstractSeekingIterator;
 import org.act.temporalProperty.util.Slice;
 
 import java.util.ArrayList;
@@ -11,11 +11,13 @@ import java.util.Map;
 
 /**
  * Created by song on 2018-01-24.
- * this class is used in range query for unstable file to build a combined iterator
+ * this class is used in range query for disk file to build a combined iterator of one entity.
+ * the result iterator only contains entries for one entity, and its time is always inc when iterating
+ * when adding sub iterators, should always add from earliest to latest (time is inc)
  * 注意：不同文件的时间虽然无overlap，但内部Key(entity id, pro Id, time)是有overlap的
  * should call seek() or seekToFirst() to initialize all sub-iterators.
  */
-public class EPAppendIterator extends AppendIterator{
+public class EPAppendIterator extends AbstractSeekingIterator<Slice,Slice> {
     // each sub iterator's time should be inc (e.g. 0 is the earliest time)
     private List<SeekingIterator<Slice,Slice>> iterators = new ArrayList<>();
     private int cur = 0;
@@ -25,8 +27,18 @@ public class EPAppendIterator extends AppendIterator{
         this.id = idSlice;
     }
 
-    public void append(EPEntryIterator iterator) {
-        iterators.add(new EPEntryIterator(id, iterator));
+    public void append(SeekingIterator<Slice,Slice> iterator) {
+        if(isEP(iterator)){
+            iterators.add(iterator);
+        }else {
+            iterators.add(new EPEntryIterator(id, iterator));
+        }
+    }
+
+    private boolean isEP(SeekingIterator<Slice, Slice> iterator) {
+        return  (iterator instanceof EPEntryIterator) ||
+                (iterator instanceof EPAppendIterator) ||
+                (iterator instanceof EPMergeIterator);
     }
 
     @Override

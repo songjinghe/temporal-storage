@@ -7,6 +7,9 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Created by song on 2018-01-24.
  */
@@ -32,14 +35,13 @@ public class FloorQueryTest {
 
     @Test
     public void test2fail0() throws Throwable {
-        StoreBuilder stBuilder = new StoreBuilder(dbDir, false);
+        StoreBuilder stBuilder = new StoreBuilder(dbDir, true);
         store = stBuilder.store();
-
-//        for(int time=10; time<Integer.MAX_VALUE/100-6; time+=5){
-//            for(long entityId=1; entityId<5; entityId++){
-//                StoreBuilder.setIntProperty(store, time, entityId, 0, time);
-//            }
-//        }
+        for(int time=10; time<Integer.MAX_VALUE/100-6; time+=5){
+            for(long entityId=1; entityId<5; entityId++){
+                StoreBuilder.setIntProperty(store, time, entityId, 0, time);
+            }
+        }
         Slice val = store.getPointValue(1, 0, 9);
         if(val!=null) log.debug("{}", val.getInt(0));
         store.shutDown();
@@ -58,7 +60,29 @@ public class FloorQueryTest {
             }
             log.debug("version {} write finish", entityId);
         }
-        Slice val = store.getPointValue(1, 3, 4);
-        log.debug("{}", val.getInt(0));
+        Slice val = store.getPointValue(1, 3, 4); // bug, throws NoSuchElementException
+        log.debug("{}", val.getInt(0)); // should be 0
+    }
+
+    @Test
+    public void javaForNullTest(){
+        Object[] arr = new Object[4];
+        arr[0] = new Object();
+        arr[1] = null;
+        arr[2] = new Object();
+        arr[3] = null;
+        arr[4] = null;
+        for(Object obj : arr){
+            log.debug("obj: {}", obj);
+        }
+        List<Object> list = new ArrayList<>();
+        list.add(new Object());
+        list.add(null);
+        list.add(new Object());
+        list.add(null);
+        list.add(null);
+        for(Object obj : list){
+            log.debug("obj: {}", obj);
+        }
     }
 }

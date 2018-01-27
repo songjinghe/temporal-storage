@@ -1,6 +1,5 @@
 package org.act.temporalProperty.index.rtree;
 
-import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.SliceOutput;
 
 import java.util.List;
@@ -33,7 +32,7 @@ public class RTreeDiskNode extends RTreeNode {
     }
 
     @Override
-    public List<Slice> getEntries() {
+    public List<IndexEntry> getEntries() {
         throw new UnsupportedOperationException();
     }
 }

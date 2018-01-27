@@ -1,11 +1,7 @@
 package org.act.temporalProperty.index;
 
-import org.act.temporalProperty.index.rtree.IndexEntryOperator;
-import org.act.temporalProperty.index.rtree.RTree;
-import org.act.temporalProperty.index.rtree.RTreeNode;
-import org.act.temporalProperty.index.rtree.RTreeNodeBlock;
+import org.act.temporalProperty.index.rtree.*;
 import org.act.temporalProperty.util.DynamicSliceOutput;
-import org.act.temporalProperty.util.Slice;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -22,7 +18,7 @@ public class IndexTableWriter {
 
     private final IndexEntryOperator op;
     private final FileChannel channel;
-    private final List<Slice> dataEntries;
+    private final List<IndexEntry> dataEntries;
     private boolean hasHeader = false;
 
     public IndexTableWriter(FileChannel channel, IndexEntryOperator op){
@@ -31,7 +27,7 @@ public class IndexTableWriter {
         this.op = op;
     }
 
-    public void add(Slice entry){
+    public void add(IndexEntry entry){
         if(!hasHeader){
             addHeader();
         }

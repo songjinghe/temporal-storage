@@ -1,7 +1,7 @@
 package org.act.temporalProperty.index;
 
+import org.act.temporalProperty.index.rtree.IndexEntry;
 import org.act.temporalProperty.index.rtree.IndexEntryOperator;
-import org.act.temporalProperty.util.Slice;
 
 import java.io.IOException;
 import java.nio.channels.FileChannel;
@@ -20,7 +20,7 @@ public class IndexTable {
         this.channel = fileChannel;
     }
 
-    public Iterator<Slice> iterator(IndexQueryRegion regions) throws IOException {
+    public Iterator<IndexEntry> iterator(IndexQueryRegion regions) throws IOException {
         return new IndexTableIterator(this.channel, regions, extractOperator(regions));
     }
 

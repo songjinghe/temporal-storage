@@ -3,38 +3,102 @@ package org.act.temporalProperty.index;
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.PeekingIterator;
+import org.act.temporalProperty.index.rtree.IndexEntry;
+import org.act.temporalProperty.index.rtree.IndexEntryOperator;
+import org.act.temporalProperty.util.Slice;
 
-import java.util.Iterator;
-import java.util.NoSuchElementException;
+import java.util.*;
 
 /**
  * Created by song on 2018-01-19.
  */
-public class IndexPoint2IntervalIterator extends AbstractIterator<IndexIntervalEntry> implements PeekingIterator<IndexIntervalEntry>{
-    private final PeekingIterator<IndexPointEntry> tpIter;
+public class IndexPoint2IntervalIterator extends AbstractIterator<IndexEntry> implements PeekingIterator<IndexEntry>{
+    private final Iterator<TimePointEntry> tpIter;
     private final int endTime;
+    private final Map<Integer, TimePointEntry> map = new HashMap<>();
+    private final List<Integer> proIdList;
+    private final IndexEntryOperator op;
+    private TimePointEntry lastEntry;
+    private boolean reachEnd=false;
 
-    public IndexPoint2IntervalIterator(Iterator<IndexPointEntry> in, int endTime){
-        this.tpIter = Iterators.peekingIterator(in);
+    public IndexPoint2IntervalIterator(List<Integer> proIds, List<TimePointEntry> data, int endTime, IndexEntryOperator op){
+        this.proIdList = proIds;
         this.endTime = endTime;
-    }
-
-    protected IndexIntervalEntry computeNext()
-    {
-        if(tpIter.hasNext()){
-            IndexPointEntry tpv1 = tpIter.next();
-            if(tpIter.hasNext()){
-                IndexPointEntry tpv2 = tpIter.peek();
-                if(tpv2.getEntityId()==tpv1.getEntityId()){
-                    return new IndexIntervalEntry(tpv1.getEntityId(), tpv1.getTimePoint(), tpv2.getTimePoint()-1, tpv1.getValue());
+        this.op = op;
+        data.sort((o1, o2) -> {
+            int eidCmp = Long.compare(o1.getEntityId(), o2.getEntityId());
+            if(eidCmp==0) {
+                int timeCmp = Integer.compare(o1.getTimePoint(), o2.getTimePoint());
+                if(timeCmp==0){
+                    return Integer.compare(o1.getPropertyId(), o2.getPropertyId());
                 }else{
-                    return new IndexIntervalEntry(tpv1.getEntityId(), tpv1.getTimePoint(), endTime, tpv1.getValue());
+                    return timeCmp;
                 }
             }else{
-                return new IndexIntervalEntry(tpv1.getEntityId(), tpv1.getTimePoint(), endTime, tpv1.getValue());
+                return eidCmp;
             }
-        }else{
-            return endOfData();
-        }
+        });
+        this.tpIter = data.iterator();
     }
+
+    protected IndexEntry computeNext()
+    {
+        if(reachEnd) return endOfData();
+        while(tpIter.hasNext()) {
+            TimePointEntry cur = tpIter.next();
+            long curEID = cur.getEntityId();
+            int curTime = cur.getTimePoint();
+            int curProId = cur.getPropertyId();
+
+            if(curTime>endTime) { //skip
+                //do nothing, skip cur without update lastEntry: it is ok
+            }else if(lastEntry==null){ // start
+                map.put(curProId, cur);
+                lastEntry = cur;
+            }else if(curEID != lastEntry.getEntityId()){ //cross entity: output then state to start
+                IndexEntry result = outputEntry(endTime);
+                map.clear();
+                map.put(curProId, cur);
+                lastEntry = cur;
+                return result;
+            }else{ // same entity
+                if(curTime>lastEntry.getTimePoint()){ // should output
+                    IndexEntry result = outputEntry(cur.getTimePoint() - 1);
+                    map.put(curProId, cur);
+                    lastEntry = cur;
+                    return result;
+                }else if(curTime == lastEntry.getTimePoint()){
+                    map.put(curProId, cur);
+                    lastEntry = cur;
+                }else{ // curTime < lastEntry.time
+                    throw new RuntimeException("SNH: time not inc!");
+                }
+            }
+        }
+        reachEnd=true;
+        return outputEntry(endTime);
+    }
+
+    private IndexEntry outputEntry(int endTime) {
+        Slice[] vList = new Slice[proIdList.size()];
+        int latestStartTime = -1;
+        long entityId = -1;
+        for(int i=0; i<proIdList.size(); i++){
+            Integer proId = proIdList.get(i);
+            TimePointEntry point = map.get(proId);
+            if(point==null){
+                vList[i] = null;
+            }else{
+                vList[i] = point.getValue();
+                if(latestStartTime<point.getTimePoint()) latestStartTime = point.getTimePoint();
+                if(entityId!=-1 && entityId!=point.getEntityId()){
+                    throw new RuntimeException("SNH: entity not equal");
+                }
+                if(entityId==-1) entityId = point.getEntityId();
+            }
+        }
+        return new IndexEntry(entityId, latestStartTime, endTime, vList);
+    }
+
+
 }

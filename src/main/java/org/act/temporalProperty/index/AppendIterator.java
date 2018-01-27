@@ -11,6 +11,8 @@ import java.util.Map;
 /**
  * Created by song on 2018-01-24.
  *
+ * when adding sub iterators of unstable files, should always add from earliest to latest (time is inc)
+ *
  */
 public class AppendIterator extends AbstractSeekingIterator<Slice,Slice>{
     private List<SeekingIterator<Slice,Slice>> iterators = new ArrayList<>();

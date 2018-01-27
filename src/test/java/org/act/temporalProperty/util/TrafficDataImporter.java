@@ -61,7 +61,7 @@ public class TrafficDataImporter {
             }
 //            log.info("input files done {} {}", file.getName(), time);
         }
-        log.info("input files done");
+        log.info("input files done, {} roads", this.roadIdMap.size());
     }
 
     private static void getFileRecursive(File dir, List<File> fileList, int level){

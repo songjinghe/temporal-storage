@@ -1,17 +1,11 @@
 package org.act.temporalProperty.index;
 
-import org.act.temporalProperty.EPEntryIterator;
 import org.act.temporalProperty.impl.InternalKey;
-import org.act.temporalProperty.impl.MemTable;
 import org.act.temporalProperty.impl.SeekingIterator;
 import org.act.temporalProperty.impl.ValueType;
 import org.act.temporalProperty.util.AbstractSeekingIterator;
 import org.act.temporalProperty.util.Slice;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
 import java.util.Map.Entry;
 
 /**
@@ -19,63 +13,65 @@ import java.util.Map.Entry;
  */
 public class EPMergeIterator extends AbstractSeekingIterator<Slice, Slice> {
     private final Slice id;
-    private final SeekingIterator<Slice, Slice> high;
-    private final SeekingIterator<Slice, Slice> low;
+    private final SeekingIterator<Slice, Slice> latest;
+    private final SeekingIterator<Slice, Slice> old;
 
-    public EPMergeIterator(Slice idSlice, SeekingIterator<Slice, Slice> low, SeekingIterator<Slice, Slice> high) {
+    public EPMergeIterator(Slice idSlice, SeekingIterator<Slice, Slice> old, SeekingIterator<Slice, Slice> latest) {
         this.id = idSlice;
-        this.low = isEP(low)? low : new EPEntryIterator(idSlice, low);
-        this.high = isEP(high) ? high : new EPEntryIterator(idSlice, high);
+        this.old = isEP(old)? old : new EPEntryIterator(idSlice, old);
+        this.latest = isEP(latest) ? latest : new EPEntryIterator(idSlice, latest);
     }
 
     private boolean isEP(SeekingIterator<Slice, Slice> iterator) {
-        return iterator instanceof EPEntryIterator || iterator instanceof EPAppendIterator;
+        return  (iterator instanceof EPEntryIterator) ||
+                (iterator instanceof EPAppendIterator) ||
+                (iterator instanceof EPMergeIterator);
     }
 
     @Override
     protected void seekToFirstInternal() {
-        this.low.seekToFirst();
-        this.high.seekToFirst();
+        this.old.seekToFirst();
+        this.latest.seekToFirst();
     }
 
     @Override
     protected void seekInternal(Slice targetKey) {
-        this.low.seek(targetKey);
-        this.high.seek(targetKey);
+        this.old.seek(targetKey);
+        this.latest.seek(targetKey);
     }
 
     @Override
     protected Entry<Slice, Slice> getNextElement() {
-        // remove head DELETION values in high
-        while (high.hasNext()){
-            InternalKey tmpKey = new InternalKey(high.peek().getKey());
+        // remove head DELETION values in latest
+        while (latest.hasNext()){
+            InternalKey tmpKey = new InternalKey(latest.peek().getKey());
             if (tmpKey.getValueType()== ValueType.DELETION){
-                high.next(); // continue next loop;
+                latest.next(); // continue next loop;
             } else{
                 break;
             }
         }
 
-        if (high.hasNext() && low.hasNext()){
-            Entry<Slice,Slice> mem = high.peek();
-            Entry<Slice,Slice> disk = low.peek();
+        if (latest.hasNext() && old.hasNext()){
+            Entry<Slice,Slice> mem = latest.peek();
+            Entry<Slice,Slice> disk = old.peek();
 
             if (time(mem) <= time(disk)){
-                high.next();
-                if (high.hasNext()){
-                    pollUntil(low, time(high.peek()));
+                latest.next();
+                if (latest.hasNext()){
+                    pollUntil(old, time(latest.peek()));
                 } else{
-                    pollUntil(low, Integer.MAX_VALUE);
+                    pollUntil(old, Integer.MAX_VALUE);
                 }
                 return mem;
             } else{
-                low.next();
+                old.next();
                 return disk;
             }
-        } else if (high.hasNext()){ // diskIter run out
-            return high.next();
-        } else if (low.hasNext()){ // memIter run out
-            return low.next();
+        } else if (latest.hasNext()){ // diskIter run out
+            return latest.next();
+        } else if (old.hasNext()){ // memIter run out
+            return old.next();
         } else{ // both ran out
             return null;
         }
@@ -89,7 +85,7 @@ public class EPMergeIterator extends AbstractSeekingIterator<Slice, Slice> {
     private void pollUntil(SeekingIterator<Slice,Slice> iter, int time){
         InternalKey tmp = new InternalKey(id, time, 0, ValueType.VALUE);
         iter.seek(tmp.encode());
-        if(iter.hasNext() && time(iter.peek()) < time){
+        while(iter.hasNext() && time(iter.peek()) < time){
             iter.next();
         }
     }

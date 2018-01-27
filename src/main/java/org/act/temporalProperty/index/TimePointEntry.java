@@ -7,15 +7,21 @@ import java.nio.ByteBuffer;
 /**
  * Created by song on 2018-01-19.
  */
-public class IndexPointEntry {
+public class TimePointEntry {
+    private int propertyId;
     private long entityId;
     private int timePoint;
     private Slice value;
 
-    public IndexPointEntry(long entityId, int timePoint, Slice value) {
+    public TimePointEntry(int propertyId, long entityId, int timePoint, Slice value) {
+        this.propertyId = propertyId;
         this.entityId = entityId;
         this.timePoint = timePoint;
         this.value = value;
+    }
+
+    public int getPropertyId() {
+        return propertyId;
     }
 
     public long getEntityId() {

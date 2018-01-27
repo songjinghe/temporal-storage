@@ -3,6 +3,7 @@ package org.act.temporalProperty;
 import org.act.temporalProperty.impl.RangeQueryCallBack;
 import org.act.temporalProperty.index.IndexQueryRegion;
 import org.act.temporalProperty.index.IndexValueType;
+import org.act.temporalProperty.index.rtree.IndexEntry;
 import org.act.temporalProperty.util.Slice;
 
 import java.util.List;
@@ -60,6 +61,8 @@ public interface TemporalPropertyStore
 	 * @return null if no index available;
 	 */
 	List<Long> getEntities(IndexQueryRegion condition);
+
+	List<IndexEntry> getEntries(IndexQueryRegion condition);
 
 	void flushMemTable2Disk();
 

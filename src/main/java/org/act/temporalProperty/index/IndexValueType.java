@@ -21,6 +21,11 @@ public enum IndexValueType {
             tmp2 += max2.getInt(0);
             return Long.compare(tmp1, tmp2);
         }
+
+        @Override
+        public String toString(Slice field) {
+            return null;
+        }
     },
     LONG(1){
         @Override
@@ -35,6 +40,11 @@ public enum IndexValueType {
             long tmp2 = min2.getLong(0);
             tmp2 += max2.getLong(0);
             return Long.compare(tmp1, tmp2);
+        }
+
+        @Override
+        public String toString(Slice field) {
+            return null;
         }
     },
     FLOAT(2){
@@ -51,6 +61,11 @@ public enum IndexValueType {
             tmp2 += max2.getFloat(0);
             return Float.compare(tmp1, tmp2);
         }
+
+        @Override
+        public String toString(Slice field) {
+            return null;
+        }
     },
     DOUBLE(3){
         @Override
@@ -65,6 +80,11 @@ public enum IndexValueType {
             double tmp2 = min2.getDouble(0);
             tmp2 += max2.getDouble(0);
             return Double.compare(tmp1, tmp2);
+        }
+
+        @Override
+        public String toString(Slice field) {
+            return null;
         }
     },
     STRING(4){
@@ -103,6 +123,11 @@ public enum IndexValueType {
             tmp2+=max2;
             return Integer.compare(tmp1, tmp2);
         }
+
+        @Override
+        public String toString(Slice field) {
+            return null;
+        }
     };
 
 
@@ -128,4 +153,5 @@ public enum IndexValueType {
     public abstract int compare(Slice entry1, Slice entry2);
     public abstract int compareRange(Slice min1, Slice max1, Slice min2, Slice max2);
 
+    public abstract String toString(Slice field);
 }
