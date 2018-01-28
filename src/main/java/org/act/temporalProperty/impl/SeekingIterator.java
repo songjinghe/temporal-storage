@@ -43,6 +43,9 @@ public interface SeekingIterator<K, V>
      * |  4  |  3  |
      * |  5  |  5  |
      * |  6  |  5  |
+     * IMPORTANT NOTE:
+     * the behavior of peek() and next() is defined by implementations. For example, a implementation may
+     * only return entries whose key > 2, thus seek(0), seek(1), seek(2), seek(3) have the same effect.
      */
     void seek(K targetKey);
 }
