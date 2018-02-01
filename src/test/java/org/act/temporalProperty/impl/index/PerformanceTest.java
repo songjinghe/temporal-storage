@@ -3,12 +3,13 @@ package org.act.temporalProperty.impl.index;
 import org.act.temporalProperty.TemporalPropertyStore;
 import org.act.temporalProperty.impl.RangeQueryCallBack;
 import org.act.temporalProperty.index.IndexQueryRegion;
+import org.act.temporalProperty.index.IndexTableIterator;
 import org.act.temporalProperty.index.IndexValueType;
 import org.act.temporalProperty.index.PropertyValueInterval;
 import org.act.temporalProperty.index.rtree.IndexEntry;
+import org.act.temporalProperty.index.rtree.RTreeNode;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.StoreBuilder;
-import org.act.temporalProperty.util.TimeIntervalUtil;
 import org.act.temporalProperty.util.TrafficDataImporter;
 import org.junit.After;
 import org.junit.Before;
@@ -19,13 +20,15 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 
 /**
- * Created by song on 2018-01-27.
+ * Created by song on 2018-01-28.
  */
-public class CorrectnessTest {
+public class PerformanceTest {
+    public static LinkedList<Integer> nodeAccessList;
+
     private static Logger log = LoggerFactory.getLogger(BuildAndQueryTest.class);
 
     private static String dataPath = "/home/song/tmp/road data";
-    private static String dbDir = "/tmp/temporal.property.test.correctness";
+    private static String dbDir = "/media/song/G680/songjh/projects/TGraph/runtime/test/performance";
 
     private TemporalPropertyStore store;
     private StoreBuilder stBuilder;
@@ -52,63 +55,61 @@ public class CorrectnessTest {
     }
 
     @Test
-    public void main() {
-        int startTime = 18300, endTime = 20000, valMin=0, valMax=200;
-        compare(startTime, endTime, valMin, valMax);
-    }
-
-    private void compare(int startTime, int endTime, int valMin, int valMax){
-        List<IndexEntry> indexResult = queryByIndex(startTime, endTime, valMin, valMax);//27000
-        indexResult.sort(cmp);
-        log.info("index query complete");
-
-        List<IndexEntry> rangeResult = queryByRange( startTime, endTime, valMin, valMax);
-        rangeResult.sort(cmp);
-        log.info("range query complete");
-
-        log.info("size: range({}) vs index({})", rangeResult.size(), indexResult.size());
-        int i;
-        for(i=0; i<rangeResult.size() && i<indexResult.size(); i++){
-            IndexEntry rangeE = rangeResult.get(i);
-            IndexEntry indexE = indexResult.get(i);
-            if(!rangeE.equals(indexE)){
-                if(!partialEqual(rangeE, indexE, endTime)) {
-                    log.debug("entry not equal. index({}) vs range({})", indexE, rangeE);
-                }
+    public void performance(){
+        LinkedList<Long> indexTimeList = new LinkedList<>();
+        LinkedList<Integer> resultSizeList = new LinkedList<>();
+        LinkedList<Integer> nodeAccessCount = new LinkedList<>();
+        List<Integer> valMinList = new ArrayList<>();
+        List<Integer> valMaxList = new ArrayList<>();
+        log.info("index query start");
+        for(int valMin=0; valMin<1000; valMin+=60) {
+            for (int valMax = valMin; valMax < 1000; valMax += 60) {
+                valMinList.add(valMin);
+                valMaxList.add(valMax);
             }
         }
 
-        log.info("begin validation");
-        for(IndexEntry entry : indexResult){
-            validateByRangeQuery(entry.getEntityId(), 1, entry.getStart(), entry.getEnd(), entry.getValue(0));
-        }
-    }
-
-    private boolean partialEqual(IndexEntry rangeE, IndexEntry indexE, int endTime) {
-        if(     rangeE.getStart()==indexE.getStart() && rangeE.getEnd()==endTime && indexE.getEnd()>endTime &&
-                allNullOrEqual(rangeE.getEntityId(), indexE.getEntityId())){
-            boolean valEq = true;
-            for(int j=0; j<rangeE.valueLength(); j++){
-                if(!allNullOrEqual(rangeE.getValue(j), indexE.getValue(j))){
-                    valEq=false;
+        for(int start=1560; start<27860; start+=300){
+            for(int end=start; end<27360; end+=300){
+                indexTimeList.add(System.currentTimeMillis());
+                for(int valMin=0; valMin<1000; valMin+=60){
+                    for(int valMax=valMin; valMax<1000; valMax+=60){
+                        List<IndexEntry> indexResult = queryByIndex(start, end, valMin, valMax);
+                        resultSizeList.add(indexResult.size());
+                        indexTimeList.add(System.currentTimeMillis());
+                        nodeAccessCount.add(IndexTableIterator.Statistic.nodeAccessList.size());
+                        IndexTableIterator.Statistic.nodeAccessList.clear();
+                    }
                 }
+
+                Long startTP = indexTimeList.pollFirst();
+                Iterator<Integer> sizeIter = resultSizeList.iterator();
+                Iterator<Long> indexIter = indexTimeList.iterator();
+                Iterator<Integer> nodeCountIter = nodeAccessCount.iterator();
+                int i=0;
+                while(indexIter.hasNext()){
+                    Long indexT = indexIter.next();
+                    int valMin = valMinList.get(i);
+                    int valMax = valMaxList.get(i);
+                    int size = sizeIter.next();
+                    int nodeAccessed = nodeCountIter.next();
+                    System.out.println(start+", "+end+", "+valMin+", "+valMax+", "+size+", "+(indexT-startTP)+", "+nodeAccessed);
+                    startTP = indexT;
+                    i++;
+                }
+//                log.info("==================================");
+                resultSizeList.clear();
+                indexTimeList.clear();
+
             }
-            return valEq;
+            break;
         }
-        return false;
+//        LinkedList<Long> rangeTimeList = new LinkedList<>();
+//                        List<IndexEntry> rangeResult = queryByRange( start, end, valMin, valMax);
+//                        rangeTimeList.add(System.currentTimeMillis());
+//        log.info("range query done. loop {}, time {}ms, avg {}ms per query", loopCount, stop-tick, ((stop-tick)/(double)loopCount));
     }
 
-    private boolean allNullOrEqual(Object a, Object b){
-        return (a==null && b==null) || (a!=null && b!=null && a.equals(b));
-    }
-
-    private boolean smallTest() {
-        store.getRangeValue(62254, 1, 0, 999999, new CustomCallBack(62254){
-            public void onCall(int time, Slice value) { log.info("{} {}", time, value.getInt(0));}
-            public Object onReturn() { log.info("onReturn of test"); return null;}
-        });
-        return true;
-    }
 
     private List<IndexEntry> queryByIndex(int timeMin, int timeMax, int valueMin, int valueMax){
         IndexQueryRegion condition = new IndexQueryRegion(timeMin, timeMax);
@@ -118,7 +119,7 @@ public class CorrectnessTest {
         maxValue.setInt(0, valueMax);
         condition.add(new PropertyValueInterval(1, minValue, maxValue, IndexValueType.INT));
         List<IndexEntry> result = store.getEntries(condition);
-        log.info("index result count {}", result.size());
+//        log.info("index result count {}", result.size());
         return result;
     }
 
@@ -215,19 +216,13 @@ public class CorrectnessTest {
         }
     }
 
-    Comparator<IndexEntry> cmp = (o1, o2) -> {
-        int eidCmp = Long.compare(o1.getEntityId(), o2.getEntityId());
-        if (eidCmp == 0) {
-            int startCmp = Integer.compare(o1.getStart(), o2.getStart());
-            if (startCmp == 0) {
-                return Integer.compare(o1.getEnd(), o2.getEnd());
-            } else {
-                return startCmp;
-            }
-        } else {
-            return eidCmp;
-        }
-    };
+    private class ComparisonTask{
+        List<IndexValueType> types;
+        IndexQueryRegion queryRegion;
+        long resultEntryCount;
+        long executionTime;
+
+    }
 
     @After
     public void closeDB(){

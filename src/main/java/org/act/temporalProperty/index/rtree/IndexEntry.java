@@ -1,12 +1,15 @@
 package org.act.temporalProperty.index.rtree;
 
 
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import org.act.temporalProperty.util.DynamicSliceOutput;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.SliceInput;
 import org.act.temporalProperty.util.SliceOutput;
 import org.act.temporalProperty.util.VariableLengthQuantity;
+
+import java.util.Arrays;
 
 /**
  * Created by song on 2018-01-21.
@@ -105,4 +108,43 @@ public class IndexEntry {
     }
 
     public Slice encode() { return encode(false); }
+
+    public int valueLength(){
+        return value.length;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        IndexEntry entry = (IndexEntry) o;
+        boolean timeEq = (start == entry.start && end == entry.end);
+        boolean eidEq = allNullOrEqual(entityId, entry.entityId);
+        boolean valEq = true;
+        for(int i=0; i<value.length; i++){
+            if(!allNullOrEqual(value[i], entry.value[i])){
+                valEq=false;
+            }
+        }
+        return timeEq && eidEq && valEq;
+    }
+
+    private boolean allNullOrEqual(Object a, Object b){
+        return (a==null && b==null) || (a!=null && b!=null && a.equals(b));
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(start, end);
+    }
+
+    @Override
+    public String toString() {
+        return "IndexEntry{" +
+                "start=" + start +
+                ", end=" + end +
+                ", value=" + value[0].getInt(0) +
+                ", entityId=" + entityId +
+                '}';
+    }
 }

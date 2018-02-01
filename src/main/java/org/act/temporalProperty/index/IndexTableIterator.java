@@ -45,6 +45,7 @@ public class IndexTableIterator extends AbstractIterator<IndexEntry> implements 
         RTreeNodeBlock block = new RTreeNodeBlock(map, op);
         RTreeNode node = block.getNode();
         node.setBound(bound);
+        Statistic.nodeAccessList.add(pos);
         return node;
     }
 
@@ -92,5 +93,9 @@ public class IndexTableIterator extends AbstractIterator<IndexEntry> implements 
     private void incLast(LinkedList<Integer> indexStack) {
         int i = indexStack.pop();
         indexStack.push(i+1);
+    }
+
+    public static class Statistic{
+        public static final LinkedList<Integer> nodeAccessList = new LinkedList<>(); // for statistic in performance test only
     }
 }
