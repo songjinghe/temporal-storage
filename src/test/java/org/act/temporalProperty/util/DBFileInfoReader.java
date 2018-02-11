@@ -4,6 +4,8 @@ import org.act.temporalProperty.impl.FileMetaData;
 import org.act.temporalProperty.impl.InternalKey;
 import org.act.temporalProperty.impl.LogReader;
 import org.act.temporalProperty.impl.VersionEdit;
+import org.act.temporalProperty.index.IndexValueType;
+import org.act.temporalProperty.index.rtree.*;
 import org.act.temporalProperty.table.FileChannelTable;
 import org.act.temporalProperty.table.Table;
 import org.act.temporalProperty.table.TableComparator;
@@ -11,7 +13,12 @@ import org.act.temporalProperty.table.TableIterator;
 import org.junit.Test;
 
 import java.io.*;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -19,7 +26,8 @@ import java.util.Map;
  */
 public class DBFileInfoReader
 {
-    private String dbDir="/tmp/temporal.property.test";
+//    private String dbDir="/tmp/temporal.property.test";
+    private String dbDir="/media/song/G680/songjh/projects/TGraph/runtime/test/performance";
 
     @Test
     public void unStableFileInfo() throws IOException {
@@ -34,6 +42,22 @@ public class DBFileInfoReader
         readMetaFileContent("stable.meta");
         readMetaFileContent("stable.new.meta");
     }
+
+    @Test
+    public void indexFileInfo() throws Exception{
+        readIndexFile();
+    }
+
+    private void readIndexFile() throws IOException {
+        FileChannel channel = new FileInputStream(new File(this.dbDir, "index")).getChannel();
+        List<IndexValueType> types = new ArrayList<>();
+        types.add(IndexValueType.INT);
+        IndexFileIterator reader = new IndexFileIterator(channel, new IndexEntryOperator(types, 4096));//blocksize is not used when reading index files.
+        reader.printIndexBlocks(2);
+        reader.printDataBlocks(0, 3);
+        channel.close();
+    }
+
 
     private void readMetaFileContent(String fileName) throws IOException {
         File metaFile = new File( this.dbDir + "/" + fileName );
@@ -151,5 +175,98 @@ public class DBFileInfoReader
             return size + "Byte";
         }
 
+    }
+
+    private class IndexFileIterator{
+        private final IndexEntryOperator op;
+        private final ByteBuffer map;
+        private final int rootPos;
+        private final RTreeRange rootBound;
+
+        public IndexFileIterator(FileChannel channel, IndexEntryOperator indexEntryOperator) throws IOException {
+            this.map = channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size());
+            this.map.order(ByteOrder.LITTLE_ENDIAN);
+            this.op = indexEntryOperator;
+            this.rootPos = map.getInt();
+            this.rootBound = RTreeRange.decode(map, op);
+        }
+
+        private RTreeNode getNode(int pos, RTreeRange bound) {
+            map.position(pos);
+            RTreeNodeBlock block = new RTreeNodeBlock(map, op);
+            RTreeNode node = block.getNode();
+            node.setBound(bound);
+            return node;
+        }
+
+        public void printIndexBlocks(int level) {
+            boolean isIndexLevel = true;
+            int curLevel = 0;
+            List<RTreeNode> levelNodes = new ArrayList<>();
+            levelNodes.add(getNode(rootPos, rootBound));
+            while(isIndexLevel && curLevel<level){
+                System.out.println("level "+curLevel+" contains "+levelNodes.size()+" nodes");
+                if(curLevel<3){
+                    for(RTreeNode node : levelNodes){
+                        System.out.println("\t"+node);
+                    }
+                }
+                isIndexLevel = bfs(levelNodes);
+                curLevel++;
+                if(curLevel==3) for(int i=0; i<levelNodes.size()-1; i++){
+                    for(int j=i+1; j<levelNodes.size(); j++){
+                        if(levelNodes.get(i).getBound().overlap(levelNodes.get(j).getBound())){
+                            throw new RuntimeException("bound overlap "+i+" "+j);
+                        }
+                    }
+                }
+            }
+        }
+
+        public void printDataBlocks(int start, int end) {
+            dfs(getNode(rootPos, rootBound), 0,  start, end);
+        }
+
+        private long dfs(RTreeNode node, long curBlock, int start, int end){
+            if(!node.isLeaf()){
+                List<RTreeNode> children=node.getChildren();
+                for(RTreeNode diskNode : children){
+                    RTreeNode child = getNode(diskNode.getPos(), diskNode.getBound());
+                    curBlock = dfs(child, curBlock, start, end);
+                }
+            }else{
+                curBlock++;
+                if(start<=curBlock && curBlock<=end){
+                    System.out.println("========= block("+curBlock+")  bound["+node.getBound()+"] "+node.getEntries().size()+" entries ========");
+                    for(IndexEntry entry : node.getEntries()){
+                        System.out.println(entry);
+                    }
+                }
+            }
+            return curBlock;
+        }
+
+        private boolean bfs(List<RTreeNode> nodes) {
+            List<RTreeNode> result = new ArrayList<>();
+            long entryCount = 0;
+            for(RTreeNode cur : nodes){
+                if(!cur.isLeaf()){
+                    for(RTreeNode diskNode : cur.getChildren()){
+                        RTreeNode node = getNode(diskNode.getPos(), diskNode.getBound());
+                        result.add(node);
+                    }
+                }else{
+                    entryCount+=cur.getEntries().size();
+                }
+            }
+            if(entryCount==0) {
+                nodes.clear();
+                nodes.addAll(result);
+                return true;
+            }else{
+                System.out.println("level leaf contains "+ entryCount+" entries");
+                return false;
+            }
+        }
     }
 }

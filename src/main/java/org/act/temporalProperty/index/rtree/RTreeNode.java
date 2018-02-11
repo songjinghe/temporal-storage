@@ -34,6 +34,10 @@ public abstract class RTreeNode
         this.bound = range;
     }
 
+    public String toString(){
+        return "RTreeNode[bound="+bound.toString()+"]";
+    }
+
     // method only for index nodes ================
     public abstract List<RTreeNode> getChildren();
 

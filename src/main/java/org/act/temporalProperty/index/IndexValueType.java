@@ -23,8 +23,9 @@ public enum IndexValueType {
         }
 
         @Override
-        public String toString(Slice field) {
-            return null;
+        public String toString(Slice val) {
+            if(val.length()==4) return String.valueOf(val.getInt(0));
+            else return null;
         }
     },
     LONG(1){
@@ -43,8 +44,9 @@ public enum IndexValueType {
         }
 
         @Override
-        public String toString(Slice field) {
-            return null;
+        public String toString(Slice val) {
+            if(val.length()==8) return String.valueOf(val.getLong(0));
+            else return null;
         }
     },
     FLOAT(2){
@@ -63,8 +65,9 @@ public enum IndexValueType {
         }
 
         @Override
-        public String toString(Slice field) {
-            return null;
+        public String toString(Slice val) {
+            if(val.length()==4) return String.valueOf(val.getFloat(0));
+            else return null;
         }
     },
     DOUBLE(3){
@@ -83,8 +86,9 @@ public enum IndexValueType {
         }
 
         @Override
-        public String toString(Slice field) {
-            return null;
+        public String toString(Slice val) {
+            if(val.length()==8) return String.valueOf(val.getDouble(0));
+            else return null;
         }
     },
     STRING(4){
@@ -125,8 +129,8 @@ public enum IndexValueType {
         }
 
         @Override
-        public String toString(Slice field) {
-            return null;
+        public String toString(Slice val) {
+            return val.toString();
         }
     };
 

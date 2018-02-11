@@ -180,15 +180,18 @@ public class IndexEntryOperator {
 
     public String toString(IndexEntry entry) {
         StringBuilder sb = new StringBuilder();
-        sb.append("IndexEntity(eid=").append(entry.getEntityId()).append(",");
+        sb.append("IndexEntity(");
+        Long eid = entry.getEntityId();
+        if(eid!=null) sb.append("eid=").append(eid).append(",");
         for(int i=0; i<dimensionCount(); i++) {
             if(i==0){
                 sb.append("start=").append(entry.getStart()).append(',');
             }else if(i==1){
                 sb.append("end=").append(entry.getEnd()).append(',');
             }else{
-                sb.append("val").append(toValueIndex(i));
-                sb.append('=').append(values.get(i).toString(entry.getValue(toValueIndex(i))));
+                int valIndex = toValueIndex(i);
+                sb.append("val").append(valIndex);
+                sb.append('=').append(values.get(valIndex).toString(entry.getValue(valIndex)));
             }
         }
         sb.append(")");

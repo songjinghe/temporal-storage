@@ -66,9 +66,10 @@ public class IndexEntry {
         }
     }
 
-    public long getEntityId() {
-        if(entityId!=null) return entityId;
-        else throw new RuntimeException("do not contains entityId");
+    public Long getEntityId() {
+        return entityId;
+//        if(entityId!=null) return entityId;
+//        else throw new RuntimeException("do not contains entityId");
     }
 
     public int getStart() {
