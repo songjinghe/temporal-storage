@@ -18,11 +18,11 @@ public class InternalKey
     /**
      * 属性id
      */
-	private final int propertyId;
+    private final int propertyId;
     /**
      * 点/边id
      */
-	private final long entityId;
+    private final long entityId;
 	/**
 	 * 点/边id，和属性id的编码，用于确定一个动态属性
 	 */
@@ -54,8 +54,8 @@ public class InternalKey
         Preconditions.checkArgument( valueLength >= 0 , "valueLength is nagative" );
 
         this.Id = Id;
-        this.propertyId = Id.getInt(0);
-        this.entityId = Id.getLong(4);
+        this.propertyId = Id.getInt(8);
+        this.entityId = Id.getLong(0);
         this.startTime = startTime;
         this.valueType = valueType;
         this.valueLength = valueLength;
@@ -70,8 +70,8 @@ public class InternalKey
         Preconditions.checkNotNull(data, "data is null");
         Preconditions.checkArgument(data.length() >= SIZE_OF_LONG, "data must be at least %s bytes", SIZE_OF_LONG);
         this.Id = getId( data );
-        this.propertyId = data.getInt(0);
-        this.entityId = data.getLong(4);
+        this.propertyId = data.getInt(8);
+        this.entityId = data.getLong(0);
         long packedSequenceAndType = data.getLong( data.length() - SIZE_OF_LONG );
         this.startTime = (int)SequenceNumber.unpackTime(packedSequenceAndType);
         this.valueType = SequenceNumber.unpackValueType(packedSequenceAndType);

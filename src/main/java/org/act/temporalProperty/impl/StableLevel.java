@@ -17,6 +17,7 @@ import java.util.concurrent.locks.ReadWriteLock;
 
 import org.act.temporalProperty.Level;
 import org.act.temporalProperty.impl.MemTable.MemTableIterator;
+import org.act.temporalProperty.index.*;
 import org.act.temporalProperty.table.BufferFileAndTableIterator;
 import org.act.temporalProperty.table.FileChannelTable;
 import org.act.temporalProperty.table.Table;
@@ -263,7 +264,7 @@ public class StableLevel implements Level, StableLevelAddFile
                 continue;
             if( metaData.getSmallest() > endTime )
                 break;
-            if( TimeIntervalUtil.Union( startTime, endTime, metaData.getSmallest(), metaData.getLargest() ) )
+            if( TimeIntervalUtil.overlap( startTime, endTime, metaData.getSmallest(), metaData.getLargest() ) )
             {
                 int start = Math.max( startTime, metaData.getSmallest() );
                 int end = Math.min( endTime, metaData.getLargest() );
@@ -288,7 +289,7 @@ public class StableLevel implements Level, StableLevelAddFile
                                 break;
                         }
                     }
-                	if( hasUpdate ){
+                	if( hasUpdate ){//hasUpdate
                 		 
                 		SeekingIterator<Slice, Slice> iterator = new BufferFileAndTableIterator(buffer.iterator(), this.cache.newIterator(metaData), TableComparator.instance() );
                 		iterator.seek( searchKey.encode() );
@@ -368,6 +369,24 @@ public class StableLevel implements Level, StableLevelAddFile
             }
         }
         this.fileMetaLock.readLock().unlock();
+    }
+
+    public EPAppendIterator getRangeValueIter(Slice idSlice, int startTime, int endTime)
+    {
+        EPAppendIterator appendIterator = new EPAppendIterator(idSlice);
+        for( FileMetaData metaData : this.files.values() ){
+            if( null == metaData ) throw new RuntimeException("SNH: null value in collections");
+            if( metaData.getSmallest() > endTime ) break;
+            if( TimeIntervalUtil.overlap( startTime, endTime, metaData.getSmallest(), metaData.getLargest() ) ){
+                SeekingIterator<Slice,Slice> mergedIterator = this.cache.newIterator( metaData.getNumber() );
+                FileBuffer buffer = this.fileBuffers.get( metaData.getNumber() );
+                if( null != buffer ) {
+                    mergedIterator = new EPMergeIterator(idSlice, mergedIterator, buffer.iterator());
+                }
+                appendIterator.append(mergedIterator);
+            }
+        }
+        return appendIterator;
     }
     /**
      * 进行写入
@@ -590,4 +609,28 @@ public class StableLevel implements Level, StableLevelAddFile
         }
     }
 
+
+
+    public SeekingIterator<Slice,Slice> getRangeValueIter(int startTime, int endTime)
+    {
+        AppendIterator appendIterator = new AppendIterator();
+        for( FileMetaData metaData : this.files.values() ){
+            if( null == metaData ) continue;
+            if( metaData.getSmallest() > endTime ) break;//return
+            if( TimeIntervalUtil.overlap( startTime, endTime, metaData.getSmallest(), metaData.getLargest() ) ){
+                int start = Math.max( startTime, metaData.getSmallest() );
+                int end = Math.min( endTime, metaData.getLargest() );
+                SeekingIterator<Slice, Slice> iterator;
+                FileBuffer buffer = this.fileBuffers.get( metaData.getNumber() );
+                if(buffer==null){
+                    iterator = this.cache.newIterator( metaData.getNumber() );
+                }else{
+                    iterator = new BufferFileAndTableIterator(buffer.iterator(), this.cache.newIterator(metaData), TableComparator.instance() );
+                }
+                iterator.seekToFirst();
+                appendIterator.append(iterator);
+            }
+        }
+        return appendIterator;
+    }
 }

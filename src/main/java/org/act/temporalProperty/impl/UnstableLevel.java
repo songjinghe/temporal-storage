@@ -12,8 +12,13 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import com.google.common.collect.PeekingIterator;
+import org.act.temporalProperty.index.EPEntryIterator;
 import org.act.temporalProperty.Level;
 import org.act.temporalProperty.impl.MemTable.MemTableIterator;
+import org.act.temporalProperty.index.*;
+import org.act.temporalProperty.index.rtree.IndexEntry;
+import org.act.temporalProperty.index.rtree.IndexEntryOperator;
 import org.act.temporalProperty.table.*;
 import org.act.temporalProperty.util.MergingIterator;
 import org.act.temporalProperty.util.Slice;
@@ -65,7 +70,9 @@ public class UnstableLevel implements Level
      */
     private ReadWriteLock fileMetaDataLock;
     private StableLevel stLevel;
-    
+
+    // indexTable
+    private IndexTable indexTable;
     UnstableLevel( String dbDir, MergeProcess merge, ReadWriteLock fileLock, StableLevel stLevel )
     {
         this.dbDir = dbDir;
@@ -309,7 +316,7 @@ public class UnstableLevel implements Level
                 continue;
             if( metaData.getSmallest() > endTime )
                 break;
-            if( TimeIntervalUtil.Union( startTime, endTime, metaData.getSmallest(), metaData.getLargest() ) )
+            if( TimeIntervalUtil.overlap( startTime, endTime, metaData.getSmallest(), metaData.getLargest() ) )
             {
                 int start = Math.max( startTime, metaData.getSmallest() );
                 int end = Math.min( endTime, metaData.getLargest() );
@@ -380,6 +387,60 @@ public class UnstableLevel implements Level
             }
         }
         this.fileMetaDataLock.readLock().unlock();
+    }
+
+    public EPAppendIterator getRangeValueIter(Slice idSlice, int startTime, int endTime)
+    {
+        EPAppendIterator unstableIter = new EPAppendIterator(idSlice);
+        for( int i = 4; i >= 0; i-- ) {
+            FileMetaData meta = this.files.get((long) i);
+            if (meta != null && TimeIntervalUtil.overlap(startTime, endTime, meta.getSmallest(), meta.getLargest())) {
+                SeekingIterator<Slice, Slice> iterator = this.cache.newIterator(meta.getNumber());
+                FileBuffer buffer = this.fileBuffers.get( meta.getNumber() );
+                if( null != buffer ){
+                    unstableIter.append(new BufferFileAndTableIterator(buffer.iterator(), iterator, TableComparator.instance()));
+                }else {
+                    unstableIter.append(iterator);
+                }
+            }
+        }
+        return unstableIter;
+    }
+
+    public SeekingIterator<Slice,Slice> getMemTableIter(Slice idSlice){
+        if(this.stableMemTable != null) {
+            return new EPMergeIterator(idSlice, stableMemTable.iterator(), memTable.iterator());
+        }else{
+            return new EPEntryIterator(idSlice, memTable.iterator());
+        }
+    }
+
+    private SeekingIterator<Slice, Slice> getRangeValueIter(int startTime, int endTime)
+    {
+        AppendIterator unstableIter = new AppendIterator();
+        for( int i = 4; i >= 0; i-- ) {
+            FileMetaData meta = this.files.get((long) i);
+            if (meta != null && TimeIntervalUtil.overlap(startTime, endTime, meta.getSmallest(), meta.getLargest())) {
+                SeekingIterator<Slice, Slice> iterator = this.cache.newIterator(meta.getNumber());
+                FileBuffer buffer = this.fileBuffers.get( meta.getNumber() );
+                if( null != buffer ){
+                    unstableIter.append(new BufferFileAndTableIterator(buffer.iterator(), iterator, TableComparator.instance()));
+                }else {
+                    unstableIter.append(iterator);
+                }
+            }
+        }
+        return unstableIter;
+    }
+
+    private SeekingIterator<Slice,Slice> getMemTableIter(int start, int end){
+        if(this.stableMemTable != null) {
+            return new TimeRangeFilterIterator(
+                    new BufferFileAndTableIterator(memTable.iterator(), stableMemTable.iterator(), TableComparator.instance()),
+                    start, end );
+        }else{
+            return new TimeRangeFilterIterator(memTable.iterator(), start, end);
+        }
     }
 
     /**
@@ -610,5 +671,81 @@ public class UnstableLevel implements Level
         }
     }
 
+    private IndexTable index;
+    public void createValueIndex(int start, int end, List<Integer> proIds, List<IndexValueType> types){
+        if(proIds.size()>1) throw new TGraphNotImplementedException();
+        if(proIds.isEmpty()) throw new RuntimeException("should have at least one proId");
+        try {
+            this.memtableLock.lock();
+            waitUntilCurrentMergeComplete();
+            //
+            IndexEntryOperator op = new IndexEntryOperator(types,4096);
+            SeekingIterator<Slice,Slice> iterator = buildIndexIterator(start, end, proIds);
+            IndexBuilderCallback indexBuilderCallback = new IndexBuilderCallback(proIds, op);
+            while(iterator.hasNext()){
+                Entry<Slice, Slice> entry = iterator.next();
+                InternalKey key = new InternalKey(entry.getKey());
+                if(key.getValueType()==ValueType.INVALID) {
+                    indexBuilderCallback.onCall(key.getPropertyId(), key.getEntityId(), key.getStartTime(), null);
+                }else{
+                    indexBuilderCallback.onCall(key.getPropertyId(), key.getEntityId(), key.getStartTime(), entry.getValue());
+                }
+            }
+            PeekingIterator<IndexEntry> data = indexBuilderCallback.getIterator(end);
 
+            FileChannel channel = new FileOutputStream(new File(this.dbDir, "index")).getChannel();
+            IndexTableWriter writer = new IndexTableWriter(channel, op);
+            while(data.hasNext()){
+                writer.add(data.next());
+            }
+            writer.finish();
+            channel.close();
+            this.index = new IndexTable(new FileInputStream(new File(this.dbDir, "index")).getChannel());
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            this.memtableLock.unlock();
+        }
+    }
+
+    private SeekingIterator<Slice, Slice> buildIndexIterator(int start, int end, List<Integer> proIds) {
+        AppendIterator appendIterator = new AppendIterator();
+        if( start < this.stLevel.getTimeBoundary() ) {
+            int stEnd = Math.min((int) this.stLevel.getTimeBoundary(), end);
+            appendIterator.append(this.stLevel.getRangeValueIter(start, stEnd));
+        }
+        if( end >= this.stLevel.getTimeBoundary() ) {
+            int unStart = Math.max((int) this.stLevel.getTimeBoundary(), start);
+            appendIterator.append(this.getRangeValueIter(unStart, end));
+        }
+        return new PropertyFilterIterator(
+                proIds,
+                new BufferFileAndTableIterator(
+                        this.getMemTableIter(start, end),
+                        appendIterator,
+                        TableComparator.instance()));
+    }
+
+
+    public List<IndexEntry> valueIndexQuery(IndexQueryRegion condition) throws IOException {
+        Iterator<IndexEntry> iter = this.index.iterator(condition);
+        IndexEntryOperator op = extractOperator(condition);
+        List<IndexEntry> result = new ArrayList<>();
+        while(iter.hasNext()){
+            result.add(iter.next());
+        }
+        return result;
+    }
+
+    private IndexEntryOperator extractOperator(IndexQueryRegion regions) {
+        List<IndexValueType> types = new ArrayList<>();
+        for(PropertyValueInterval p : regions.getPropertyValueIntervals()){
+            types.add(p.getType());
+        }
+        return new IndexEntryOperator(types, 4096);
+    }
 }

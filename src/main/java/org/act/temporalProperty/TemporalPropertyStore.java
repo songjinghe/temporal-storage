@@ -1,7 +1,12 @@
 package org.act.temporalProperty;
 
 import org.act.temporalProperty.impl.RangeQueryCallBack;
+import org.act.temporalProperty.index.IndexQueryRegion;
+import org.act.temporalProperty.index.IndexValueType;
+import org.act.temporalProperty.index.rtree.IndexEntry;
 import org.act.temporalProperty.util.Slice;
+
+import java.util.List;
 
 /**
  * 动态属性存储系统，对外提供其功能的接口
@@ -55,7 +60,18 @@ public interface TemporalPropertyStore
      */
     public boolean delete(Slice id);
 
-    void flushMemTable2Disk();
+	void createValueIndex(int start, int end, List<Integer> proIds, List<IndexValueType> types);
+
+	/**
+	 * get entity id which satisfy query condition
+	 * @param condition query condition of one property
+	 * @return null if no index available;
+	 */
+	List<Long> getEntities(IndexQueryRegion condition);
+
+	List<IndexEntry> getEntries(IndexQueryRegion condition);
+
+	void flushMemTable2Disk();
 
     void flushMetaInfo2Disk();
 
