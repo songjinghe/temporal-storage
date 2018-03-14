@@ -34,7 +34,7 @@ public class CorrectnessTest {
     @Before
     public void initDB() throws Throwable {
         stBuilder = new StoreBuilder(dbDir, true);
-        importer = new TrafficDataImporter(stBuilder.store(), dataPath, 100);
+        importer = new TrafficDataImporter(stBuilder.store(), dataPath, 10);
         log.info("time: {} - {}", importer.getMinTime(), importer.getMaxTime());
         store = stBuilder.store();
         buildIndex();
@@ -76,6 +76,7 @@ public class CorrectnessTest {
                     log.debug("entry not equal. index({}) vs range({})", indexE, rangeE);
                 }
             }
+            if(i>1000) return;
         }
 
         log.info("begin validation");

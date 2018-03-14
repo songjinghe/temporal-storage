@@ -98,7 +98,7 @@ public class IndexEntryOperator {
                 Slice max1 = bound1.getMax().getValue(valIndex);
                 Slice min2 = bound2.getMin().getValue(valIndex);
                 Slice max2 = bound2.getMax().getValue(valIndex);
-                return values.get(dimIndex).compareRange(min1, max1, min2, max2);
+                return values.get(valIndex).compareRange(min1, max1, min2, max2);
             }
         }
     }

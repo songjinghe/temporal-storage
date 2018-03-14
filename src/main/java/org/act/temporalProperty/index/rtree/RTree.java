@@ -74,14 +74,15 @@ public class RTree {
     private void nodeRecursiveSort(List<RTreeNode> data, int left, int right, int corIndex, int k) {
         data.subList(left, right).sort(nodeComparator(this.op, corIndex));
         if(k>1) {
-            int r = right - left;
-            int p = r / bIndex + (r % bIndex == 0 ? 0 : 1);
-            int s = (int) Math.round(Math.ceil(Math.pow(p, 1d / k)));
-            int groupLen = s * bIndex;
+            int r = right - left; // total entry count
+            int p = r / bIndex + (r % bIndex == 0 ? 0 : 1); // total block count
+            int s = (int) Math.round(Math.ceil(Math.pow(p, 1d / k))); // block count at current dimension (corIndex).
+            int groupLen = s * bIndex; // group
             for (int i = 0; i < s; i++) {
-                int start = i * groupLen;
-                int end = i * (groupLen + 1) > right ? right : i * (groupLen + 1);
-                nodeRecursiveSort(data, start, end, corIndex + 1, k - 1);
+                int start = i*groupLen+left;
+                int endTmp = (i+1)*groupLen+left;
+                int end = endTmp>right ? right : endTmp;
+                if(start<end) nodeRecursiveSort(data, start, end, corIndex + 1, k - 1);
             }
         }
     }
@@ -104,9 +105,10 @@ public class RTree {
             int s = (int) Math.round(Math.ceil(Math.pow(p, 1d / k)));
             int groupLen = s * bData;
             for (int i = 0; i < s; i++) {
-                int start = i * groupLen;
-                int end = i * (groupLen + 1) > right ? right : i * (groupLen + 1);
-                dataRecursiveSort(data, start, end, corIndex + 1, k - 1);
+                int start = i*groupLen+left;
+                int endTmp = (i+1)*groupLen+left;
+                int end = endTmp>right ? right : endTmp;
+                if(start<end) dataRecursiveSort(data, start, end, corIndex + 1, k - 1);
             }
         }
     }
