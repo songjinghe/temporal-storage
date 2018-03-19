@@ -1,8 +1,11 @@
 package org.act.temporalProperty.impl.index;
 
 import org.act.temporalProperty.index.rtree.IndexEntry;
+import org.act.temporalProperty.util.Slice;
 
 import java.io.*;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.*;
 /*
 * edit by yf
@@ -23,22 +26,42 @@ public class SourceCompare {
     // traffic data dir path
     private final File dataDir;
 
-    // the files filtered by (startTime, endTime)
-    private List<File> dataFileList;
+    // ---%--the files filtered by (startTime, endTime)
+    //private List<File> dataFileList;
+    private List<File> totalFileList;
 
-    private Map<Integer, ArrayList<IndexEntry>> entryMap;
+    private Map<String, Long> entityIdMap;
 
-    public SourceCompare(String dataPath) {
+    //private Map<Integer, ArrayList<IndexEntry>> entryMap;
+
+    private final int inputFileCount;
+
+    public SourceCompare(String dataPath, int inputFileCount) {
         this.dataDir = new File(dataPath);
-        this.dataFileList = new ArrayList<File>();
-        this.entryMap = new HashMap<Integer, ArrayList<IndexEntry>>();
+        //this.dataFileList = new ArrayList<File>();
+        //this.entryMap = new HashMap<Integer, ArrayList<IndexEntry>>();
+        this.entityIdMap = new HashMap<String, Long>();
+        this.totalFileList = new ArrayList<File>();
+        this.inputFileCount = inputFileCount;
+    }
+
+    public List<IndexEntry> queryBySource(int timeMin, int timeMax, int valueMin, int valueMax) {
+
+        int ret1 = importFiles();
+        if(ret1 < 0)
+            return null;
+
+        return filterEntry(timeMin, timeMax, valueMin, valueMax);
     }
 
     // According to the (startTime, endTime; inputFileCount) to filter files in dataDir
-    public int importFiles(int inputFileCount, int starTime, int endTime) {
-        List<File> totalFileList = new ArrayList<File>();
+    /* Read (startTime, endTime, [propertyId]; entityId, propertyValue) into a array (iterator); List<List<entry>()> --- each file one list;
+     *  use propertyValue to filter; HashMap<travelTime, EntryList>
+     */
 
-        if(!this.dataDir.isDirectory()) {
+    private int importFiles() {
+
+        if (!this.dataDir.isDirectory()) {
             System.out.println("SoureCompare-importFiles: dataDir = %s is not a Directory.");
             return -1;
         }
@@ -50,40 +73,68 @@ public class SourceCompare {
         }
         totalFileList.sort(Comparator.comparing(File::getName));
 
-        for (int i = 0; (i < totalFileList.size()) && (i < inputFileCount); i++) {
-            File file = totalFileList.get(i);
-            int time = timeStr2int(file.getName().substring(9, 21)) - 1288800000;
-
-            if ((time >= starTime) && (time < endTime)) {
-                this.dataFileList.add(file);
-            }
-        }
-
         return 0;
     }
 
-    /* Read (startTime, endTime, [propertyId]; entityId, propertyValue) into a array (iterator); List<List<entry>()> --- each file one list;
-    *  use propertyValue to filter; HashMap<travelTime, EntryList>
-    */
-    public int importEntries() {
+    private List<IndexEntry> filterEntry(int starTime, int endTime, int valueMin, int valueMax){
 
-        for (File file : this.dataFileList) {
+        int fileCount = Math.min(totalFileList.size(), inputFileCount);
+        List<IndexEntry> entryList = new ArrayList<IndexEntry>();
 
-           // FileReader fr = new FileReader(file);
+        for (int i = 0; i < fileCount; i++) {
+            File file = totalFileList.get(i);
+            int sTime = timeStr2int(file.getName().substring(9, 21)) - 1288800000;
 
-            try (BufferedReader br = new BufferedReader(new FileReader(file.getName()))) {
+            try (BufferedReader br = new BufferedReader(new FileReader(file))) {
 
                 String line = br.readLine();
-                while((line = br.readLine()) != null) {
+                while ((line = br.readLine()) != null) {
+                    String[] fields = line.split(",");
+
+                    String gridId = fields[1];
+                    String chainId = fields[2];
+                    Long entityId = getEntityId(gridId, chainId);
+
+                    int travelTime = Integer.valueOf(fields[6]);
+
+                    if((sTime >= starTime) && (sTime < endTime) && (travelTime >= valueMin) && (travelTime <= valueMax)) {
+
+                        int eTime = getEndTime(i + 1, endTime);
+                        Slice value = new Slice(ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(travelTime).array());
+
+                        entryList.add(new IndexEntry(entityId, sTime, eTime, new Slice[]{value}));
+                    }
 
                 }
-            } catch(IOException e) {
+            } catch (IOException e) {
                 System.out.println("FileReader: NullIOException.");
             }
         }
-        return 0;
+
+        return entryList;
     }
 
+    private int getEndTime(int fileNum, int endTime){
+        if(fileNum < totalFileList.size()) {
+            File file = totalFileList.get(fileNum);
+            return (timeStr2int(file.getName().substring(9, 21)) - 1288800000);
+        } else {
+            return endTime;
+        }
+    }
+
+    private Long getEntityId(String gridId, String chainId){
+
+        String key = gridId + ":" + chainId;
+
+        if(entityIdMap.containsKey(key)) {
+            return entityIdMap.get(key);
+        } else {
+            long value = entityIdMap.size();
+            entityIdMap.put(key, value);
+            return value;
+        }
+    }
 
     /*
     the same function as TrafficDataImporter.java->timeStr2int()

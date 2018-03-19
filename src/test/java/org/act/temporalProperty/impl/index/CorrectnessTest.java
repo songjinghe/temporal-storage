@@ -24,17 +24,19 @@ import java.util.*;
 public class CorrectnessTest {
     private static Logger log = LoggerFactory.getLogger(BuildAndQueryTest.class);
 
-    private static String dataPath = "/home/song/tmp/road data";
-    private static String dbDir = "/tmp/temporal.property.test.correctness";
+    private static String dataPath = "C:\\Users\\Administrator\\Desktop\\TGraph-source\\20101104.tar\\20101104";
+    private static String dbDir = "temporal.property.test";
 
     private TemporalPropertyStore store;
     private StoreBuilder stBuilder;
     private TrafficDataImporter importer;
+    private SourceCompare sourceEntry;
 
     @Before
     public void initDB() throws Throwable {
         stBuilder = new StoreBuilder(dbDir, true);
         importer = new TrafficDataImporter(stBuilder.store(), dataPath, 10);
+        sourceEntry = new SourceCompare(dataPath, 10); //fileCount = 10; no entry in timeRange, but query results can be found in Index and Range? --- endTime (<=endTime --> < endTime?)
         log.info("time: {} - {}", importer.getMinTime(), importer.getMaxTime());
         store = stBuilder.store();
         buildIndex();
@@ -53,11 +55,16 @@ public class CorrectnessTest {
 
     @Test
     public void main() {
-        int startTime = 18300, endTime = 20000, valMin=0, valMax=200;
+        int startTime = 18300, endTime = 20000, valMin=0, valMax=200; //should return (18300, 20000); as importer is (0, 2760), return (2760, 20000) ???!!!! Wrong answer?
         compare(startTime, endTime, valMin, valMax);
     }
 
     private void compare(int startTime, int endTime, int valMin, int valMax){
+
+
+        List<IndexEntry> sourceResult = sourceEntry.queryBySource(startTime, endTime, valMin, valMax);
+        sourceResult.sort(cmp);
+
         List<IndexEntry> indexResult = queryByIndex(startTime, endTime, valMin, valMax);//27000
         indexResult.sort(cmp);
         log.info("index query complete");
