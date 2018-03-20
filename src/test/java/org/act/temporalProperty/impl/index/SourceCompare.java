@@ -100,7 +100,7 @@ public class SourceCompare {
 
                     int travelTime = Integer.valueOf(fields[6]);
 
-                    if((sTime >= starTime) && (sTime < endTime) && (travelTime >= valueMin) && (travelTime <= valueMax)) {
+                    if((travelTime >= valueMin) && (travelTime <= valueMax)) {
 
                         //int eTime = getEndTime(i + 1, endTime);
                         Slice value = new Slice(ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(travelTime).array());
@@ -115,12 +115,12 @@ public class SourceCompare {
             }
         }
 
-        entryList = mergeEntryList(entryList);
+        entryList = mergeEntryList(entryList, starTime, endTime);
 
         return entryList;
     }
 
-    private List<IndexEntry> mergeEntryList(List<IndexEntry> entryList) {
+    private List<IndexEntry> mergeEntryList(List<IndexEntry> entryList, int startTime, int endTime) {
 
         List<IndexEntry> mergeList = new ArrayList<>();
 
@@ -149,8 +149,10 @@ public class SourceCompare {
                         if(j + 1 == entityIdList.size()) {
                             eTime = entity.getEnd();
 
-                            entity = new IndexEntry(entityId, sTime, eTime, new Slice[]{value});
-                            mergeList.add(entity);
+                            if((sTime <= endTime) && (eTime >= startTime)) {
+                                entity = new IndexEntry(entityId, sTime, eTime, new Slice[]{value});
+                                mergeList.add(entity);
+                            }
 
                             j++;
                             break;
@@ -158,8 +160,10 @@ public class SourceCompare {
                         } else if(!entityIdList.get(j).getValue(0).equals(entityIdList.get(j + 1).getValue(0))){
                             eTime = entityIdList.get(j + 1).getStart() - 1;
 
-                            entity = new IndexEntry(entityId, sTime, eTime, new Slice[]{value});
-                            mergeList.add(entity);
+                            if((sTime <= endTime) && (eTime >= startTime)) {
+                                entity = new IndexEntry(entityId, sTime, eTime, new Slice[]{value});
+                                mergeList.add(entity);
+                            }
 
                             j++;
                             break;
