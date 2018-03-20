@@ -1,4 +1,4 @@
-package org.act.temporalProperty.index;
+package org.act.temporalProperty.helper;
 
 import org.act.temporalProperty.impl.InternalKey;
 import org.act.temporalProperty.impl.SeekingIterator;

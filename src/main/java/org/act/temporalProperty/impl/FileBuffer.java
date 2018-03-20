@@ -26,22 +26,17 @@ public class FileBuffer implements Closeable
     
     /**
      * 实例化方法
-     * @param filename 对应的StableFile或UnStableFile文件名
-     * @param UnSortedTableAbsolutName 在磁盘中起备份作用的文件的绝对名称
+     * @param unSortedTableFile 在磁盘中起备份作用的文件的绝对名称
      * @throws IOException
      */
-    public FileBuffer(String filename, String UnSortedTableAbsolutName ) throws IOException
+    public FileBuffer(File unSortedTableFile ) throws IOException
     {
         this.memTable = new MemTable( TableComparator.instance() );
-        File tableFile = new File( UnSortedTableAbsolutName );
-        if( !tableFile.exists() )
-        {
-            tableFile.createNewFile(); 
-            this.discTable = new UnSortedTable( filename, tableFile );
-        }
-        else
-        {
-            this.discTable = new UnSortedTable( filename, tableFile );
+        if( !unSortedTableFile.exists() ){
+            unSortedTableFile.createNewFile();
+            this.discTable = new UnSortedTable(unSortedTableFile);
+        }else{
+            this.discTable = new UnSortedTable(unSortedTableFile);
             this.discTable.initFromFile( this.memTable );
         }
     }

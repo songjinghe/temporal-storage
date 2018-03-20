@@ -60,6 +60,15 @@ public class InternalKey
         this.valueType = valueType;
         this.valueLength = valueLength;
     }
+    /**
+     * 新建一个InternalKey，将相关信息传入，用于编码后生成一个Slice，通常用于查找
+     * @param Id
+     * @param startTime
+     */
+    public InternalKey(Slice Id, int startTime)
+    {
+        this(Id, startTime, 0, ValueType.VALUE);
+    }
 
     /**
      * 新建一个InternalKey，将相关Slice传入，可用于解码相关信息。如起始时间，record类型，id等

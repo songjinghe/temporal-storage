@@ -60,6 +60,15 @@ public final class Filename
     {
         return makeFileName(number, "st");
     }
+
+    public static String stableFileName(int propertyId, long number)
+    {
+        return propertyId+"/"+makeFileName(number, "st");
+    }
+
+    public static String stPath(String proDir, long fileNumber) {
+        return new File(proDir, stableFileName(fileNumber)).getAbsolutePath();
+    }
     
     /**
      * 返回对应编号的UnStableFile文件的名称
@@ -67,6 +76,15 @@ public final class Filename
     public static String unStableFileName(long number)
     {
         return makeFileName( number, "un" );
+    }
+
+    public static String unStableFileName(int propertyId, long number)
+    {
+        return propertyId+"/"+makeFileName( number, "un" );
+    }
+
+    public static String unPath(String proDir, long fileNumber) {
+        return new File(proDir, unStableFileName(fileNumber)).getAbsolutePath();
     }
 
     /**
@@ -112,7 +130,7 @@ public final class Filename
     {
         return "LOG";
     }
-    
+
     public static String oldInfoLogFileName()
     {
         return "LOG.old";

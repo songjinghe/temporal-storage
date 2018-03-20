@@ -26,12 +26,11 @@ import com.google.common.cache.LoadingCache;
  */
 public class TableCache
 {
-    private final LoadingCache<Long, TableAndFile> cache;
+    private final LoadingCache<String, TableAndFile> cache;
     private final Finalizer<Table> finalizer = new Finalizer<>(1);;
 
-    public TableCache(final File databaseDir, int tableCacheSize, final UserComparator userComparator, final boolean verifyChecksums, final boolean isStableFile)
+    public TableCache(int tableCacheSize, final UserComparator userComparator, final boolean verifyChecksums)
     {
-        Preconditions.checkNotNull(databaseDir, "databaseName is null");
         cache = CacheBuilder.newBuilder()
                 .maximumSize(tableCacheSize)
 //                .removalListener(new RemovalListener<Long, TableAndFile>()
@@ -43,60 +42,41 @@ public class TableCache
 //                        finalizer.addCleanup(table, table.closer());
 //                    }
 //                })
-                .build(new CacheLoader<Long, TableAndFile>()
-                {
+                .build(new CacheLoader<String, TableAndFile>(){
                     @Override
-                    public TableAndFile load(Long fileNumber)
-                            throws IOException
-                    {
-                        return new TableAndFile(databaseDir, fileNumber, userComparator, verifyChecksums, isStableFile);
+                    public TableAndFile load(String filePath) throws IOException{
+                        return new TableAndFile(filePath, userComparator, verifyChecksums);
                     }
                 });
     }
 
     /**
-     * 通过需要查询文件的元信息，得到相应文件的Iterator
-     * @param file 文件元信息
-     * @return 相应文件的Iterator
-     */
-    public SeekingIterator<Slice,Slice> newIterator(FileMetaData file)
-    {
-        return newIterator(file.getNumber());
-    }
-
-    /**
      * 通过文件的编号，得到相应文件的Iterator
-     * @param number 文件编号
+     * @param filePath 文件编号
      * @return 相应文件的Iterator
      */
-    public SeekingIterator<Slice,Slice> newIterator(long number)
+    public SeekingIterator<Slice,Slice> newIterator(String filePath)
     {
-        return getTable(number).iterator();
-    }
-    
-    
-    public Table newTable( long number )
-    {
-        return getTable( number );
+        return getTable(filePath).iterator();
     }
 
-    public long getApproximateOffsetOf(FileMetaData file, Slice key)
+    public Table newTable( String filePath )
     {
-        return getTable(file.getNumber()).getApproximateOffsetOf(key);
+        return getTable( filePath );
     }
 
-    private Table getTable(long number)
+    private Table getTable(String filePath)
     {
         Table table;
         try {
-            table = cache.get(number).getTable();
+            table = cache.get(filePath).getTable();
         }
         catch (ExecutionException e) {
             Throwable cause = e;
             if (e.getCause() != null) {
                 cause = e.getCause();
             }
-            throw new RuntimeException("Could not open table " + number, cause);
+            throw new RuntimeException("Could not open table " + filePath, cause);
         }
         return table;
     }
@@ -112,39 +92,28 @@ public class TableCache
 
     /**
      * 将某个文件从缓存中排除
-     * @param number 文件编号
+     * @param filePath 文件绝对路径
      */
-    public void evict(long number)
+    public void evict(String filePath)
     {
-        cache.invalidate(number);
+        cache.invalidate(filePath);
     }
 
     private static final class TableAndFile
     {
-
         private final Table table;
         private final FileChannel fileChannel;
     	
-    	private TableAndFile(File databaseDir, long fileNumber, UserComparator userComparator, boolean verifyChecksums, boolean isStableFile)
-                throws IOException
-        {
-            String tableFileName;
-            if( isStableFile )
-                tableFileName = Filename.stableFileName(fileNumber);
-            else
-                tableFileName = Filename.unStableFileName(fileNumber);
-            File tableFile = new File(databaseDir, tableFileName);
-            fileChannel = new RandomAccessFile(tableFile,"rw").getChannel();
+    	private TableAndFile(String filePath, UserComparator userComparator, boolean verifyChecksums) throws IOException{
+            fileChannel = new RandomAccessFile(filePath,"rw").getChannel();
             try {
                 //FIXME 
                 if ( true ) {
-                    table = new MMapTable(tableFile.getAbsolutePath(), fileChannel, userComparator, verifyChecksums);
+                    table = new MMapTable(filePath, fileChannel, userComparator, verifyChecksums);
+                }else{
+                    table = new FileChannelTable(filePath, fileChannel, userComparator, verifyChecksums);
                 }
-                else {
-                    table = new FileChannelTable(tableFile.getAbsolutePath(), fileChannel, userComparator, verifyChecksums);
-                }
-            }
-            catch (IOException e) {
+            } catch (IOException e) {
                 Closeables.closeQuietly(fileChannel);
                 throw e;
             }

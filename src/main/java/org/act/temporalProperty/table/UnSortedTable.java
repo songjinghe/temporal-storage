@@ -21,7 +21,7 @@ public class UnSortedTable implements Closeable
     private FileChannel channel;
     private long writePostion;
     
-    public UnSortedTable( String filename, File tableFile ) throws IOException
+    public UnSortedTable( File tableFile ) throws IOException
     {
         this.channel = new RandomAccessFile( tableFile, "rw" ).getChannel();
         this.writePostion = this.channel.size();

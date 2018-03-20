@@ -1,0 +1,306 @@
+package org.act.temporalProperty.impl;
+
+import com.google.common.collect.Lists;
+import org.act.temporalProperty.TemporalPropertyStore;
+import org.act.temporalProperty.helper.EPAppendIterator;
+import org.act.temporalProperty.meta.PropertyMetaData;
+import org.act.temporalProperty.table.BufferFileAndTableIterator;
+import org.act.temporalProperty.table.MergeProcess.MergeTask;
+import org.act.temporalProperty.table.Table;
+import org.act.temporalProperty.table.TableBuilder;
+import org.act.temporalProperty.table.TableComparator;
+import org.act.temporalProperty.util.Slice;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.channels.FileChannel;
+import java.nio.file.Files;
+import java.util.List;
+import java.util.Map.Entry;
+import java.util.NoSuchElementException;
+
+/**
+ * Created by song on 2018-03-14.
+ */
+public class SinglePropertyStore
+{
+    private PropertyMetaData propertyMeta;
+    private String proDir;
+    private Logger log = LoggerFactory.getLogger( TemporalPropertyStoreImpl.class );
+    private TableCache cache;
+
+    /**
+     * 实例化方法
+     * @param dbDir 存储动态属性数据的目录地址
+     */
+    public SinglePropertyStore(PropertyMetaData propertyMeta, File dbDir, TableCache cache ) throws Throwable{
+        this.propertyMeta = propertyMeta;
+        this.proDir = new File(dbDir, propertyMeta.getPropertyId().toString()).getAbsolutePath();
+        this.cache = cache;
+        this.loadBuffers();
+    }
+
+    private void loadBuffers() throws IOException {
+        for(FileMetaData meta : propertyMeta.getUnStableFiles().values()){
+            File bufferFile = new File(this.proDir, Filename.bufferFileName(meta.getNumber()));
+            if (bufferFile.exists()) {
+                FileBuffer buffer = new FileBuffer(bufferFile);
+                propertyMeta.addUnstableBuffer(meta.getNumber(), buffer);
+            }
+        }
+        for(FileMetaData meta : propertyMeta.getStableFiles().values()){
+            File bufferFile = new File(this.proDir, Filename.stbufferFileName(meta.getNumber()));
+            if (bufferFile.exists()) {
+                FileBuffer buffer = new FileBuffer(bufferFile);
+                propertyMeta.addStableBuffer(meta.getNumber(), buffer);
+            }
+        }
+    }
+
+    /**
+     * 进行时间点查询，参考{@link TemporalPropertyStore}中的说明
+     */
+    public Slice getPointValue(Slice idSlice, int time )
+    {
+        InternalKey searchKey = new InternalKey(idSlice, time);
+        if( time > propertyMeta.stMaxTime() ){
+            Slice result = this.unPointValue( searchKey );
+            if( null == result || result.length() == 0 ) {
+                return null;
+            }else {
+                return result;
+            }
+        }else {
+            FileMetaData meta = propertyMeta.stHasTime(time);
+            if(meta!=null) {
+                return this.stPointValue(meta, searchKey);
+            }else{
+                return null;
+            }
+        }
+    }
+
+    public EPAppendIterator getRangeValueIter(Slice idSlice, int startTime, int endTime)
+    {
+        List<FileMetaData> stList = propertyMeta.overlappedStable(startTime, endTime);
+        List<FileMetaData> unList = propertyMeta.overlappedUnstable(startTime, endTime);
+        EPAppendIterator iterator = new EPAppendIterator(idSlice);
+
+        for(FileMetaData meta : stList){
+            SeekingIterator<Slice, Slice> fileIterator = this.cache.newIterator(Filename.unPath(proDir, meta.getNumber()));
+            FileBuffer buffer = propertyMeta.getStableBuffers( meta.getNumber() );
+            if( null != buffer ){
+                iterator.append(new BufferFileAndTableIterator(buffer.iterator(), iterator, TableComparator.instance()));
+            }else {
+                iterator.append(fileIterator);
+            }
+        }
+        for( FileMetaData meta : unList ){
+            SeekingIterator<Slice, Slice> fileIterator = this.cache.newIterator(Filename.stPath(proDir, meta.getNumber()));
+            FileBuffer buffer = propertyMeta.getUnstableBuffers( meta.getNumber() );
+            if( null != buffer ){
+                iterator.append(new BufferFileAndTableIterator(buffer.iterator(), iterator, TableComparator.instance()));
+            }else {
+                iterator.append(fileIterator);
+            }
+        }
+        return iterator;
+    }
+
+    private Slice unPointValue(InternalKey searchKey) {
+        List<FileMetaData> checkList = Lists.reverse(propertyMeta.unFloorTime(searchKey.getStartTime()));
+        for (FileMetaData meta : checkList) {
+            SeekingIterator<Slice, Slice> iterator = this.cache.newIterator(Filename.unPath(proDir, meta.getNumber()));
+            FileBuffer buffer = propertyMeta.getUnstableBuffers(meta.getNumber());
+            if (null != buffer) {
+                iterator = new BufferFileAndTableIterator(buffer.iterator(), iterator, TableComparator.instance());
+            }
+            iterator.seek(searchKey.encode());
+            Entry<Slice, Slice> entry;
+            try {
+                entry = iterator.next();
+            } catch (NoSuchElementException e) {
+                continue;
+            }
+            InternalKey resultKey = new InternalKey(entry.getKey());
+            if (resultKey.getId().equals(searchKey.getId()) && resultKey.getValueType() == ValueType.VALUE) {
+                return entry.getValue();
+            }
+        }
+        // search unstable complete but not found. now search latest stable file
+        FileMetaData meta = propertyMeta.latestStableMeta();
+        if(meta!=null) {
+            return stPointValue(meta, searchKey);
+        }else {
+            return null;
+        }
+    }
+
+    private Slice stPointValue(FileMetaData meta, InternalKey searchKey){
+        SeekingIterator<Slice, Slice> iterator = this.cache.newIterator(Filename.stPath(proDir, meta.getNumber()));
+        FileBuffer buffer = propertyMeta.getStableBuffers(meta.getNumber());
+        if (null != buffer) {
+            iterator = new BufferFileAndTableIterator(buffer.iterator(), iterator, TableComparator.instance());
+        }
+        iterator.seek(searchKey.encode());
+        Entry<Slice, Slice> entry;
+        try {
+            entry = iterator.next();
+        } catch (NoSuchElementException e) {
+            return null;
+        }
+        InternalKey resultKey = new InternalKey(entry.getKey());
+        if (resultKey.getId().equals(searchKey.getId()) && resultKey.getValueType() == ValueType.VALUE) {
+            return entry.getValue();
+        }else{
+            return null;
+        }
+    }
+
+
+    // this method runs in the background thread.
+    // insert entry to file buffer, and pack remain entries to a MergeTask
+    public MergeTask merge(MemTable memTable) throws IOException {
+        SeekingIterator<Slice,Slice> iterator = memTable.iterator();
+        MemTable stableMemTable = new MemTable(TableComparator.instance());
+        boolean stExist = propertyMeta.hasStable();
+        boolean unExist = propertyMeta.hasUnstable();
+        while( iterator.hasNext() ){
+            Entry<Slice,Slice> entry = iterator.next();
+            InternalKey key = new InternalKey( entry.getKey() );
+            int time = key.getStartTime();
+            if( !unExist && !stExist ){
+                stableMemTable.add(entry.getKey(), entry.getValue());
+            }else if( unExist && !stExist){
+                if(time <= propertyMeta.unMaxTime()) {
+                    insertUnstableBuffer(key, entry.getValue());
+                }else{
+                    stableMemTable.add(entry.getKey(), entry.getValue());
+                }
+            }else if( unExist && stExist){
+                if(time <= propertyMeta.stMaxTime()){
+                    insertStableBuffer(key, entry.getValue());
+                }else if(time <= propertyMeta.unMaxTime()){
+                    insertUnstableBuffer(key, entry.getValue());
+                }else{
+                    stableMemTable.add(entry.getKey(), entry.getValue());
+                }
+            }else{ // !unExist && stExist
+                if(time <= propertyMeta.stMaxTime()){
+                    insertStableBuffer(key, entry.getValue());
+                }else{
+                    stableMemTable.add(entry.getKey(), entry.getValue());
+                }
+            }
+        }
+        if(!stableMemTable.isEmpty()){
+            propertyMeta.updateMemTableMinTime( stableMemTable.getEndTime()+1 );
+            return this.createMergeTask(propertyMeta, stableMemTable);
+        }else{
+            return null;
+        }
+    }
+
+
+    public MergeTask createMergeTask(PropertyMetaData propertyMeta, MemTable stableMemTable) throws IOException {
+        File propertyDir = new File(proDir, propertyMeta.getPropertyId().toString());
+        MergeTask task = new MergeTask(propertyDir, stableMemTable, propertyMeta, this.cache);
+        return task;
+    }
+
+
+    /**
+     * 对某个已存在的UnStableFile的插入，插入到相应的Buffer中。如果不存在则新建一个Buffer
+     * @param key
+     * @param value
+     */
+    private void insertUnstableBuffer(InternalKey key, Slice value ) throws IOException
+    {
+        FileMetaData meta = propertyMeta.unFloorTimeOneMeta( key.getStartTime() );
+        assert meta!=null : "SNH: meta should not null!";
+
+        FileBuffer buffer = propertyMeta.getUnstableBuffers( meta.getNumber() );
+        if( null == buffer ) {
+            buffer = new FileBuffer(new File(this.proDir, Filename.bufferFileName(meta.getNumber())));
+            propertyMeta.addUnstableBuffer(meta.getNumber(), buffer);
+        }
+        buffer.add( key.encode(), value );
+        if(buffer.size()>1024*1024*10) {
+            unBufferToFile( meta, buffer );
+        }
+    }
+
+    private void insertStableBuffer(InternalKey key, Slice value) throws IOException {
+        FileMetaData meta = propertyMeta.stFloorTimeOneMeta( key.getStartTime() );
+        assert meta!=null : "SNH: meta should not null!";
+
+        FileBuffer buffer = propertyMeta.getStableBuffers( meta.getNumber() );
+        if( null == buffer ) {
+            buffer = new FileBuffer(new File(this.proDir, Filename.bufferFileName(meta.getNumber())));
+            propertyMeta.addStableBuffer(meta.getNumber(), buffer);
+        }
+        buffer.add( key.encode(), value );
+        if(buffer.size()>1024*1024*10) {
+            stBufferToFile( meta, buffer );
+        }
+    }
+
+
+    private void unBufferToFile(FileMetaData meta, FileBuffer buffer) throws IOException {
+        String filePath = Filename.unPath(proDir, meta.getNumber());
+        String bufferPath = Filename.bufferFileName(meta.getNumber());
+        File tempFile = buffer2file(filePath, bufferPath, buffer);
+        propertyMeta.delUnstableBuffer(meta.getNumber());
+        if(!tempFile.renameTo(new File(filePath))) throw new IOException("rename failed!");
+    }
+
+    private void stBufferToFile(FileMetaData meta, FileBuffer buffer) throws IOException {
+        String filePath = Filename.stPath(proDir, meta.getNumber());
+        String bufferFileName = Filename.stbufferFileName(meta.getNumber());
+        File tempFile = buffer2file(filePath, bufferFileName, buffer);
+        propertyMeta.delStableBuffer(meta.getNumber());
+        if(!tempFile.renameTo(new File(filePath))) throw new IOException("rename failed!");
+    }
+
+    private File buffer2file(String filePath, String bufferFileName, FileBuffer buffer) throws IOException {
+        File tempFile = new File(this.proDir, Filename.tempFileName(6));
+        if (tempFile.exists() && !tempFile.delete()) throw new IOException("can not delete tmp file!");
+        if(!tempFile.createNewFile()) throw new IOException("can not create tmp file!");
+
+        FileOutputStream stream = new FileOutputStream(tempFile);
+        FileChannel channel = stream.getChannel();
+        TableBuilder builder = new TableBuilder(new Options(), channel, TableComparator.instance());
+        Table table = this.cache.newTable(filePath);
+        SeekingIterator<Slice, Slice> iterator = new BufferFileAndTableIterator(buffer.iterator(), table.iterator(), TableComparator.instance());
+        while (iterator.hasNext()) {
+            Entry<Slice, Slice> entry = iterator.next();
+            builder.add(entry.getKey(), entry.getValue());
+        }
+        builder.finish();
+        channel.close();
+        stream.close();
+        table.close();
+        this.cache.evict(filePath);
+        File originFile = new File(filePath);
+        Files.delete(originFile.toPath());
+        buffer.close();
+        Files.delete(new File(this.proDir, bufferFileName).toPath());
+        return tempFile;
+    }
+
+
+//    @Override
+//    public boolean delete( Slice id )
+//    {
+//        // TODO Auto-generated method stub
+//        return false;
+//    }
+//
+
+
+
+
+}

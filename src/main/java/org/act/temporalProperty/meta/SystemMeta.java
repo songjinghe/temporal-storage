@@ -1,19 +1,10 @@
 package org.act.temporalProperty.meta;
 
-import org.act.temporalProperty.impl.LogReader;
-import org.act.temporalProperty.impl.LogWriter;
-import org.act.temporalProperty.impl.Logs;
-import org.act.temporalProperty.impl.index.IndexMetaData;
-import org.act.temporalProperty.meta.PropertyMetaData;
-import org.act.temporalProperty.meta.PropertyMetaDataController;
-import org.act.temporalProperty.util.DynamicSliceOutput;
-import org.act.temporalProperty.util.Slice;
+import org.act.temporalProperty.impl.*;
+import org.act.temporalProperty.index.IndexMetaData;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.nio.channels.FileChannel;
-import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -25,11 +16,19 @@ public class SystemMeta {
     private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock( false );
     private final Map<Integer, PropertyMetaData> properties = new HashMap<>();
     private final Map<Integer, IndexMetaData> indexes = new HashMap<>();
-//    private Map<Integer, TemporalPropertyController> tpMap = new HashMap<>();
+    private final Map<Integer, SinglePropertyStore> propertyStores = new HashMap<>();
 //    private Map<Integer, TPIndex> indexMap = new HashMap<>();
 
     public SystemMeta(){
 
+    }
+
+    public SinglePropertyStore getStore(int propertyId){
+        return propertyStores.get(propertyId);
+    }
+
+    public void addStore(int propertyId, SinglePropertyStore store){
+        propertyStores.put(propertyId, store);
     }
 
     public Map<Integer, PropertyMetaData> getProperties() {
@@ -45,7 +44,7 @@ public class SystemMeta {
     }
 
     public void addIndex(IndexMetaData iMeta) {
-        indexes.put(iMeta.getId(), iMeta);
+        indexes.put(iMeta.getProId(), iMeta);
     }
 
     public void lockShared(){
@@ -62,5 +61,16 @@ public class SystemMeta {
 
     public void unLockExclusive(){
         lock.writeLock().unlock();
+    }
+
+    public void force(File dir) throws IOException {
+        SystemMetaController.forceToDisk(dir, this);
+    }
+
+    public void initStore(File storeDir, TableCache cache) throws Throwable {
+        for( PropertyMetaData pMeta : properties.values()){
+            SinglePropertyStore onePropStore = new SinglePropertyStore(pMeta, storeDir, cache);
+            propertyStores.put(pMeta.getPropertyId(), onePropStore);
+        }
     }
 }

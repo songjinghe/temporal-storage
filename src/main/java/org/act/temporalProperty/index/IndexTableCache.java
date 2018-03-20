@@ -22,15 +22,15 @@ public class IndexTableCache {
 
     private final LoadingCache<Long, IndexTableFile> cache;
 
-    public IndexTableCache(final File databaseDir, int tableCacheSize)
+    public IndexTableCache(final File indexDir, int tableCacheSize)
     {
-        Preconditions.checkNotNull(databaseDir, "databaseName is null");
+        Preconditions.checkNotNull(indexDir, "databaseName is null");
         cache = CacheBuilder.newBuilder()
                 .maximumSize(tableCacheSize)
                 .build(new CacheLoader<Long, IndexTableFile>(){
                     @Override
                     public IndexTableFile load(Long fileNumber) throws IOException{
-                        return new IndexTableFile(databaseDir, fileNumber);
+                        return new IndexTableFile(indexDir, fileNumber);
                     }
                 });
     }
@@ -85,9 +85,9 @@ public class IndexTableCache {
         private final IndexTable table;
         private final FileChannel fileChannel;
 
-        private IndexTableFile(File databaseDir, long fileNumber) throws IOException{
+        private IndexTableFile(File indexDir, long fileNumber) throws IOException{
             String tableFileName = Filename.unStableFileName(fileNumber);
-            File tableFile = new File(databaseDir, tableFileName);
+            File tableFile = new File(indexDir, tableFileName);
             fileChannel = new RandomAccessFile(tableFile,"rw").getChannel();
             table = new IndexTable(fileChannel);
         }

@@ -1,13 +1,11 @@
 package org.act.temporalProperty.meta;
 
-import com.google.common.hash.HashCode;
-import com.google.common.hash.Hashing;
-import org.act.temporalProperty.exception.TPSMetaLoadFailedException;
 import org.act.temporalProperty.exception.TPSNHException;
 import org.act.temporalProperty.impl.LogReader;
 import org.act.temporalProperty.impl.LogWriter;
 import org.act.temporalProperty.impl.Logs;
-import org.act.temporalProperty.impl.index.IndexMetaData;
+import org.act.temporalProperty.index.IndexMetaData;
+import org.act.temporalProperty.index.IndexMetaDataController;
 import org.act.temporalProperty.util.DynamicSliceOutput;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.SliceInput;

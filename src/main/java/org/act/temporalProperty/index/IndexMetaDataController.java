@@ -19,7 +19,7 @@ public class IndexMetaDataController {
     }
 
     public static void encode(SliceOutput out, IndexMetaData meta){
-        out.writeInt(meta.getId());
+        out.writeInt(meta.getProId());
         out.writeInt(meta.getType().getId());
         out.writeInt(meta.getTimeStart());
         out.writeInt(meta.getTimeEnd());
