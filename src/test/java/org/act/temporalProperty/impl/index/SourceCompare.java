@@ -1,5 +1,6 @@
 package org.act.temporalProperty.impl.index;
 
+import org.act.temporalProperty.impl.InternalKey;
 import org.act.temporalProperty.index.rtree.IndexEntry;
 import org.act.temporalProperty.util.Slice;
 
@@ -22,6 +23,8 @@ import java.util.*;
 */
 
 public class SourceCompare {
+
+    public static final int NOW_TIME = 0x40000000; //2^30
 
     // traffic data dir path
     private final File dataDir;
@@ -99,10 +102,11 @@ public class SourceCompare {
 
                     if((sTime >= starTime) && (sTime < endTime) && (travelTime >= valueMin) && (travelTime <= valueMax)) {
 
-                        int eTime = getEndTime(i + 1, endTime);
+                        //int eTime = getEndTime(i + 1, endTime);
                         Slice value = new Slice(ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(travelTime).array());
 
-                        entryList.add(new IndexEntry(entityId, sTime, eTime, new Slice[]{value}));
+                        entryList.add(new IndexEntry(entityId, sTime, endTime, new Slice[]{value}));
+
                     }
 
                 }
@@ -111,7 +115,71 @@ public class SourceCompare {
             }
         }
 
+        entryList = mergeEntryList(entryList);
+
         return entryList;
+    }
+
+    private List<IndexEntry> mergeEntryList(List<IndexEntry> entryList) {
+
+        List<IndexEntry> mergeList = new ArrayList<>();
+
+        entryList.sort(Comparator.comparing(IndexEntry::getEntityId));
+
+        List<IndexEntry> entityIdList = new ArrayList<>();
+        for (int i = 0; i < entryList.size(); i++) {
+
+            IndexEntry entry = entryList.get(i);
+            entityIdList.add(entry);
+
+            if ((i + 1 == entryList.size()) || !entryList.get(i + 1).getEntityId().equals(entry.getEntityId())) {
+
+                entityIdList.sort(Comparator.comparing(IndexEntry::getStart));
+
+                for(int j = 0; j < entityIdList.size(); ) {
+
+                    IndexEntry entity = entityIdList.get(j);
+                    Long entityId = entity.getEntityId();
+                    int sTime = entity.getStart();
+                    Slice value = entity.getValue(0);
+                    int eTime = 0;
+
+                    while(j < entityIdList.size()) {
+
+                        if(j + 1 == entityIdList.size()) {
+                            eTime = entity.getEnd();
+
+                            entity = new IndexEntry(entityId, sTime, eTime, new Slice[]{value});
+                            mergeList.add(entity);
+
+                            j++;
+                            break;
+
+                        } else if(!entityIdList.get(j).getValue(0).equals(entityIdList.get(j + 1).getValue(0))){
+                            eTime = entityIdList.get(j + 1).getStart() - 1;
+
+                            entity = new IndexEntry(entityId, sTime, eTime, new Slice[]{value});
+                            mergeList.add(entity);
+
+                            j++;
+                            break;
+                        }
+
+                        j++;
+                    }
+                }
+
+                entityIdList.clear();
+            }
+        }
+
+        entityIdList.clear();
+        entityIdList = null;
+
+        entryList.clear();
+        entryList = null;
+
+        return mergeList;
     }
 
     private int getEndTime(int fileNum, int endTime){
