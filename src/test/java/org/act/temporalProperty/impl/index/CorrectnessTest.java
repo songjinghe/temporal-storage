@@ -10,6 +10,7 @@ import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.StoreBuilder;
 import org.act.temporalProperty.util.TimeIntervalUtil;
 import org.act.temporalProperty.util.TrafficDataImporter;
+import org.apache.commons.lang3.SystemUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -24,8 +25,20 @@ import java.util.*;
 public class CorrectnessTest {
     private static Logger log = LoggerFactory.getLogger(BuildAndQueryTest.class);
 
-    private static String dataPath = "C:\\Users\\Administrator\\Desktop\\TGraph-source\\20101104.tar\\20101104";
-    private static String dbDir = "temporal.property.test";
+    private static String dataPath(){
+         if(SystemUtils.IS_OS_WINDOWS){
+             return "C:\\Users\\Administrator\\Desktop\\TGraph-source\\20101104.tar\\20101104";
+         }else{
+             return "/home/song/tmp/road data/20101104";
+         }
+    }
+    private static String dbDir(){
+        if(SystemUtils.IS_OS_WINDOWS){
+            return "temporal.property.test";
+        }else{
+            return "/tmp/temporal.property.test";
+        }
+    }
 
     private TemporalPropertyStore store;
     private StoreBuilder stBuilder;
@@ -34,9 +47,9 @@ public class CorrectnessTest {
 
     @Before
     public void initDB() throws Throwable {
-        stBuilder = new StoreBuilder(dbDir, true);
-        importer = new TrafficDataImporter(stBuilder.store(), dataPath, 10);
-        sourceEntry = new SourceCompare(dataPath, 10); //fileCount = 10; no entry in timeRange, but query results can be found in Index and Range? --- endTime (<=endTime --> < endTime?)
+        stBuilder = new StoreBuilder(dbDir(), true);
+        importer = new TrafficDataImporter(stBuilder.store(), dataPath(), 10);
+        sourceEntry = new SourceCompare(dataPath(), 10); //fileCount = 10; no entry in timeRange, but query results can be found in Index and Range? --- endTime (<=endTime --> < endTime?)
         log.info("time: {} - {}", importer.getMinTime(), importer.getMaxTime());
         store = stBuilder.store();
         buildIndex();
@@ -62,38 +75,66 @@ public class CorrectnessTest {
     private void compare(int startTime, int endTime, int valMin, int valMax){
 
 
-        List<IndexEntry> sourceResult = sourceEntry.queryBySource(startTime, endTime, valMin, valMax);
-        sourceResult.sort(cmp);
+        List<IndexEntry> rangeResult = sourceEntry.queryBySource(startTime, endTime, valMin, valMax);
+        rangeResult.sort(cmp);
 
         List<IndexEntry> indexResult = queryByIndex(startTime, endTime, valMin, valMax);//27000
         indexResult.sort(cmp);
         log.info("index query complete");
 
-        List<IndexEntry> rangeResult = queryByRange( startTime, endTime, valMin, valMax);
-        rangeResult.sort(cmp);
-        log.info("range query complete");
+//        List<IndexEntry> rangeResult = queryByRange( startTime, endTime, valMin, valMax);
+//        rangeResult.sort(cmp);
+//        log.info("range query complete");
 
         log.info("size: range({}) vs index({})", rangeResult.size(), indexResult.size());
+
+        sameEntities(rangeResult, indexResult);
+
         int i;
         for(i=0; i<rangeResult.size() && i<indexResult.size(); i++){
             IndexEntry rangeE = rangeResult.get(i);
             IndexEntry indexE = indexResult.get(i);
             if(!rangeE.equals(indexE)){
-                if(!partialEqual(rangeE, indexE, endTime)) {
+                if(!partialEqual(rangeE, indexE, startTime, endTime)) {
                     log.debug("entry not equal. index({}) vs range({})", indexE, rangeE);
                 }
             }
             if(i>1000) return;
         }
 
-        log.info("begin validation");
-        for(IndexEntry entry : indexResult){
-            validateByRangeQuery(entry.getEntityId(), 1, entry.getStart(), entry.getEnd(), entry.getValue(0));
-        }
+//        log.info("begin validation");
+//        for(IndexEntry entry : indexResult){
+//            validateByRangeQuery(entry.getEntityId(), 1, entry.getStart(), entry.getEnd(), entry.getValue(0));
+//        }
     }
 
-    private boolean partialEqual(IndexEntry rangeE, IndexEntry indexE, int endTime) {
-        if(     rangeE.getStart()==indexE.getStart() && rangeE.getEnd()==endTime && indexE.getEnd()>endTime &&
+    private boolean sameEntities(List<IndexEntry> rangeResult, List<IndexEntry> indexResult){
+        Set<Long> rangeEntities = new HashSet<>();
+        Set<Long> indexEntities = new HashSet<>();
+        for(IndexEntry entry: indexResult){
+            indexEntities.add(entry.getEntityId());
+        }
+        for(IndexEntry entry: rangeResult){
+            rangeEntities.add(entry.getEntityId());
+        }
+//        if(rangeEntities.size()!=indexEntities.size()) return false;
+
+        Set<Long> common = new HashSet<>(rangeEntities);
+        common.retainAll(indexEntities);
+
+        rangeEntities.removeAll(common);
+        log.debug("eid only in range: {}", rangeEntities);
+        indexEntities.removeAll(common);
+        log.debug("eid only in index: {}", indexEntities);
+
+        return rangeEntities.isEmpty() && indexEntities.isEmpty();
+    }
+
+    private boolean partialEqual(IndexEntry rangeE, IndexEntry indexE, int startTime, int endTime) {
+        if(     rangeE.getStart()<=startTime &&
+                indexE.getStart()<=startTime &&
+                rangeE.getEnd()>=endTime &&
+                indexE.getEnd()>endTime &&
                 allNullOrEqual(rangeE.getEntityId(), indexE.getEntityId())){
             boolean valEq = true;
             for(int j=0; j<rangeE.valueLength(); j++){
