@@ -6,6 +6,7 @@ import org.act.temporalProperty.exception.TPSRuntimeException;
 import org.act.temporalProperty.impl.Filename;
 import org.act.temporalProperty.impl.LogReader;
 import org.act.temporalProperty.impl.MemTable;
+import org.act.temporalProperty.index.IndexStore;
 import org.act.temporalProperty.meta.SystemMeta;
 import org.act.temporalProperty.meta.SystemMetaController;
 import org.act.temporalProperty.meta.SystemMetaFile;
@@ -36,6 +37,7 @@ public class StoreInitial {
     private SystemMeta findAndLoadMeta(File rootDir) throws TPSMetaLoadFailedException {
         if(rootDir!=null && rootDir.isDirectory()) {
             String[] files = rootDir.list();
+            if(files!=null && files.length==0) return null;
             if(files!=null) {
                 Set<String> fileSet = new HashSet<>(Arrays.asList(files));
                 SystemMetaFile metaFile=null, metaTmpFile=null;
@@ -109,4 +111,8 @@ public class StoreInitial {
         }
     }
 
+    public IndexStore initIndex() {
+
+        return null;
+    }
 }

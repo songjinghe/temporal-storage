@@ -50,240 +50,122 @@ public class StableLevel
         this.rangeQueryIndex = new RangeQueryIndex(dbDir);
         this.propertyMeta = propertyMeta;
     }
-
-
-
-
-
-//    /**
-//     * 进行时间点查询
-//     */
-//    @Override
-//    public Slice getPointValue( Slice idSlice, int time )
-//    {
-//        InternalKey searchKey = new InternalKey( idSlice, time, 0, ValueType.VALUE );
-//        boolean found = false;
-//        for( long fileNumber : this.files.keySet() )
-//        {
-//            FileMetaData meta = this.files.get( fileNumber );
-//            if( null != meta && time >= meta.getSmallest() && time <= meta.getLargest() )
-//            {
-//            	found = true;
-//                SeekingIterator<Slice,Slice> iterator = this.cache.newIterator( meta );
-//                iterator.seek( searchKey.encode() );
-//                Entry<Slice,Slice> entry = iterator.next();
-//                FileBuffer buffer = this.fileBuffers.get( fileNumber );
-//                if( null != buffer )
-//                {
-//                    SeekingIterator<Slice,Slice> bufferIterator = this.fileBuffers.get( fileNumber ).iterator();
-//                    bufferIterator.seek( searchKey.encode() );
-//                    Entry<Slice,Slice> bufferEntry = bufferIterator.next();
-//                    InternalKey bufferkey = new InternalKey( bufferEntry.getKey() );
-//                    InternalKey key = new InternalKey( entry.getKey() );
-//                    if( key.getId().equals( idSlice ) )
-//                    {
-//                        if( bufferkey.getId().equals( idSlice ) )
-//                        {
-//                            if( key.getStartTime() == bufferkey.getStartTime() )
-//                            {
-//                                if( bufferkey.getValueType().getPersistentId() != ValueType.DELETION.getPersistentId() )
-//                                {
-//                                    this.fileMetaLock.readLock().unlock();
-//                                    return bufferEntry.getValue().slice( 0, bufferkey.getValueLength() );
-//                                }
-//                            }
-//                            else if( bufferkey.getStartTime() <= time && bufferkey.getStartTime() > key.getStartTime() && bufferkey.getValueType().getPersistentId() != ValueType.DELETION.getPersistentId()
-//                                    && bufferkey.getValueType().getPersistentId() != ValueType.INVALID.getPersistentId())
-//                            {
-//                                this.fileMetaLock.readLock().unlock();
-//                                return bufferEntry.getValue().slice( 0, bufferkey.getValueLength() );
-//                            }
-//                        }
-//                        this.fileMetaLock.readLock().unlock();
-//                        return entry.getValue().slice( 0, key.getValueLength() );
-//                    }
-//                }
-//                else
-//                {
-//                    InternalKey key = new InternalKey( entry.getKey() );
-//                    if( key.getId().equals( idSlice ) )
-//                    {
-//                        this.fileMetaLock.readLock().unlock();
-//                        return entry.getValue().slice( 0, key.getValueLength() );
-//                    }
-//                    this.fileMetaLock.readLock().unlock();
-//                    return null;
-//                }
-//            }
-//        }
-//        if(!found){
-//        	long fileNumber = this.files.lastKey();
-//        	FileMetaData meta = this.files.get(fileNumber);
-//        	SeekingIterator<Slice,Slice> iterator = this.cache.newIterator( meta );
-//            iterator.seek( searchKey.encode() );
-//            Entry<Slice,Slice> entry = iterator.next();
-//            FileBuffer buffer = this.fileBuffers.get( fileNumber );
-//            if( null != buffer )
-//            {
-//                SeekingIterator<Slice,Slice> bufferIterator = this.fileBuffers.get( fileNumber ).iterator();
-//                bufferIterator.seek( searchKey.encode() );
-//                Entry<Slice,Slice> bufferEntry = bufferIterator.next();
-//                InternalKey bufferkey = new InternalKey( bufferEntry.getKey() );
-//                InternalKey key = new InternalKey( entry.getKey() );
-//                if( key.getId().equals( idSlice ) )
-//                {
-//                    if( bufferkey.getId().equals( idSlice ) )
-//                    {
-//                        if( key.getStartTime() == bufferkey.getStartTime() )
-//                        {
-//                            if( bufferkey.getValueType().getPersistentId() != ValueType.DELETION.getPersistentId() )
-//                            {
-//                                this.fileMetaLock.readLock().unlock();
-//                                return bufferEntry.getValue().slice( 0, bufferkey.getValueLength() );
-//                            }
-//                        }
-//                        else if( bufferkey.getStartTime() <= time && bufferkey.getStartTime() > key.getStartTime() && bufferkey.getValueType().getPersistentId() != ValueType.DELETION.getPersistentId()
-//                                && bufferkey.getValueType().getPersistentId() != ValueType.INVALID.getPersistentId())
-//                        {
-//                            this.fileMetaLock.readLock().unlock();
-//                            return bufferEntry.getValue().slice( 0, bufferkey.getValueLength() );
-//                        }
-//                    }
-//                    this.fileMetaLock.readLock().unlock();
-//                    return entry.getValue().slice( 0, key.getValueLength() );
-//                }
-//            }
-//            else
-//            {
-//                InternalKey key = new InternalKey( entry.getKey() );
-//                if( key.getId().equals( idSlice ) )
-//                {
-//                    this.fileMetaLock.readLock().unlock();
-//                    return entry.getValue().slice( 0, key.getValueLength() );
-//                }
-//                this.fileMetaLock.readLock().unlock();
-//                return null;
-//            }
-//        }
-//        this.fileMetaLock.readLock().unlock();
-//        return null;
-//    }
     /**
      * 进行时间段查询
      */
-    public void getRangeValue( Slice idSlice, int startTime, int endTime, RangeQueryCallBack callback )
-    {
-        for( FileMetaData metaData : this.files.values() )
-        {
-            if( null == metaData )
-                continue;
-            if( metaData.getSmallest() > endTime )
-                break;
-            if( TimeIntervalUtil.overlap( startTime, endTime, metaData.getSmallest(), metaData.getLargest() ) )
-            {
-                int start = Math.max( startTime, metaData.getSmallest() );
-                int end = Math.min( endTime, metaData.getLargest() );
-                if( start == metaData.getSmallest() && end == metaData.getLargest() && callback.getType() != RangeQueryCallBack.CallBackType.USER ){
-                	
-                	FileBuffer buffer = this.fileBuffers.get( metaData.getNumber() );
-                	InternalKey searchKey = new InternalKey(idSlice, start, 0, ValueType.VALUE);
-                	boolean hasUpdate = false;
-                    if( null != buffer )
-                    {
-                        MemTableIterator bufferiterator = buffer.iterator();
-                        bufferiterator.seek( searchKey.encode() );
-                        while( bufferiterator.hasNext() )
-                        {
-                            Entry<Slice,Slice> entry = bufferiterator.next();
-                            InternalKey key = new InternalKey( entry.getKey() );
-                            if( key.getId().equals( idSlice ) )
-                            {
-                                hasUpdate = true;
-                            }
-                            else
-                                break;
-                        }
-                    }
-                	if( hasUpdate ){//hasUpdate
-                		 
-                		SeekingIterator<Slice, Slice> iterator = new BufferFileAndTableIterator(buffer.iterator(), this.cache.newIterator(metaData), TableComparator.instance() );
-                		iterator.seek( searchKey.encode() );
-                		int count = 0;
-                        Slice max = null;
-                        Slice min = null;
-                        Slice sum = null;
-                		while( iterator.hasNext() ){
-                			Entry<Slice,Slice> entry = iterator.next();
-                			InternalKey key = new InternalKey(entry.getKey());
-                			if(!key.getId().equals(searchKey.getId()))
-                				break;
-                			else{
-                				callback.onCall(key.getStartTime(), entry.getValue());
-                				count++;
-                                max = RangeQueryUtil.max(max,entry.getValue());
-                                min = RangeQueryUtil.min(min,entry.getValue());
-                                sum = RangeQueryUtil.sum(max,entry.getValue());
-                			}
-                		}
-                		try {
-                            File indexFile = new File(this.proDir + "/index" + metaData.getNumber() );
-                            FileOutputStream stream = new FileOutputStream(indexFile);
-                            FileChannel channel = stream.getChannel();
-							Table indexTable = new FileChannelTable(this.proDir + "/index" + metaData.getNumber(), channel, TableComparator.instance(), false);
-							TableUpdater updater = new TableUpdater(indexTable);
-							Slice countSlice = new Slice(4);
-							countSlice.setInt(0, count);
-							updater.update(idSlice, 0, 4, ValueType.VALUE, countSlice);
-							updater.update(idSlice, 1, 4, ValueType.VALUE, max);
-							updater.update(idSlice, 2, 4, ValueType.VALUE, min);
-							updater.update(idSlice, 3, 4, ValueType.VALUE, sum);
-						} catch (IOException e) {
-							e.printStackTrace();
-						}
-                		
-                	}
-                	else{ 
-	                	Slice value = this.rangeQueryIndex.get(metaData.getNumber(), callback.getType(), idSlice);
-	                	callback.onCallBatch(value);
-                	}
-                	continue;
-                }
-                InternalKey searchKey = new InternalKey( idSlice, start, 0, ValueType.VALUE );
-                SeekingIterator<Slice,Slice> iterator = this.cache.newIterator( metaData.getNumber() );
-                iterator.seek( searchKey.encode() );
-                while( iterator.hasNext() )
-                {
-                    Entry<Slice,Slice> entry = iterator.next();
-                    InternalKey key = new InternalKey( entry.getKey() );
-                    if( key.getId().equals( idSlice ) && key.getStartTime() <= end && key.getValueType().getPersistentId() != ValueType.DELETION.getPersistentId() )
-                    {
-                        callback.onCall( key.getStartTime(), entry.getValue() );
-                    }
-                    else
-                        break;
-                }
-                FileBuffer buffer = this.fileBuffers.get( metaData.getNumber() );
-                if( null != buffer )
-                {
-                    MemTableIterator bufferiterator = buffer.iterator();
-                    bufferiterator.seek( searchKey.encode() );
-                    while( bufferiterator.hasNext() )
-                    {
-                        Entry<Slice,Slice> entry = bufferiterator.next();
-                        InternalKey key = new InternalKey( entry.getKey() );
-                        if( key.getId().equals( idSlice ) && key.getStartTime() <= end 
-                                && key.getValueType().getPersistentId() != ValueType.INVALID.getPersistentId()
-                                && key.getValueType().getPersistentId() != ValueType.DELETION.getPersistentId())
-                        {
-                            callback.onCall( key.getStartTime(), entry.getValue() );
-                        }
-                        else
-                            break;
-                    }
-                }
-            }
-        }
-    }
+//    public void getRangeValue( Slice idSlice, int startTime, int endTime, RangeQueryCallBack callback )
+//    {
+//        for( FileMetaData metaData : this.files.values() )
+//        {
+//            if( null == metaData )
+//                continue;
+//            if( metaData.getSmallest() > endTime )
+//                break;
+//            if( TimeIntervalUtil.overlap( startTime, endTime, metaData.getSmallest(), metaData.getLargest() ) )
+//            {
+//                int start = Math.max( startTime, metaData.getSmallest() );
+//                int end = Math.min( endTime, metaData.getLargest() );
+//                if( start == metaData.getSmallest() && end == metaData.getLargest() && callback.getType() != RangeQueryCallBack.CallBackType.USER ){
+//
+//                	FileBuffer buffer = this.fileBuffers.get( metaData.getNumber() );
+//                	InternalKey searchKey = new InternalKey(idSlice, start, 0, ValueType.VALUE);
+//                	boolean hasUpdate = false;
+//                    if( null != buffer )
+//                    {
+//                        MemTableIterator bufferiterator = buffer.iterator();
+//                        bufferiterator.seek( searchKey.encode() );
+//                        while( bufferiterator.hasNext() )
+//                        {
+//                            Entry<Slice,Slice> entry = bufferiterator.next();
+//                            InternalKey key = new InternalKey( entry.getKey() );
+//                            if( key.getId().equals( idSlice ) )
+//                            {
+//                                hasUpdate = true;
+//                            }
+//                            else
+//                                break;
+//                        }
+//                    }
+//                	if( hasUpdate ){//hasUpdate
+//
+//                		SeekingIterator<Slice, Slice> iterator = new BufferFileAndTableIterator(buffer.iterator(), this.cache.newIterator(metaData), TableComparator.instance() );
+//                		iterator.seek( searchKey.encode() );
+//                		int count = 0;
+//                        Slice max = null;
+//                        Slice min = null;
+//                        Slice sum = null;
+//                		while( iterator.hasNext() ){
+//                			Entry<Slice,Slice> entry = iterator.next();
+//                			InternalKey key = new InternalKey(entry.getKey());
+//                			if(!key.getId().equals(searchKey.getId()))
+//                				break;
+//                			else{
+//                				callback.onCall(key.getStartTime(), entry.getValue());
+//                				count++;
+//                                max = RangeQueryUtil.max(max,entry.getValue());
+//                                min = RangeQueryUtil.min(min,entry.getValue());
+//                                sum = RangeQueryUtil.sum(max,entry.getValue());
+//                			}
+//                		}
+//                		try {
+//                            File indexFile = new File(this.proDir + "/index" + metaData.getNumber() );
+//                            FileOutputStream stream = new FileOutputStream(indexFile);
+//                            FileChannel channel = stream.getChannel();
+//							Table indexTable = new FileChannelTable(this.proDir + "/index" + metaData.getNumber(), channel, TableComparator.instance(), false);
+//							TableUpdater updater = new TableUpdater(indexTable);
+//							Slice countSlice = new Slice(4);
+//							countSlice.setInt(0, count);
+//							updater.update(idSlice, 0, 4, ValueType.VALUE, countSlice);
+//							updater.update(idSlice, 1, 4, ValueType.VALUE, max);
+//							updater.update(idSlice, 2, 4, ValueType.VALUE, min);
+//							updater.update(idSlice, 3, 4, ValueType.VALUE, sum);
+//						} catch (IOException e) {
+//							e.printStackTrace();
+//						}
+//
+//                	}
+//                	else{
+//	                	Slice value = this.rangeQueryIndex.get(metaData.getNumber(), callback.getType(), idSlice);
+//	                	callback.onCallBatch(value);
+//                	}
+//                	continue;
+//                }
+//                InternalKey searchKey = new InternalKey( idSlice, start, 0, ValueType.VALUE );
+//                SeekingIterator<Slice,Slice> iterator = this.cache.newIterator( metaData.getNumber() );
+//                iterator.seek( searchKey.encode() );
+//                while( iterator.hasNext() )
+//                {
+//                    Entry<Slice,Slice> entry = iterator.next();
+//                    InternalKey key = new InternalKey( entry.getKey() );
+//                    if( key.getId().equals( idSlice ) && key.getStartTime() <= end && key.getValueType().getPersistentId() != ValueType.DELETION.getPersistentId() )
+//                    {
+//                        callback.onCall( key.getStartTime(), entry.getValue() );
+//                    }
+//                    else
+//                        break;
+//                }
+//                FileBuffer buffer = this.fileBuffers.get( metaData.getNumber() );
+//                if( null != buffer )
+//                {
+//                    MemTableIterator bufferiterator = buffer.iterator();
+//                    bufferiterator.seek( searchKey.encode() );
+//                    while( bufferiterator.hasNext() )
+//                    {
+//                        Entry<Slice,Slice> entry = bufferiterator.next();
+//                        InternalKey key = new InternalKey( entry.getKey() );
+//                        if( key.getId().equals( idSlice ) && key.getStartTime() <= end
+//                                && key.getValueType().getPersistentId() != ValueType.INVALID.getPersistentId()
+//                                && key.getValueType().getPersistentId() != ValueType.DELETION.getPersistentId())
+//                        {
+//                            callback.onCall( key.getStartTime(), entry.getValue() );
+//                        }
+//                        else
+//                            break;
+//                    }
+//                }
+//            }
+//        }
+//    }
 
 //    public EPAppendIterator getRangeValueIter(Slice idSlice, int startTime, int endTime)
 //    {
@@ -358,88 +240,88 @@ public class StableLevel
      * note: meta data is not update, therefore the size of file is not update.
      * @throws IOException
      */
-    private void mergeBufferToFile(long number) throws IOException {
-        FileBuffer buffer = this.fileBuffers.get( number );
-        if( null != buffer )
-        {
-            Table table = this.cache.newTable( number );
-            String tempfilename = Filename.tempFileName( 7 );
-            File tempFile = new File(this.proDir + "/" + tempfilename );
-            if( !tempFile.exists() )
-                tempFile.createNewFile();
-            File indexFile = new File(this.proDir + "/index" + number);
-            boolean hasIndexFile = indexFile.exists();
-            if( hasIndexFile )
-            	indexFile = new File(this.proDir + "/index" + number + "temp");
-            FileOutputStream indexStream = new FileOutputStream( indexFile );
-            FileOutputStream stream = new FileOutputStream( tempFile );
-            FileChannel indexChannel = indexStream.getChannel();
-            FileChannel channel = stream.getChannel();
-            TableBuilder builder = new TableBuilder( new Options(), channel, TableComparator.instance() );
-            TableBuilder indexBuilder = new TableBuilder(new Options(), indexChannel, TableComparator.instance() );
-            List<SeekingIterator<Slice,Slice>> iterators = new ArrayList<SeekingIterator<Slice,Slice>>(2);
-            SeekingIterator<Slice,Slice> iterator = new BufferFileAndTableIterator( buffer.iterator(), table.iterator(), TableComparator.instance() );
-            iterators.add( iterator );
-            MergingIterator mergeIterator = new MergingIterator( iterators, TableComparator.instance() );
-            InternalKey lastKey = null;
-            int count = 0;
-            Slice max = null;
-            Slice min = null;
-            Slice sum = null;
-            while( mergeIterator.hasNext() )
-            {
-                Entry<Slice,Slice> entry = mergeIterator.next();
-                builder.add( entry.getKey(), entry.getValue() );
-                InternalKey currentKey = new InternalKey(entry.getKey());
-                if(lastKey == null || lastKey.getId().equals(currentKey.getId()) ){
-                    if( lastKey == null ){
-                        lastKey = currentKey;
-                        max = entry.getKey();
-                        min = entry.getKey();
-                        sum = entry.getKey();
-                    }
-                    count++;
-                    max = RangeQueryUtil.max(max,entry.getValue());
-                    min = RangeQueryUtil.min(min,entry.getValue());
-                    sum = RangeQueryUtil.sum(max,entry.getValue());
-                    continue;
-                }
-                else{
-                    InternalKey countKey = new InternalKey(lastKey.getId(), 0, 4, ValueType.VALUE);
-                    Slice countSlice = new Slice(4);
-                    countSlice.setInt(0, count);
-                    InternalKey maxKey = new InternalKey(lastKey.getId(), 1, max.length(), ValueType.VALUE);
-                    InternalKey minKey = new InternalKey(lastKey.getId(), 2, min.length(), ValueType.VALUE);
-                    InternalKey sumKey = new InternalKey(lastKey.getId(), 3, sum.length(), ValueType.VALUE);
-                    indexBuilder.add(countKey.encode(), countSlice);
-                    indexBuilder.add(maxKey.encode(), max);
-                    indexBuilder.add(minKey.encode(), min);
-                    indexBuilder.add(sumKey.encode(), sum);
-                    count = 1;
-                    max = entry.getKey();
-                    min = entry.getKey();
-                    sum = entry.getKey();
-                    lastKey = currentKey;
-                }
-            }
-            indexBuilder.finish();
-            builder.finish();
-            channel.close();
-            indexChannel.close();
-            stream.close();
-            indexStream.close();
-            table.close();
-            this.cache.evict( number );
-            File originFile = new File( this.proDir + "/" + Filename.stableFileName(number));
-            Files.delete( originFile.toPath() );
-            buffer.close();
-            Files.delete(new File(this.proDir + "/" + Filename.stbufferFileName( number ) ).toPath());
-            this.fileBuffers.put( number, null);
-            tempFile.renameTo(new File(this.proDir + "/" + Filename.stableFileName( number ) ) );
-            if( hasIndexFile ){
-            	Files.delete(indexFile.toPath());
-            	new File(this.proDir + "/index" + number + "temp").renameTo(new File(this.proDir + "/index" + number));
-            }
-        }
-    }
+//    private void mergeBufferToFile(long number) throws IOException {
+//        FileBuffer buffer = this.fileBuffers.get( number );
+//        if( null != buffer )
+//        {
+//            Table table = this.cache.newTable( number );
+//            String tempfilename = Filename.tempFileName( 7 );
+//            File tempFile = new File(this.proDir + "/" + tempfilename );
+//            if( !tempFile.exists() )
+//                tempFile.createNewFile();
+//            File indexFile = new File(this.proDir + "/index" + number);
+//            boolean hasIndexFile = indexFile.exists();
+//            if( hasIndexFile )
+//            	indexFile = new File(this.proDir + "/index" + number + "temp");
+//            FileOutputStream indexStream = new FileOutputStream( indexFile );
+//            FileOutputStream stream = new FileOutputStream( tempFile );
+//            FileChannel indexChannel = indexStream.getChannel();
+//            FileChannel channel = stream.getChannel();
+//            TableBuilder builder = new TableBuilder( new Options(), channel, TableComparator.instance() );
+//            TableBuilder indexBuilder = new TableBuilder(new Options(), indexChannel, TableComparator.instance() );
+//            List<SeekingIterator<Slice,Slice>> iterators = new ArrayList<SeekingIterator<Slice,Slice>>(2);
+//            SeekingIterator<Slice,Slice> iterator = new BufferFileAndTableIterator( buffer.iterator(), table.iterator(), TableComparator.instance() );
+//            iterators.add( iterator );
+//            MergingIterator mergeIterator = new MergingIterator( iterators, TableComparator.instance() );
+//            InternalKey lastKey = null;
+//            int count = 0;
+//            Slice max = null;
+//            Slice min = null;
+//            Slice sum = null;
+//            while( mergeIterator.hasNext() )
+//            {
+//                Entry<Slice,Slice> entry = mergeIterator.next();
+//                builder.add( entry.getKey(), entry.getValue() );
+//                InternalKey currentKey = new InternalKey(entry.getKey());
+//                if(lastKey == null || lastKey.getId().equals(currentKey.getId()) ){
+//                    if( lastKey == null ){
+//                        lastKey = currentKey;
+//                        max = entry.getKey();
+//                        min = entry.getKey();
+//                        sum = entry.getKey();
+//                    }
+//                    count++;
+//                    max = RangeQueryUtil.max(max,entry.getValue());
+//                    min = RangeQueryUtil.min(min,entry.getValue());
+//                    sum = RangeQueryUtil.sum(max,entry.getValue());
+//                    continue;
+//                }
+//                else{
+//                    InternalKey countKey = new InternalKey(lastKey.getId(), 0, 4, ValueType.VALUE);
+//                    Slice countSlice = new Slice(4);
+//                    countSlice.setInt(0, count);
+//                    InternalKey maxKey = new InternalKey(lastKey.getId(), 1, max.length(), ValueType.VALUE);
+//                    InternalKey minKey = new InternalKey(lastKey.getId(), 2, min.length(), ValueType.VALUE);
+//                    InternalKey sumKey = new InternalKey(lastKey.getId(), 3, sum.length(), ValueType.VALUE);
+//                    indexBuilder.add(countKey.encode(), countSlice);
+//                    indexBuilder.add(maxKey.encode(), max);
+//                    indexBuilder.add(minKey.encode(), min);
+//                    indexBuilder.add(sumKey.encode(), sum);
+//                    count = 1;
+//                    max = entry.getKey();
+//                    min = entry.getKey();
+//                    sum = entry.getKey();
+//                    lastKey = currentKey;
+//                }
+//            }
+//            indexBuilder.finish();
+//            builder.finish();
+//            channel.close();
+//            indexChannel.close();
+//            stream.close();
+//            indexStream.close();
+//            table.close();
+//            this.cache.evict( number );
+//            File originFile = new File( this.proDir + "/" + Filename.stableFileName(number));
+//            Files.delete( originFile.toPath() );
+//            buffer.close();
+//            Files.delete(new File(this.proDir + "/" + Filename.stbufferFileName( number ) ).toPath());
+//            this.fileBuffers.put( number, null);
+//            tempFile.renameTo(new File(this.proDir + "/" + Filename.stableFileName( number ) ) );
+//            if( hasIndexFile ){
+//            	Files.delete(indexFile.toPath());
+//            	new File(this.proDir + "/index" + number + "temp").renameTo(new File(this.proDir + "/index" + number));
+//            }
+//        }
+//    }
 }

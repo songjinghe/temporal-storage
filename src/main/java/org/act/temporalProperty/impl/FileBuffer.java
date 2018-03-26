@@ -73,6 +73,6 @@ public class FileBuffer implements Closeable
     }
 
     public long size(){
-        return this.memTable.approximateMemoryUsage();
+        return this.memTable.approximateMemUsage();
     }
 }

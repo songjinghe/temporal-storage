@@ -47,11 +47,9 @@ public class BuildAndQueryTest {
     public void buildIndex(){
         List<Integer> proIds = new ArrayList<>();
         proIds.add(1);
-        List<IndexValueType> types = new ArrayList<>();
-        types.add(IndexValueType.INT);
 //        store.createValueIndex(1288803660, 1288824660, proIds, types);
 //        store.createValueIndex(1288800300, 1288802460, proIds, types);
-        store.createValueIndex(1560, 27360, proIds, types);
+        store.createValueIndex(1560, 27360, proIds);
         log.info("create index done");
     }
 
@@ -107,7 +105,7 @@ public class BuildAndQueryTest {
 
 
     private static void testRangeQuery(TemporalPropertyStore store) {
-        store.getRangeValue(2, 2, 1560, 27000, new RangeQueryCallBack() {
+        store.getRangeValue(2, 1, 1560, 27000, new RangeQueryCallBack() {
             public void setValueType(String valueType) {}
             public void onCall(int time, Slice value) {
                 log.info("{} {}", time, value.getInt(0));

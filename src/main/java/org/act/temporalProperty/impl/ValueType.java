@@ -19,6 +19,7 @@ package org.act.temporalProperty.impl;
 
 public enum ValueType
 {
+    UNKNOWN(0x03),
     DELETION(0x01),
     VALUE(0x00),
     INVALID(0x02);
@@ -34,7 +35,7 @@ public enum ValueType
             case 2:
                 return INVALID;
             default:
-                throw new IllegalArgumentException("Unknown persistentId " + persistentId);
+                return UNKNOWN;
         }
     }
 

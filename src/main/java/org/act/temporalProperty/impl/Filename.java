@@ -66,7 +66,7 @@ public final class Filename
         return propertyId+"/"+makeFileName(number, "st");
     }
 
-    public static String stPath(String proDir, long fileNumber) {
+    public static String stPath(File proDir, long fileNumber) {
         return new File(proDir, stableFileName(fileNumber)).getAbsolutePath();
     }
     
@@ -83,7 +83,7 @@ public final class Filename
         return propertyId+"/"+makeFileName( number, "un" );
     }
 
-    public static String unPath(String proDir, long fileNumber) {
+    public static String unPath(File proDir, long fileNumber) {
         return new File(proDir, unStableFileName(fileNumber)).getAbsolutePath();
     }
 

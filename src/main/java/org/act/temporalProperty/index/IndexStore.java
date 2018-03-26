@@ -1,37 +1,56 @@
 package org.act.temporalProperty.index;
 
-import com.google.common.base.Supplier;
-import com.google.common.collect.*;
+import com.google.common.collect.Lists;
+import com.google.common.collect.PeekingIterator;
+import org.act.temporalProperty.exception.TGraphNotImplementedException;
 import org.act.temporalProperty.impl.InternalKey;
 import org.act.temporalProperty.impl.SeekingIterator;
+import org.act.temporalProperty.impl.TemporalPropertyStoreImpl;
 import org.act.temporalProperty.impl.ValueType;
-import org.act.temporalProperty.index.IndexMetaData.SingleValIndexMeta;
 import org.act.temporalProperty.index.rtree.IndexEntry;
 import org.act.temporalProperty.index.rtree.IndexEntryOperator;
-import org.act.temporalProperty.table.BufferFileAndTableIterator;
-import org.act.temporalProperty.table.TableComparator;
 import org.act.temporalProperty.util.Slice;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.act.temporalProperty.index.IndexType.MULTI_VALUE;
+import static org.act.temporalProperty.index.IndexType.SINGLE_VALUE;
 
 /**
  * Created by song on 2018-03-19.
  */
 public class IndexStore {
+    private final TemporalPropertyStoreImpl tpStore;
     private IndexTableCache cache;
     private File indexDir;
-
+    private AtomicInteger nextId = new AtomicInteger(0);
     //meta
     private Map<Integer, TreeMap<Integer, IndexMetaData>> singleVal = new HashMap<>(); // proId, time
-    private TreeMap<Integer, List<IndexMetaData>> multiVal = new TreeMap<>();
+    private TreeMap<Integer, List<IndexMetaData>> multiVal = new TreeMap<>(); // time
     private Map<Integer, TreeMap<Integer, IndexMetaData>> aggr = new HashMap<>(); // proId, time
 
-    public IndexStore(File indexDir){
+    public IndexStore(File indexDir, TemporalPropertyStoreImpl store, Set<IndexMetaData> indexes) throws IOException {
+        if(!indexDir.exists() && !indexDir.mkdir()) throw new IOException("unable to create index dir");
         this.indexDir = indexDir;
+        this.tpStore = store;
+        for(IndexMetaData meta : indexes){
+            if(meta.getType()==SINGLE_VALUE){
+                addSingleValIndex(meta);
+            }else if(meta.getType()==MULTI_VALUE){
+                addMultiValIndex(meta);
+            }else{
+                addAggrIndex(meta);
+            }
+        }
         this.cache = new IndexTableCache(indexDir, 4);
     }
+
 
     public List<IndexMetaData> availableSingleValIndexes(int proId, int start, int end){
         TreeMap<Integer, IndexMetaData> map = singleVal.get(proId);
@@ -45,11 +64,11 @@ public class IndexStore {
     public List<IndexMetaData> availableMultiValIndexes(List<Integer> proIds, int start, int end){
         proIds.sort(Integer::compareTo);
         Collection<List<IndexMetaData>> list = multiVal.subMap(start, true, end, true).values();
+        List<IndexMetaData> result = new ArrayList<>();
         for(List<IndexMetaData> lst : list) {
-            for (IndexMetaData meta : lst) {
-
-            }
+            result.addAll(lst);
         }
+        return result;
     }
 
     public void createValueIndex(int start, int end, List<Integer> proIds, List<IndexValueType> types) throws IOException {
@@ -58,31 +77,32 @@ public class IndexStore {
             indexMeta = createSingleValIndex(start, end, proIds.get(0), types.get(0));
             addSingleValIndex(indexMeta);
         } else {
-
+            throw new TGraphNotImplementedException();
         }
-
-    }
-
-
-
-    public List<Long> getEntities(IndexQueryRegion condition){
-
-    }
-
-    public List<IndexEntry> getEntries(IndexQueryRegion condition){
-
     }
 
     private void addSingleValIndex(IndexMetaData indexMeta) {
-        SingleValIndexMeta im = (SingleValIndexMeta) indexMeta;
-        singleVal.computeIfAbsent(im.getProId(), k -> new TreeMap<>());
-        singleVal.get(im.getProId()).put(indexMeta.getTimeStart(), indexMeta);
+        int pid = indexMeta.getPropertyIdList().get(0);
+        singleVal.computeIfAbsent(pid, k -> new TreeMap<>());
+        singleVal.get(pid).put(indexMeta.getTimeStart(), indexMeta);
     }
+
+    private void addMultiValIndex(IndexMetaData meta) {
+        multiVal.computeIfAbsent(meta.getTimeStart(), k -> new ArrayList<>());
+        multiVal.get(meta.getTimeStart()).add(meta);
+    }
+
+    private void addAggrIndex(IndexMetaData indexMeta) {
+        int pid = indexMeta.getPropertyIdList().get(0);
+        aggr.computeIfAbsent(pid, k -> new TreeMap<>());
+        aggr.get(pid).put(indexMeta.getTimeStart(), indexMeta);
+    }
+
 
     private IndexMetaData createSingleValIndex(int start, int end, int proId, IndexValueType types) throws IOException {
         IndexEntryOperator op = new IndexEntryOperator(Lists.newArrayList(types),4096);
-        SeekingIterator<Slice,Slice> iterator = buildIndexIterator(start, end, Lists.newArrayList(proId));
-        IndexBuilderCallback indexBuilderCallback = new IndexBuilderCallback(proId, op);
+        SeekingIterator<Slice,Slice> iterator = tpStore.buildIndexIterator(start, end, Lists.newArrayList(proId));
+        IndexBuilderCallback indexBuilderCallback = new IndexBuilderCallback(Lists.newArrayList(proId), op);
         while(iterator.hasNext()){
             Map.Entry<Slice, Slice> entry = iterator.next();
             InternalKey key = new InternalKey(entry.getKey());
@@ -101,32 +121,11 @@ public class IndexStore {
         }
         writer.finish();
         channel.close();
-        return new SingleValIndexMeta(proId, start, end);
+        return new IndexMetaData(nextId.getAndIncrement(), SINGLE_VALUE, Lists.newArrayList(proId), start, end);
     }
-
-
-    private SeekingIterator<Slice, Slice> buildIndexIterator(int start, int end, List<Integer> proIds) {
-        AppendIterator appendIterator = new AppendIterator();
-        if( start < this.stLevel.getTimeBoundary() ) {
-            int stEnd = Math.min((int) this.stLevel.getTimeBoundary(), end);
-            appendIterator.append(this.stLevel.getRangeValueIter(start, stEnd));
-        }
-        if( end >= this.stLevel.getTimeBoundary() ) {
-            int unStart = Math.max((int) this.stLevel.getTimeBoundary(), start);
-            appendIterator.append(this.getRangeValueIter(unStart, end));
-        }
-        return new PropertyFilterIterator(
-                proIds,
-                new BufferFileAndTableIterator(
-                        this.getMemTableIter(start, end),
-                        appendIterator,
-                        TableComparator.instance()));
-    }
-
 
     public List<IndexEntry> valueIndexQuery(IndexQueryRegion condition) throws IOException {
-        Iterator<IndexEntry> iter = this.index.iterator(condition);
-        IndexEntryOperator op = extractOperator(condition);
+        Iterator<IndexEntry> iter = this.getQueryIterator(condition);
         List<IndexEntry> result = new ArrayList<>();
         while(iter.hasNext()){
             result.add(iter.next());
@@ -134,4 +133,13 @@ public class IndexStore {
         return result;
     }
 
+    //Fixme, naive version.
+    private Iterator<IndexEntry> getQueryIterator(IndexQueryRegion condition) throws IOException {
+        FileChannel channel = new RandomAccessFile(new File(this.indexDir, "index"), "r").getChannel();
+        return new IndexTable(channel).iterator(condition);
+    }
+
+    public void deleteProperty(int propertyId) {
+        //Fixme TODO
+    }
 }

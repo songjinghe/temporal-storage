@@ -38,7 +38,7 @@ public class SystemMetaController {
         for(PropertyMetaData p: props){
             PropertyMetaDataController.encode(out, p);
         }
-        Collection<IndexMetaData> indexes = meta.getIndexes().values();
+        Collection<IndexMetaData> indexes = meta.getIndexes();
         out.writeInt(indexes.size());
         for(IndexMetaData p: indexes){
             IndexMetaDataController.encode(out, p);

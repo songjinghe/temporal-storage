@@ -31,9 +31,9 @@ public class StoreBuilder {
                 deleteAllFilesOfDir(dbDir);
             }
             dbDir.mkdir();
-            store = TemporalPropertyStoreFactory.newPropertyStore(dbDir.getAbsolutePath());
+            store = TemporalPropertyStoreFactory.newPropertyStore(dbDir);
         }else{
-            store = TemporalPropertyStoreFactory.newPropertyStore(dbDir.getAbsolutePath());
+            store = TemporalPropertyStoreFactory.newPropertyStore(dbDir);
         }
     }
 

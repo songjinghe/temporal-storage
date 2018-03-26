@@ -1,19 +1,18 @@
 package org.act.temporalProperty.impl;
 
 import org.act.temporalProperty.TemporalPropertyStore;
+import org.act.temporalProperty.exception.TGraphNotImplementedException;
 import org.act.temporalProperty.exception.TPSRuntimeException;
 import org.act.temporalProperty.helper.StoreInitial;
 import org.act.temporalProperty.helper.EPEntryIterator;
 import org.act.temporalProperty.helper.EPMergeIterator;
-import org.act.temporalProperty.index.IndexQueryRegion;
-import org.act.temporalProperty.index.IndexStore;
-import org.act.temporalProperty.index.IndexValueType;
-import org.act.temporalProperty.index.PropertyValueInterval;
-import org.act.temporalProperty.index.TimeRangeFilterIterator;
+import org.act.temporalProperty.index.*;
 import org.act.temporalProperty.index.rtree.IndexEntry;
 import org.act.temporalProperty.index.rtree.IndexEntryOperator;
+import org.act.temporalProperty.meta.PropertyMetaData;
 import org.act.temporalProperty.meta.SystemMeta;
 import org.act.temporalProperty.meta.SystemMetaController;
+import org.act.temporalProperty.meta.ValueContentType;
 import org.act.temporalProperty.table.BufferFileAndTableIterator;
 import org.act.temporalProperty.table.MergeProcess;
 import org.act.temporalProperty.table.TableBuilder;
@@ -29,6 +28,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
+
 /**
  * TemporalPropertyStore的实现类
  *
@@ -40,7 +40,11 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
     private File dbDir;
     private TableCache cache;
     private MemTable memTable;
+    private MemTable stableMemTable; // a full memtable, which only used for query and (to be) merged, never write.
     private IndexStore index;
+
+    private boolean forbiddenWrite=false;
+
 
     /**
      * @param dbDir 存储动态属性数据的目录地址
@@ -52,6 +56,7 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
         this.mergeProcess = new MergeProcess(dbDir.getAbsolutePath(), meta);
         this.mergeProcess.start();
         this.meta.initStore(dbDir, cache);
+        this.index = new IndexStore(new File(dbDir, "index"), this, meta.getIndexes());
     }
 
     /**
@@ -84,6 +89,13 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
             Slice result = memTable.get(searchKey.encode());
             if (result != null && result.length() > 0) {
                 return result;
+            } else if(this.stableMemTable!=null){
+                result = stableMemTable.get(searchKey.encode());
+                if (result != null && result.length() > 0) {
+                    return result;
+                } else {
+                    return meta.getStore(proId).getPointValue(idSlice, time);
+                }
             } else {
                 return meta.getStore(proId).getPointValue(idSlice, time);
             }
@@ -99,6 +111,7 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
             Slice idSlice = toSlice(proId, id);
 
             SeekingIterator<Slice,Slice> memIter = new EPEntryIterator(idSlice, memTable.iterator());
+            if(this.stableMemTable!=null) memIter = new EPMergeIterator(idSlice, stableMemTable.iterator(), memIter);
             SeekingIterator<Slice,Slice> diskIter = meta.getStore(proId).getRangeValueIter(idSlice, startTime, endTime);
             SeekingIterator<Slice,Slice> mergedIterator = new EPMergeIterator(idSlice, diskIter, memIter);
 
@@ -117,59 +130,98 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
         }
     }
 
-    private SeekingIterator<Slice,Slice> getMemTableIter(int start, int end){
-        if(this.stableMemTable != null) {
-            return new TimeRangeFilterIterator(
-                    new BufferFileAndTableIterator(memTable.iterator(), stableMemTable.iterator(), TableComparator.instance()),
-                    start, end );
+    @Override
+    public boolean createProperty(int propertyId, ValueContentType type) {
+        SinglePropertyStore prop = meta.proStores().get(propertyId);
+        if(prop==null){
+            try {
+                PropertyMetaData pMeta = new PropertyMetaData(propertyId, type);
+                meta.addStore(propertyId, new SinglePropertyStore(pMeta, dbDir,cache));
+                meta.addProperty(pMeta);
+                return true;
+            } catch (Throwable ignore) {
+                return false;
+            }
         }else{
-            return new TimeRangeFilterIterator(memTable.iterator(), start, end);
-        }
-    }
-
-    public SeekingIterator<Slice,Slice> getMemTableIter(Slice idSlice){
-        if(this.stableMemTable != null) {
-            return new EPMergeIterator(idSlice, stableMemTable.iterator(), memTable.iterator());
-        }else{
-            return new EPEntryIterator(idSlice, memTable.iterator());
+            PropertyMetaData pMeta = meta.getProperties().get(propertyId);
+            if(pMeta!=null && pMeta.getType()==type){
+                // already exist, maybe in recovery. so just delete all property then create again.
+                deleteProperty(propertyId);
+                createProperty(propertyId, type);
+                return true;
+            }else{
+                throw new TPSRuntimeException("create temporal property failed, exist property with same id but diff type!");
+            }
         }
     }
 
     @Override
     public boolean setProperty( Slice key, byte[] value ){
-        if( this.memTable.approximateMemoryUsage() >= 4*1024*1024 ){
-            while( this.mergeProcess.isMerging()){
-                try{
-                    Thread.sleep(200);
-                }catch ( InterruptedException e ){
-                    //FIXME
-                    e.printStackTrace();
-                }
+        meta.lockExclusive();
+        try{
+            if(forbiddenWrite) meta.waitWriteCondition.await();
+            this.memTable.add(key, new Slice(value));
+            if( this.memTable.approximateMemUsage() >= 4*1024*1024 ){
+                forbiddenWrite = true;
+                this.stableMemTable = this.memTable;
+                this.mergeProcess.add( this.stableMemTable ); // may await at current line.
+                this.memTable = new MemTable( TableComparator.instance() );
+                forbiddenWrite = false;
             }
-        }
-        this.memTable.add(key, new Slice(value));
-        if( !this.mergeProcess.isMerging() && this.memTable.approximateMemoryUsage() >= 4*1024*1024 ){
-            MemTable temp = this.memTable;
-            this.mergeProcess.offer( temp );
-            this.memTable = new MemTable( TableComparator.instance() );
+            meta.waitWriteCondition.signal();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+            return false;
+        } finally {
+            meta.unLockExclusive();
         }
         return true;
     }
 
     @Override
-    public boolean delete( Slice id )
-    {
-        // TODO Auto-generated method stub
+    public boolean deleteProperty(int propertyId) {
+        meta.lockExclusive();
+        try{
+            meta.getProperties().remove(propertyId);
+            meta.getStore(propertyId).destroy();
+            Set<IndexMetaData> indexSet = meta.getIndexes();
+            for(IndexMetaData iMeta : indexSet){
+                Set<Integer> pids = new HashSet<>(iMeta.getPropertyIdList());
+                if(pids.contains(propertyId)) indexSet.remove(iMeta);
+            }
+            index.deleteProperty(propertyId);
+            return true;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
+        } finally {
+            meta.unLockExclusive();
+        }
+    }
+
+    @Override
+    public boolean deleteEntityProperty(Slice id) {
         return false;
     }
 
+    @Override
+    public void createValueIndex(int start, int end, List<Integer> proIds) {
+        List<IndexValueType> types = new ArrayList<>();
+        for(Integer pid : proIds){
+            PropertyMetaData pMeta = meta.getProperties().get(pid);
+            types.add(IndexValueType.convertFrom(pMeta.getType()));
+        }
+        createValueIndex(start, end, proIds, types);
+    }
 
-    public void createValueIndex(int start, int end, List<Integer> proIds, List<IndexValueType> types){
+    private void createValueIndex(int start, int end, List<Integer> proIds, List<IndexValueType> types){
         if(proIds.isEmpty()) throw new RuntimeException("should have at least one proId");
         meta.lockShared();
         try {
             index.createValueIndex(start, end, proIds, types);
-        }finally {
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
             meta.unLockShared();
         }
     }
@@ -197,12 +249,34 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
     @Override
     public List<IndexEntry> getEntries(IndexQueryRegion condition) {
         try {
-            return unLevel.valueIndexQuery(condition);
+            return index.valueIndexQuery(condition);
         } catch (IOException e) {
             e.printStackTrace();
             throw new RuntimeException(e);
         }
     }
+
+    private SeekingIterator<Slice,Slice> getMemTableIter(int start, int end){
+        if(this.stableMemTable != null) {
+            return new TimeRangeFilterIterator(
+                    new BufferFileAndTableIterator(memTable.iterator(), stableMemTable.iterator(), TableComparator.instance()),
+                    start, end );
+        }else{
+            return new TimeRangeFilterIterator(memTable.iterator(), start, end);
+        }
+    }
+
+    public SeekingIterator<Slice, Slice> buildIndexIterator(int start, int end, List<Integer> proIds) {
+        if(proIds.size()==1) {
+            return new BufferFileAndTableIterator(
+                    getMemTableIter(start, end),
+                    new TimeRangeFilterIterator(meta.getStore(proIds.get(0)).buildIndexIterator(start, end), start, end),
+                    TableComparator.instance());
+        }else{
+            throw new TGraphNotImplementedException();
+        }
+    }
+
 
     private static Slice toSlice(int proId, long id) {
         Slice result = new Slice(12);

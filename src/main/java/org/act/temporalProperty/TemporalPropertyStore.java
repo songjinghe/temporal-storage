@@ -4,6 +4,7 @@ import org.act.temporalProperty.impl.RangeQueryCallBack;
 import org.act.temporalProperty.index.IndexQueryRegion;
 import org.act.temporalProperty.index.IndexValueType;
 import org.act.temporalProperty.index.rtree.IndexEntry;
+import org.act.temporalProperty.meta.ValueContentType;
 import org.act.temporalProperty.util.Slice;
 
 import java.util.List;
@@ -28,7 +29,7 @@ public interface TemporalPropertyStore
 	 * @param time 需要查询的时间
 	 * @return @{Slice} 查询的结果
 	 */
-    public Slice getPointValue( long id, int proId, int time );
+    Slice getPointValue( long id, int proId, int time );
     
     /**
 	 * 对某个动态属性进行时间段查询，返回查询的 结果
@@ -39,28 +40,44 @@ public interface TemporalPropertyStore
 	 * @param callback 时间段查询所采用的聚集类型
 	 * @return @{Slice} 查询的结果
 	 */
-    public Object getRangeValue( long id, int proId, int startTime, int endTime, RangeQueryCallBack callback );
-    
+    Object getRangeValue( long id, int proId, int startTime, int endTime, RangeQueryCallBack callback );
+
+	/**
+	 * 创建某个动态属性
+	 * @param propertyId 动态属性的id
+	 * @return 是否创建成功，如果有相同ID但类型不同的属性则返回false
+	 */
+	boolean createProperty(int propertyId, ValueContentType type);
+
     /**
      * 写入某个动态属性的值
-     * @param id 动态属性所属的点/边的id
-     * @param proid 动态属性id
-     * @param time 相应值有效的起始时间
+     * @param id 动态属性所属的点/边的id+动态属性id+相应值有效的起始时间
      * @param value 值
      * @return 是否写入成功
      */
-    public boolean setProperty( Slice id, byte[] value );
+    boolean setProperty( Slice id, byte[] value );
     
     /**
-     * 删除某个动态属性在某个时间的值
-     * @param id 动态属性所属的点/边的id
-     * @param proid 动态属性id
-     * @param time 需要删除的值的起始有效时间
+     * 删除某个动态属性
+     * @param propertyId 动态属性的id
      * @return 是否删除成功
      */
-    public boolean delete(Slice id);
+    boolean deleteProperty(int propertyId);
 
-	void createValueIndex(int start, int end, List<Integer> proIds, List<IndexValueType> types);
+	/**
+	 * 删除某个动态属性中某个eid的所有数据
+	 * @param id 动态属性的id + entity id
+	 * @return 是否删除成功
+	 */
+	boolean deleteEntityProperty(Slice id);
+
+	/**
+	 * 创建一个值索引
+	 * @param start  索引开始时间
+	 * @param end    索引结束时间
+	 * @param proIds 索引的属性id列表
+	 */
+	void createValueIndex(int start, int end, List<Integer> proIds);
 
 	/**
 	 * get entity id which satisfy query condition
@@ -69,11 +86,16 @@ public interface TemporalPropertyStore
 	 */
 	List<Long> getEntities(IndexQueryRegion condition);
 
+	/**
+	 * get index entries which satisfy query condition
+	 * @param condition query condition of one property
+	 * @return null if no index available;
+	 */
 	List<IndexEntry> getEntries(IndexQueryRegion condition);
 
 	void flushMemTable2Disk();
 
     void flushMetaInfo2Disk();
 
-    public void shutDown();
+    void shutDown();
 }

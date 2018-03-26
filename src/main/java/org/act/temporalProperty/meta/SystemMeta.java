@@ -1,12 +1,13 @@
 package org.act.temporalProperty.meta;
 
+import org.act.temporalProperty.exception.TPSRuntimeException;
 import org.act.temporalProperty.impl.*;
 import org.act.temporalProperty.index.IndexMetaData;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
@@ -14,18 +15,28 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  */
 public class SystemMeta {
     private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock( false );
+    public final Condition waitWriteCondition = lock.writeLock().newCondition();
+    public final Condition writeDiskComplete = lock.writeLock().newCondition();
+
     private final Map<Integer, PropertyMetaData> properties = new HashMap<>();
-    private final Map<Integer, IndexMetaData> indexes = new HashMap<>();
+    private final Set<IndexMetaData> indexes = new HashSet<>();
     private final Map<Integer, SinglePropertyStore> propertyStores = new HashMap<>();
-//    private Map<Integer, TPIndex> indexMap = new HashMap<>();
+    private TableCache cache;
+    private File dbDir;
 
     public SystemMeta(){
 
     }
 
     public SinglePropertyStore getStore(int propertyId){
-        return propertyStores.get(propertyId);
+        SinglePropertyStore store = propertyStores.get(propertyId);
+        if(store==null){
+            throw new TPSRuntimeException("no such property id: "+propertyId+". should create first!");
+        }
+        return store;
     }
+
+    public Map<Integer, SinglePropertyStore> proStores(){return propertyStores;}
 
     public void addStore(int propertyId, SinglePropertyStore store){
         propertyStores.put(propertyId, store);
@@ -35,16 +46,16 @@ public class SystemMeta {
         return properties;
     }
 
-    public Map<Integer, IndexMetaData> getIndexes() {
+    public Set<IndexMetaData> getIndexes() {
         return indexes;
+    }
+
+    public void addIndex(IndexMetaData iMeta) {
+        indexes.add(iMeta);
     }
 
     public void addProperty(PropertyMetaData pMeta) {
         properties.put(pMeta.getPropertyId(), pMeta);
-    }
-
-    public void addIndex(IndexMetaData iMeta) {
-        indexes.put(iMeta.getProId(), iMeta);
     }
 
     public void lockShared(){
@@ -68,6 +79,8 @@ public class SystemMeta {
     }
 
     public void initStore(File storeDir, TableCache cache) throws Throwable {
+        this.dbDir = storeDir;
+        this.cache = cache;
         for( PropertyMetaData pMeta : properties.values()){
             SinglePropertyStore onePropStore = new SinglePropertyStore(pMeta, storeDir, cache);
             propertyStores.put(pMeta.getPropertyId(), onePropStore);

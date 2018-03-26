@@ -57,7 +57,7 @@ public class MemTable
         return table.isEmpty();
     }
 
-    public long approximateMemoryUsage()
+    public long approximateMemUsage()
     {
         return approximateMemoryUsage.get();
     }

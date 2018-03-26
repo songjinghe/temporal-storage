@@ -3,12 +3,15 @@ package org.act.temporalProperty.impl;
 import com.google.common.collect.Lists;
 import org.act.temporalProperty.TemporalPropertyStore;
 import org.act.temporalProperty.helper.EPAppendIterator;
+import org.act.temporalProperty.index.AppendIterator;
+import org.act.temporalProperty.index.PropertyFilterIterator;
 import org.act.temporalProperty.meta.PropertyMetaData;
 import org.act.temporalProperty.table.BufferFileAndTableIterator;
 import org.act.temporalProperty.table.MergeProcess.MergeTask;
 import org.act.temporalProperty.table.Table;
 import org.act.temporalProperty.table.TableBuilder;
 import org.act.temporalProperty.table.TableComparator;
+import org.act.temporalProperty.util.FileUtils;
 import org.act.temporalProperty.util.Slice;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,7 +31,7 @@ import java.util.NoSuchElementException;
 public class SinglePropertyStore
 {
     private PropertyMetaData propertyMeta;
-    private String proDir;
+    private File proDir;
     private Logger log = LoggerFactory.getLogger( TemporalPropertyStoreImpl.class );
     private TableCache cache;
 
@@ -38,7 +41,8 @@ public class SinglePropertyStore
      */
     public SinglePropertyStore(PropertyMetaData propertyMeta, File dbDir, TableCache cache ) throws Throwable{
         this.propertyMeta = propertyMeta;
-        this.proDir = new File(dbDir, propertyMeta.getPropertyId().toString()).getAbsolutePath();
+        this.proDir = new File(dbDir, propertyMeta.getPropertyId().toString());
+        if(!proDir.exists() && !proDir.mkdir()) throw new IOException("create property dir failed: "+proDir.getAbsolutePath());
         this.cache = cache;
         this.loadBuffers();
     }
@@ -83,14 +87,14 @@ public class SinglePropertyStore
         }
     }
 
-    public EPAppendIterator getRangeValueIter(Slice idSlice, int startTime, int endTime)
+    EPAppendIterator getRangeValueIter(Slice idSlice, int startTime, int endTime)
     {
         List<FileMetaData> stList = propertyMeta.overlappedStable(startTime, endTime);
         List<FileMetaData> unList = propertyMeta.overlappedUnstable(startTime, endTime);
         EPAppendIterator iterator = new EPAppendIterator(idSlice);
 
         for(FileMetaData meta : stList){
-            SeekingIterator<Slice, Slice> fileIterator = this.cache.newIterator(Filename.unPath(proDir, meta.getNumber()));
+            SeekingIterator<Slice, Slice> fileIterator = this.cache.newIterator(Filename.stPath(proDir, meta.getNumber()));
             FileBuffer buffer = propertyMeta.getStableBuffers( meta.getNumber() );
             if( null != buffer ){
                 iterator.append(new BufferFileAndTableIterator(buffer.iterator(), iterator, TableComparator.instance()));
@@ -99,7 +103,7 @@ public class SinglePropertyStore
             }
         }
         for( FileMetaData meta : unList ){
-            SeekingIterator<Slice, Slice> fileIterator = this.cache.newIterator(Filename.stPath(proDir, meta.getNumber()));
+            SeekingIterator<Slice, Slice> fileIterator = this.cache.newIterator(Filename.unPath(proDir, meta.getNumber()));
             FileBuffer buffer = propertyMeta.getUnstableBuffers( meta.getNumber() );
             if( null != buffer ){
                 iterator.append(new BufferFileAndTableIterator(buffer.iterator(), iterator, TableComparator.instance()));
@@ -198,17 +202,10 @@ public class SinglePropertyStore
         }
         if(!stableMemTable.isEmpty()){
             propertyMeta.updateMemTableMinTime( stableMemTable.getEndTime()+1 );
-            return this.createMergeTask(propertyMeta, stableMemTable);
+            return new MergeTask(proDir, stableMemTable, propertyMeta, this.cache);
         }else{
             return null;
         }
-    }
-
-
-    public MergeTask createMergeTask(PropertyMetaData propertyMeta, MemTable stableMemTable) throws IOException {
-        File propertyDir = new File(proDir, propertyMeta.getPropertyId().toString());
-        MergeTask task = new MergeTask(propertyDir, stableMemTable, propertyMeta, this.cache);
-        return task;
     }
 
 
@@ -289,6 +286,44 @@ public class SinglePropertyStore
         buffer.close();
         Files.delete(new File(this.proDir, bufferFileName).toPath());
         return tempFile;
+    }
+
+    AppendIterator buildIndexIterator(int startTime, int endTime) {
+        List<FileMetaData> stList = propertyMeta.overlappedStable(startTime, endTime);
+        List<FileMetaData> unList = propertyMeta.overlappedUnstable(startTime, endTime);
+
+        AppendIterator iterator = new AppendIterator();
+        for(FileMetaData meta : stList){
+            SeekingIterator<Slice, Slice> fileIterator = this.cache.newIterator(Filename.stPath(proDir, meta.getNumber()));
+            FileBuffer buffer = propertyMeta.getStableBuffers( meta.getNumber() );
+            if( null != buffer ){
+                iterator.append(new BufferFileAndTableIterator(buffer.iterator(), iterator, TableComparator.instance()));
+            }else {
+                iterator.append(fileIterator);
+            }
+        }
+        for( FileMetaData meta : unList ){
+            SeekingIterator<Slice, Slice> fileIterator = this.cache.newIterator(Filename.unPath(proDir, meta.getNumber()));
+            FileBuffer buffer = propertyMeta.getUnstableBuffers( meta.getNumber() );
+            if( null != buffer ){
+                iterator.append(new BufferFileAndTableIterator(buffer.iterator(), iterator, TableComparator.instance()));
+            }else {
+                iterator.append(fileIterator);
+            }
+        }
+        return iterator;
+    }
+
+    public void destroy() throws IOException {
+        for(FileMetaData f : propertyMeta.getUnStableFiles().values()) {
+            String path = Filename.unPath(proDir, f.getNumber());
+            cache.evict(path);
+        }
+        for(FileMetaData f : propertyMeta.getStableFiles().values()) {
+            String path = Filename.stPath(proDir, f.getNumber());
+            cache.evict(path);
+        }
+        FileUtils.deleteRecursively(proDir);
     }
 
 

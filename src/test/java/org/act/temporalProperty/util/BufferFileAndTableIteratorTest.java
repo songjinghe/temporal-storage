@@ -47,7 +47,7 @@ public class BufferFileAndTableIteratorTest
             tableFile.createNewFile();
             FileChannel bufferChannel = new RandomAccessFile( bufferFile, "rw" ).getChannel();
             FileChannel tableChannel = new RandomAccessFile( tableFile,"rw").getChannel();
-            buffer = new FileBuffer( bufferfileName, dbDir + tablefileName );
+            buffer = new FileBuffer( tableFile );
             builder = new TableBuilder( new Options(), tableChannel, TableComparator.instance() );
             memTable = new MemTable( TableComparator.instance() );
             for( int i = 0; i<DATA_SIZE; i++ )

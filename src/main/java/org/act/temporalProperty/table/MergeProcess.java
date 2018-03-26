@@ -28,44 +28,37 @@ public class MergeProcess extends Thread
 {
     private final SystemMeta systemMeta;
     private final String storeDir;
-    private volatile boolean mergeIsHappening = false;
+    private volatile MemTable memTable = null;
     private Logger log = LoggerFactory.getLogger( MergeProcess.class );
-    //等待写入磁盘的MemTable的队列
-    private BlockingQueue<MemTable> mergeWaitingQueue = new LinkedBlockingQueue<MemTable>();
 
     public MergeProcess(String storePath, SystemMeta systemMeta ) {
         this.storeDir = storePath;
         this.systemMeta = systemMeta;
     }
 
-    public void offer(MemTable memTable){
-        mergeWaitingQueue.offer(memTable);
-    }
-
-    public boolean isMerging(){
-        return mergeIsHappening  || !this.mergeWaitingQueue.isEmpty() ;
+    // this is called from a writer thread.
+    // the caller should get write lock first.
+    public void add(MemTable memTable) throws InterruptedException{
+        while(this.memTable!=null){
+            systemMeta.writeDiskComplete.await();
+        }
+        this.memTable = memTable;
     }
 
     @Override
     public void run(){
         Thread.currentThread().setName("TemporalPropStore-"+(storeDir.endsWith("temporal.node.properties")?"Node":"Rel"));
-        while(true){
-            try{
-                MemTable temp = mergeWaitingQueue.take();
-                mergeIsHappening = true;
-                if(!temp.isEmpty()) {
-                    startMergeProcess(temp);
+        try{
+            while(!Thread.interrupted()) {
+                if (memTable!=null && !memTable.isEmpty()) {
+                    startMergeProcess(memTable);
                 }else{
-//                    log.debug("empty memtable");
+                    Thread.sleep(100);
                 }
-            }catch ( IOException e ){
-                e.printStackTrace();
-                log.error( "error happens when dump memtable to disc", e );
-            }catch ( InterruptedException e ){
-                return;
-            }finally{
-                mergeIsHappening = false;
             }
+        }catch (Throwable e ){
+            e.printStackTrace();
+            log.error( "error happens when dump memtable to disc", e );
         }
     }
 
@@ -100,6 +93,8 @@ public class MergeProcess extends Thread
         try {
             for (MergeTask task : taskList) task.updateMetaInfo();
             systemMeta.force(new File(storeDir));
+            memTable = null;
+            systemMeta.writeDiskComplete.signalAll();
         }finally {
             systemMeta.unLockExclusive();
         }
@@ -265,9 +260,7 @@ public class MergeProcess extends Thread
                 pMeta.addStable(targetMeta);
             }else{
                 fileNumber = mergeParticipants.size();
-                startTime = mergeParticipantMinTime();
-                assert startTime<=minTime : "ERROR: startTime > minTime";
-                FileMetaData targetMeta = new FileMetaData( fileNumber, targetChannel.size(), startTime, maxTime );
+                FileMetaData targetMeta = new FileMetaData( fileNumber, targetChannel.size(), minTime, maxTime );
                 pMeta.addUnstable(targetMeta);
             }
 
@@ -275,19 +268,10 @@ public class MergeProcess extends Thread
             evictUnused(cache);
         }
 
-        private int mergeParticipantMinTime(){
-            int min = Integer.MAX_VALUE;
-            for(long fileNumber : mergeParticipants){
-                FileMetaData meta = pMeta.getUnStableFiles().get(fileNumber);
-                if(min>meta.getSmallest()) min = meta.getSmallest();
-            }
-            return min;
-        }
-
         // this should only be called when pMeta.hasStable() is true.
         private TableLatestValueIterator stableLatestValIter() {
             FileMetaData meta = pMeta.latestStableMeta();
-            String filePath = Filename.stPath(propStoreDir.getAbsolutePath(), meta.getNumber());
+            String filePath = Filename.stPath(propStoreDir, meta.getNumber());
             SeekingIterator<Slice, Slice> fileIterator = cache.newTable(filePath).iterator();
             FileBuffer buffer = pMeta.getStableBuffers( meta.getNumber() );
             if( null != buffer ){
