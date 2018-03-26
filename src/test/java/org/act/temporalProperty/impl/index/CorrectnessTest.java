@@ -10,6 +10,7 @@ import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.StoreBuilder;
 import org.act.temporalProperty.util.TimeIntervalUtil;
 import org.act.temporalProperty.util.TrafficDataImporter;
+import org.apache.commons.lang3.SystemUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -24,17 +25,31 @@ import java.util.*;
 public class CorrectnessTest {
     private static Logger log = LoggerFactory.getLogger(BuildAndQueryTest.class);
 
-    private static String dataPath = "/home/song/tmp/road data";
-    private static String dbDir = "/tmp/temporal.property.test.correctness";
+    private static String dataPath(){
+         if(SystemUtils.IS_OS_WINDOWS){
+             return "C:\\Users\\Administrator\\Desktop\\TGraph-source\\20101104.tar\\20101104";
+         }else{
+             return "/home/song/tmp/road data/20101104";
+         }
+    }
+    private static String dbDir(){
+        if(SystemUtils.IS_OS_WINDOWS){
+            return "temporal.property.test";
+        }else{
+            return "/tmp/temporal.property.test";
+        }
+    }
 
     private TemporalPropertyStore store;
     private StoreBuilder stBuilder;
     private TrafficDataImporter importer;
+    private SourceCompare sourceEntry;
 
     @Before
     public void initDB() throws Throwable {
-        stBuilder = new StoreBuilder(dbDir, true);
-        importer = new TrafficDataImporter(stBuilder.store(), dataPath, 10);
+        stBuilder = new StoreBuilder(dbDir(), true);
+        importer = new TrafficDataImporter(stBuilder.store(), dataPath(), 10);
+        sourceEntry = new SourceCompare(dataPath(), 10); //fileCount = 10; no entry in timeRange, but query results can be found in Index and Range? --- endTime (<=endTime --> < endTime?)
         log.info("time: {} - {}", importer.getMinTime(), importer.getMaxTime());
         store = stBuilder.store();
         buildIndex();
@@ -43,34 +58,44 @@ public class CorrectnessTest {
     private void buildIndex(){
         List<Integer> proIds = new ArrayList<>();
         proIds.add(1);
+        List<IndexValueType> types = new ArrayList<>();
+        types.add(IndexValueType.INT);
 //        store.createValueIndex(1288803660, 1288824660, proIds, types);
 //        store.createValueIndex(1288800300, 1288802460, proIds, types);
-        store.createValueIndex(1560, 27360, proIds);
+        store.createValueIndex(1560, 27360, proIds, types);
         log.info("create index done");
     }
 
     @Test
     public void main() {
-        int startTime = 18300, endTime = 20000, valMin=0, valMax=200;
+        int startTime = 18300, endTime = 20000, valMin=0, valMax=200; //should return (18300, 20000); as importer is (0, 2760), return (2760, 20000) ???!!!! Wrong answer?
         compare(startTime, endTime, valMin, valMax);
     }
 
     private void compare(int startTime, int endTime, int valMin, int valMax){
+
+
+        List<IndexEntry> rangeResult = sourceEntry.queryBySource(startTime, endTime, valMin, valMax);
+        rangeResult.sort(cmp);
+
         List<IndexEntry> indexResult = queryByIndex(startTime, endTime, valMin, valMax);//27000
         indexResult.sort(cmp);
         log.info("index query complete");
 
-        List<IndexEntry> rangeResult = queryByRange( startTime, endTime, valMin, valMax);
-        rangeResult.sort(cmp);
-        log.info("range query complete");
+//        List<IndexEntry> rangeResult = queryByRange( startTime, endTime, valMin, valMax);
+//        rangeResult.sort(cmp);
+//        log.info("range query complete");
 
         log.info("size: range({}) vs index({})", rangeResult.size(), indexResult.size());
+
+        sameEntities(rangeResult, indexResult);
+
         int i;
         for(i=0; i<rangeResult.size() && i<indexResult.size(); i++){
             IndexEntry rangeE = rangeResult.get(i);
             IndexEntry indexE = indexResult.get(i);
             if(!rangeE.equals(indexE)){
-                if(!partialEqual(rangeE, indexE, endTime)) {
+                if(!partialEqual(rangeE, indexE, startTime, endTime)) {
                     log.debug("entry not equal. index({}) vs range({})", indexE, rangeE);
                 }
             }
@@ -83,8 +108,33 @@ public class CorrectnessTest {
 //        }
     }
 
-    private boolean partialEqual(IndexEntry rangeE, IndexEntry indexE, int endTime) {
-        if(     rangeE.getStart()==indexE.getStart() && rangeE.getEnd()==endTime && indexE.getEnd()>endTime &&
+    private boolean sameEntities(List<IndexEntry> rangeResult, List<IndexEntry> indexResult){
+        Set<Long> rangeEntities = new HashSet<>();
+        Set<Long> indexEntities = new HashSet<>();
+        for(IndexEntry entry: indexResult){
+            indexEntities.add(entry.getEntityId());
+        }
+        for(IndexEntry entry: rangeResult){
+            rangeEntities.add(entry.getEntityId());
+        }
+//        if(rangeEntities.size()!=indexEntities.size()) return false;
+
+        Set<Long> common = new HashSet<>(rangeEntities);
+        common.retainAll(indexEntities);
+
+        rangeEntities.removeAll(common);
+        log.debug("eid only in range: {}", rangeEntities);
+        indexEntities.removeAll(common);
+        log.debug("eid only in index: {}", indexEntities);
+
+        return rangeEntities.isEmpty() && indexEntities.isEmpty();
+    }
+
+    private boolean partialEqual(IndexEntry rangeE, IndexEntry indexE, int startTime, int endTime) {
+        if(     rangeE.getStart()<=startTime &&
+                indexE.getStart()<=startTime &&
+                rangeE.getEnd()>=endTime &&
+                indexE.getEnd()>endTime &&
                 allNullOrEqual(rangeE.getEntityId(), indexE.getEntityId())){
             boolean valEq = true;
             for(int j=0; j<rangeE.valueLength(); j++){
