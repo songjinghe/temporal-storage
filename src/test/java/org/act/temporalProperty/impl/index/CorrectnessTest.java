@@ -58,11 +58,9 @@ public class CorrectnessTest {
     private void buildIndex(){
         List<Integer> proIds = new ArrayList<>();
         proIds.add(1);
-        List<IndexValueType> types = new ArrayList<>();
-        types.add(IndexValueType.INT);
 //        store.createValueIndex(1288803660, 1288824660, proIds, types);
 //        store.createValueIndex(1288800300, 1288802460, proIds, types);
-        store.createValueIndex(1560, 27360, proIds, types);
+        store.createValueIndex(1560, 27360, proIds);
         log.info("create index done");
     }
 
