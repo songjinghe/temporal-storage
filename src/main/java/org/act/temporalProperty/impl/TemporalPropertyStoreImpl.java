@@ -89,7 +89,7 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
             Slice result = memTable.get(searchKey.encode());
             if (result != null && result.length() > 0) {
                 return result;
-            } else if(this.stableMemTable!=null){
+            } else if (this.stableMemTable != null) {
                 result = stableMemTable.get(searchKey.encode());
                 if (result != null && result.length() > 0) {
                     return result;
@@ -258,11 +258,9 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
 
     private SeekingIterator<Slice,Slice> getMemTableIter(int start, int end){
         if(this.stableMemTable != null) {
-            return new TimeRangeFilterIterator(
-                    new BufferFileAndTableIterator(memTable.iterator(), stableMemTable.iterator(), TableComparator.instance()),
-                    start, end );
+            return new BufferFileAndTableIterator(memTable.iterator(), stableMemTable.iterator(), TableComparator.instance());
         }else{
-            return new TimeRangeFilterIterator(memTable.iterator(), start, end);
+            return memTable.iterator();
         }
     }
 
@@ -270,7 +268,7 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
         if(proIds.size()==1) {
             return new BufferFileAndTableIterator(
                     getMemTableIter(start, end),
-                    new TimeRangeFilterIterator(meta.getStore(proIds.get(0)).buildIndexIterator(start, end), start, end),
+                    meta.getStore(proIds.get(0)).buildIndexIterator(start, end),
                     TableComparator.instance());
         }else{
             throw new TGraphNotImplementedException();
@@ -280,8 +278,8 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
 
     private static Slice toSlice(int proId, long id) {
         Slice result = new Slice(12);
-        result.setInt( 0, proId );
-        result.setLong( 4, id );
+        result.setLong( 0, id );
+        result.setInt( 8, proId );
         return result;
     }
 
