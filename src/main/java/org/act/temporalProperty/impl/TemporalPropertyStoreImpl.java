@@ -81,8 +81,8 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
 
 
     @Override
-    public Slice getPointValue( long id, int proId, int time ) {
-        Slice idSlice = toSlice(proId, id);
+    public Slice getPointValue(long entityId, int proId, int time ) {
+        Slice idSlice = toSlice(proId, entityId);
         InternalKey searchKey = new InternalKey( idSlice, time );
         this.meta.lockShared();
         try {
@@ -201,6 +201,7 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
 
     @Override
     public boolean deleteEntityProperty(Slice id) {
+        //TODO
         return false;
     }
 
@@ -271,6 +272,10 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
                     meta.getStore(proIds.get(0)).buildIndexIterator(start, end),
                     TableComparator.instance());
         }else{
+//            return new BufferFileAndTableIterator(
+//                    getMemTableIter(start, end),
+//                    meta.getStore(pro)
+//            );
             throw new TGraphNotImplementedException();
         }
     }

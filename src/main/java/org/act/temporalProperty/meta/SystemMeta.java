@@ -86,4 +86,13 @@ public class SystemMeta {
             propertyStores.put(pMeta.getPropertyId(), onePropStore);
         }
     }
+
+    @Override
+    public String toString() {
+        return "SystemMeta{" +
+                "properties=" + properties +
+                ", indexes=" + indexes +
+                ", dbDir=" + dbDir +
+                '}';
+    }
 }

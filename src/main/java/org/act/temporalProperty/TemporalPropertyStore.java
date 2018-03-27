@@ -24,12 +24,12 @@ public interface TemporalPropertyStore
 	int Version = 1;
 	/**
 	 * 对某个动态属性进行时间点查询，返回查询的 结果
-	 * @param id 动态属性所属的点/边的id
+	 * @param entityId 动态属性所属的点/边的id
 	 * @param proId 动态属性id
 	 * @param time 需要查询的时间
 	 * @return @{Slice} 查询的结果
 	 */
-    Slice getPointValue( long id, int proId, int time );
+    Slice getPointValue( long entityId, int proId, int time );
     
     /**
 	 * 对某个动态属性进行时间段查询，返回查询的 结果
