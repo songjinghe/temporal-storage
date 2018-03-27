@@ -95,6 +95,10 @@ public class PropertyMetaData {
         return unStableFileBuffers;
     }
 
+    public SortedMap<Long, FileBuffer> getStableBuffers() {
+        return stableFileBuffers;
+    }
+
     public void delUnstable(Long fileNumber) {
         FileMetaData meta = unStableFiles.get(fileNumber);
         unstableByTime.remove(meta.getSmallest());
@@ -127,14 +131,12 @@ public class PropertyMetaData {
         return new ArrayList<>(stableByTime.subMap(startTime, true, endTime, true).values());
     }
 
-    // time is ASC order
+    /**
+     * Return unstable metas whose corresponding file needed to be searched when query value at given `time`
+     * the returned meta list, time is ASC order
+     */
     public List<FileMetaData> unFloorTime(int time) {
-        Integer start = unstableByTime.floorKey(time);
-        if(start==null) {
-            return null;
-        }else{
-            return new ArrayList<>(unstableByTime.headMap(start, true).values());
-        }
+        return new ArrayList<>(unstableByTime.headMap(time, true).values());
     }
 
     public FileMetaData unFloorTimeOneMeta(int time) {
@@ -206,5 +208,16 @@ public class PropertyMetaData {
         stableFileBuffers.put(number, buffer);
     }
 
-
+    @Override
+    public String toString() {
+        return "PropertyMetaData{" +
+                "propertyId=" + propertyId +
+                ", type=" + type +
+                ", stableFiles=" + stableFiles +
+                ", stableFileBuffers=" + stableFileBuffers +
+                ", unStableFiles=" + unStableFiles +
+                ", unStableFileBuffers=" + unStableFileBuffers +
+                ", memTableMinTime=" + memTableMinTime +
+                '}';
+    }
 }

@@ -21,6 +21,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
@@ -90,9 +91,11 @@ public class SinglePropertyStore
     EPAppendIterator getRangeValueIter(Slice idSlice, int startTime, int endTime)
     {
         List<FileMetaData> stList = propertyMeta.overlappedStable(startTime, endTime);
-        List<FileMetaData> unList = propertyMeta.overlappedUnstable(startTime, endTime);
-        EPAppendIterator iterator = new EPAppendIterator(idSlice);
+        List<FileMetaData> unList = propertyMeta.unFloorTime(endTime);
+        stList.sort(Comparator.comparingInt(FileMetaData::getSmallest));
+        unList.sort(Comparator.comparingInt(FileMetaData::getSmallest));
 
+        EPAppendIterator iterator = new EPAppendIterator(idSlice);
         for(FileMetaData meta : stList){
             SeekingIterator<Slice, Slice> fileIterator = this.cache.newIterator(Filename.stPath(proDir, meta.getNumber()));
             FileBuffer buffer = propertyMeta.getStableBuffers( meta.getNumber() );
@@ -115,7 +118,8 @@ public class SinglePropertyStore
     }
 
     private Slice unPointValue(InternalKey searchKey) {
-        List<FileMetaData> checkList = Lists.reverse(propertyMeta.unFloorTime(searchKey.getStartTime()));
+        List<FileMetaData> checkList = propertyMeta.unFloorTime(searchKey.getStartTime());
+        checkList.sort(Comparator.comparingInt(FileMetaData::getSmallest));
         for (FileMetaData meta : checkList) {
             SeekingIterator<Slice, Slice> iterator = this.cache.newIterator(Filename.unPath(proDir, meta.getNumber()));
             FileBuffer buffer = propertyMeta.getUnstableBuffers(meta.getNumber());
@@ -290,7 +294,9 @@ public class SinglePropertyStore
 
     AppendIterator buildIndexIterator(int startTime, int endTime) {
         List<FileMetaData> stList = propertyMeta.overlappedStable(startTime, endTime);
-        List<FileMetaData> unList = propertyMeta.overlappedUnstable(startTime, endTime);
+        List<FileMetaData> unList = propertyMeta.unFloorTime(endTime);
+        stList.sort(Comparator.comparingInt(FileMetaData::getSmallest));
+        unList.sort(Comparator.comparingInt(FileMetaData::getSmallest));
 
         AppendIterator iterator = new AppendIterator();
         for(FileMetaData meta : stList){
@@ -322,6 +328,12 @@ public class SinglePropertyStore
         for(FileMetaData f : propertyMeta.getStableFiles().values()) {
             String path = Filename.stPath(proDir, f.getNumber());
             cache.evict(path);
+        }
+        for(FileBuffer buffer : propertyMeta.getUnstableBuffers().values()){
+            buffer.close();
+        }
+        for(FileBuffer buffer : propertyMeta.getStableBuffers().values()){
+            buffer.close();
         }
         FileUtils.deleteRecursively(proDir);
     }
