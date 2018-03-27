@@ -10,6 +10,7 @@ import org.act.temporalProperty.table.FileChannelTable;
 import org.act.temporalProperty.table.Table;
 import org.act.temporalProperty.table.TableComparator;
 import org.act.temporalProperty.table.TableIterator;
+import org.apache.commons.lang3.SystemUtils;
 import org.junit.Test;
 
 import java.io.File;
@@ -27,8 +28,13 @@ import java.util.Map;
  */
 public class DBFileInfoReader
 {
-//    private String dbDir="/tmp/temporal.property.test";
-    private String dbDir="/media/song/G680/songjh/projects/TGraph/runtime/test/performance";
+    private String dbDir(){
+        if(SystemUtils.IS_OS_WINDOWS){
+            return "temporal.property.test";
+        }else{
+            return "/tmp/temporal.property.test/index";
+        }
+    }
 
     @Test
     public void metaFileInfo() throws IOException {
@@ -42,7 +48,7 @@ public class DBFileInfoReader
     }
 
     private void readIndexFile() throws IOException {
-        FileChannel channel = new FileInputStream(new File(this.dbDir, "index")).getChannel();
+        FileChannel channel = new FileInputStream(new File(this.dbDir(), "index")).getChannel();
         List<IndexValueType> types = new ArrayList<>();
         types.add(IndexValueType.INT);
         IndexFileIterator reader = new IndexFileIterator(channel, new IndexEntryOperator(types, 4096));//blocksize is not used when reading index files.
@@ -54,7 +60,7 @@ public class DBFileInfoReader
 
     private void readMetaFileContent(String fileName) throws IOException {
         System.out.println("################## "+fileName+" #################");
-        SystemMetaFile file = SystemMetaController.readFromDisk(new File(dbDir, fileName));
+        SystemMetaFile file = SystemMetaController.readFromDisk(new File(dbDir(), fileName));
         if(file!=null && file.isValid()){
             SystemMeta meta = SystemMetaController.decode(file.getMeta());
             System.out.println(meta);
@@ -66,13 +72,13 @@ public class DBFileInfoReader
     @Test
     public void dbtmpFileInfo() throws IOException {
         String fileName = "000000.dbtmp";
-        File metaFile = new File( this.dbDir + "/" + fileName );
+        File metaFile = new File( this.dbDir() + "/" + fileName );
         if(!metaFile.exists()){
             System.out.println("##### Warning: file not exist: "+ metaFile.getAbsolutePath());
             return;
         }
         System.out.println("################## "+fileName+" #################");
-        FileInputStream inputStream = new FileInputStream( new File( this.dbDir + "/" + fileName ) );
+        FileInputStream inputStream = new FileInputStream( new File( this.dbDir() + "/" + fileName ) );
         FileChannel channel = inputStream.getChannel();
         Table table = new FileChannelTable( fileName, channel, TableComparator.instance(), false );
         TableIterator iterator = table.iterator();
