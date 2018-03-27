@@ -107,14 +107,14 @@ public class SourceCompare {
 
                     int travelTime = Integer.valueOf(fields[6]);
 
-                    if((travelTime >= valueMin) && (travelTime <= valueMax)) {
+                   // if((travelTime >= valueMin) && (travelTime <= valueMax)) {
 
                         //int eTime = getEndTime(i + 1, endTime);
                         Slice value = new Slice(ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(travelTime).array());
 
                         entryList.add(new IndexEntry(entityId, sTime, endTime, new Slice[]{value}));
 
-                    }
+                   // }
 
                 }
             } catch (IOException e) {
@@ -122,10 +122,10 @@ public class SourceCompare {
             }
         }
 
-        return mergeEntryList(startTime, endTime);
+        return mergeEntryList(startTime, endTime, valueMin, valueMax);
     }
 
-    private List<IndexEntry> mergeEntryList(int startTime, int endTime) {
+    private List<IndexEntry> mergeEntryList(int startTime, int endTime, int valueMin, int valueMax) {
 
         List<IndexEntry> mergeList = new ArrayList<>();
 
@@ -148,13 +148,15 @@ public class SourceCompare {
                     int sTime = entity.getStart();
                     Slice value = entity.getValue(0);
                     int eTime = 0;
+                    int travelTime = value.getInt(0);
 
                     while(j < entityIdList.size()) {
 
                         if(j + 1 == entityIdList.size()) {
                             eTime = entity.getEnd();
 
-                            if((sTime <= endTime) && (eTime >= startTime)) {
+                            if((travelTime >= valueMin) && (travelTime <= valueMax) &&
+                                    (sTime <= endTime) && (eTime >= startTime)) {
                                 entity = new IndexEntry(entityId, sTime, eTime, new Slice[]{value});
                                 mergeList.add(entity);
                             }
@@ -165,7 +167,8 @@ public class SourceCompare {
                         } else if(!entityIdList.get(j).getValue(0).equals(entityIdList.get(j + 1).getValue(0))){
                             eTime = entityIdList.get(j + 1).getStart() - 1;
 
-                            if((sTime <= endTime) && (eTime >= startTime)) {
+                            if((travelTime >= valueMin) && (travelTime <= valueMax) &&
+                                    (sTime <= endTime) && (eTime >= startTime)) {
                                 entity = new IndexEntry(entityId, sTime, eTime, new Slice[]{value});
                                 mergeList.add(entity);
                             }

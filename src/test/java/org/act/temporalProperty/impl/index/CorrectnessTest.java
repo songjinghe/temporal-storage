@@ -1,6 +1,8 @@
 package org.act.temporalProperty.impl.index;
 
+import com.google.common.collect.Table;
 import org.act.temporalProperty.TemporalPropertyStore;
+import org.act.temporalProperty.impl.InternalKey;
 import org.act.temporalProperty.impl.RangeQueryCallBack;
 import org.act.temporalProperty.index.IndexQueryRegion;
 import org.act.temporalProperty.index.IndexValueType;
@@ -85,20 +87,19 @@ public class CorrectnessTest {
 //        log.info("range query complete");
 
         log.info("size: range({}) vs index({})", rangeResult.size(), indexResult.size());
-
+//
         sameEntities(rangeResult, indexResult);
 
-        int i;
-        for(i=0; i<rangeResult.size() && i<indexResult.size(); i++){
-            IndexEntry rangeE = rangeResult.get(i);
-            IndexEntry indexE = indexResult.get(i);
-            if(!rangeE.equals(indexE)){
-                if(!partialEqual(rangeE, indexE, startTime, endTime)) {
-                    log.debug("entry not equal. index({}) vs range({})", indexE, rangeE);
-                }
-            }
-            if(i>1000) return;
-        }
+//        for(int i=0; i<rangeResult.size() && i<indexResult.size(); i++){
+//            IndexEntry rangeE = rangeResult.get(i);
+//            IndexEntry indexE = indexResult.get(i);
+//            if(!rangeE.equals(indexE)){
+//                if(!partialEqual(rangeE, indexE, startTime, endTime)) {
+//                    log.debug("entry not equal. index({}) vs range({})", indexE, rangeE);
+//                }
+//            }
+//            if(i>1000) return;
+//        }
 
 //        log.info("begin validation");
 //        for(IndexEntry entry : indexResult){
@@ -124,6 +125,17 @@ public class CorrectnessTest {
         log.debug("eid only in range: {}", rangeEntities);
         indexEntities.removeAll(common);
         log.debug("eid only in index: {}", indexEntities);
+
+        List<Table<IndexEntry, String, String>> diffLists = sourceEntry.listDiffer(rangeEntities, rangeResult);
+
+        for(Table<IndexEntry, String, String> entity : diffLists){
+            for(IndexEntry rowId : entity.rowKeySet()){
+                for(Map.Entry<String, String> x : entity.row(rowId).entrySet()) {
+                    log.debug("{} {} {}", rowId, x.getKey(), x.getValue());
+                }
+            }
+        }
+
 
         return rangeEntities.isEmpty() && indexEntities.isEmpty();
     }
@@ -171,6 +183,7 @@ public class CorrectnessTest {
 
     private List<IndexEntry> queryByRange(int timeMin, int timeMax, int valueMin, int valueMax){
         List<IndexEntry> result = new ArrayList<>();
+        int count=0;
         for(Long entityId : importer.getRoadIdMap().values()){
             store.getRangeValue(entityId, 1, timeMin, timeMax,
                     new CustomCallBack(entityId){
@@ -199,9 +212,8 @@ public class CorrectnessTest {
                             return null;
                         }
                     });
-
+            if(++count%500==0) log.info("iterate range query result count {}", result.size());
         }
-//        log.info("iterate result count {}", result.size());
         return result;
     }
 
@@ -241,6 +253,27 @@ public class CorrectnessTest {
             return false;
         }
         return true;
+    }
+
+    @Test
+    public void manualValidate(){
+        int timeMin=0,  timeMax=9999999;
+        long entityId = 353;
+
+        store.getRangeValue(entityId, 1, timeMin, timeMax,
+                new CustomCallBack(entityId){
+                    public void onCall(int time, Slice value) {
+                        log.debug("time({}) val({})", time, value.getInt(0));
+                    }
+                    public Object onReturn() {
+                        return null;
+                    }
+                });
+        List<IndexEntry> indexResult = queryByIndex(18300, 20000, 380, 400);
+        log.debug("result size {}", indexResult.size());
+        for(IndexEntry entry : indexResult) {
+            log.debug("{}", entry);
+        }
     }
 
     private static boolean overlap(int t1min, int t1max, int t2min, int t2max){return (t1min<=t2max && t2min<=t1max);}
