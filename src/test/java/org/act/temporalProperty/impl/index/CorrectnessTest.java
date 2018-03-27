@@ -1,5 +1,6 @@
 package org.act.temporalProperty.impl.index;
 
+import com.google.common.collect.Table;
 import org.act.temporalProperty.TemporalPropertyStore;
 import org.act.temporalProperty.impl.RangeQueryCallBack;
 import org.act.temporalProperty.index.IndexQueryRegion;
@@ -126,6 +127,9 @@ public class CorrectnessTest {
         log.debug("eid only in range: {}", rangeEntities);
         indexEntities.removeAll(common);
         log.debug("eid only in index: {}", indexEntities);
+
+        List<Table<IndexEntry, String, String>> diffLists = sourceEntry.listDiffer(rangeEntities, rangeResult);
+
 
         return rangeEntities.isEmpty() && indexEntities.isEmpty();
     }

@@ -1,8 +1,11 @@
 package org.act.temporalProperty.impl.index;
 
+import com.google.common.collect.HashBasedTable;
+import com.google.common.collect.Table;
 import org.act.temporalProperty.impl.InternalKey;
 import org.act.temporalProperty.index.rtree.IndexEntry;
 import org.act.temporalProperty.util.Slice;
+import org.apache.commons.lang3.SystemUtils;
 
 import java.io.*;
 import java.nio.ByteBuffer;
@@ -27,6 +30,7 @@ public class SourceCompare {
     public static final int NOW_TIME = 0x40000000; //2^30
 
     // traffic data dir path
+    private String dataPath;
     private final File dataDir;
 
     // ---%--the files filtered by (startTime, endTime)
@@ -39,13 +43,17 @@ public class SourceCompare {
 
     private final int inputFileCount;
 
+    List<IndexEntry> entryList;
+
     public SourceCompare(String dataPath, int inputFileCount) {
+        this.dataPath = dataPath;
         this.dataDir = new File(dataPath);
         //this.dataFileList = new ArrayList<File>();
         //this.entryMap = new HashMap<Integer, ArrayList<IndexEntry>>();
         this.entityIdMap = new HashMap<String, Long>();
         this.totalFileList = new ArrayList<File>();
         this.inputFileCount = inputFileCount;
+        this.entryList = new ArrayList<IndexEntry>();
     }
 
     public List<IndexEntry> queryBySource(int timeMin, int timeMax, int valueMin, int valueMax) {
@@ -79,10 +87,9 @@ public class SourceCompare {
         return 0;
     }
 
-    private List<IndexEntry> filterEntry(int starTime, int endTime, int valueMin, int valueMax){
+    private List<IndexEntry> filterEntry(int startTime, int endTime, int valueMin, int valueMax){
 
         int fileCount = Math.min(totalFileList.size(), inputFileCount);
-        List<IndexEntry> entryList = new ArrayList<IndexEntry>();
 
         for (int i = 0; i < fileCount; i++) {
             File file = totalFileList.get(i);
@@ -115,12 +122,10 @@ public class SourceCompare {
             }
         }
 
-        entryList = mergeEntryList(entryList, starTime, endTime);
-
-        return entryList;
+        return mergeEntryList(startTime, endTime);
     }
 
-    private List<IndexEntry> mergeEntryList(List<IndexEntry> entryList, int startTime, int endTime) {
+    private List<IndexEntry> mergeEntryList(int startTime, int endTime) {
 
         List<IndexEntry> mergeList = new ArrayList<>();
 
@@ -180,10 +185,105 @@ public class SourceCompare {
         entityIdList.clear();
         entityIdList = null;
 
-        entryList.clear();
-        entryList = null;
+       // entryList.clear();
+       // entryList = null;
 
         return mergeList;
+    }
+
+    public List<Table<IndexEntry, String, String>> listDiffer(Set<Long> entities, List<IndexEntry> rangequeries){
+
+        List<List<IndexEntry>> entityLists = new ArrayList<>();
+        List<Table<IndexEntry, String, String>> diffLists = new ArrayList<>();
+        List<String> src = new ArrayList<>();
+
+        for(Long entityId : entities) {
+            entityLists.add(queryByEntity(entityId));
+           // sourceLists.add(queryFromSource(entityId, rangequeries));
+            Table<IndexEntry, String, String> table = queryFromSource(entityId, rangequeries);
+
+            if(table != null)
+                diffLists.add(table);
+        }
+
+        return diffLists;
+    }
+
+    private List<IndexEntry> queryByEntity(Long entityId) {
+        List<IndexEntry> entityList = new ArrayList<IndexEntry>();
+
+        for(IndexEntry entry: entryList) {
+            if(entry.getEntityId().equals(entityId)) {
+                entityList.add(entry);
+            }
+        }
+
+        return entityList;
+    }
+
+
+    private Table<IndexEntry, String, String> queryFromSource(Long entityId, List<IndexEntry> sourceEntities) {
+        String fileName = null;
+        String sourceString = null;
+        Table<IndexEntry, String, String> table = HashBasedTable.create();
+
+        for(IndexEntry entry: sourceEntities) {
+            if(entry.getEntityId().equals(entityId)) {
+
+                fileName = getFileName(entry.getStart());
+                sourceString = queryByFileName(fileName, entry);
+
+                table.put(entry, fileName, sourceString);
+            }
+        }
+
+        return table;
+    }
+
+    private String queryByFileName(String fileName, IndexEntry entry) {
+        String sourceString = null;
+        if(SystemUtils.IS_OS_WINDOWS){
+            fileName = dataPath + "\\" + fileName;
+        }else{
+            fileName = dataPath + "/" + fileName;
+        }
+
+        File file = new File(fileName);
+
+        Long entityId = entry.getEntityId();
+        int travelTime = entry.getValue(0).getInt(0);
+        int sTime = entry.getStart();
+
+        int f_sTime = timeStr2int(file.getName().substring(9, 21)) - 1288800000;
+
+        Long tmp = 0L;
+
+        try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+
+            String line = br.readLine();
+            while((line = br.readLine()) != null) {
+                String[] fields = line.split(",");
+
+                Long f_entityId = getEntityId(fields[1], fields[2]);
+                int f_travelTime = Integer.valueOf(fields[6]);
+
+
+                if((f_entityId.equals(entityId)) && (f_travelTime == travelTime)) {
+                    sourceString = line;
+                    return sourceString;
+                }
+
+                if(f_entityId > 300){
+                    tmp = f_entityId;
+                }
+
+            }
+
+        } catch (IOException e) {
+            System.out.println("SourceCompare -- queryByFileName");
+        }
+
+        return sourceString;
     }
 
     private int getEndTime(int fileNum, int endTime){
@@ -207,6 +307,7 @@ public class SourceCompare {
             return value;
         }
     }
+
 
     /*
     the same function as TrafficDataImporter.java->timeStr2int()
@@ -233,6 +334,42 @@ public class SourceCompare {
         }else {
             throw new RuntimeException("timestamp larger than Integer.MAX_VALUE, this should not happen");
         }
+    }
+
+    private String getFileName(long startTime){
+        String fileName = "TJamData_";
+        long timestamp = (startTime + 1288800000) * 1000;
+        Calendar ca = Calendar.getInstance();
+        ca.setTimeInMillis(timestamp);
+
+        int year = ca.get(Calendar.YEAR);
+        int month = ca.get(Calendar.MONTH) + 1;
+        int day = ca.get(Calendar.DAY_OF_MONTH);
+        int hour = ca.get(Calendar.HOUR_OF_DAY);
+        int minute = ca.get(Calendar.MINUTE);
+
+        String yearStr = Integer.toString(year);
+        String monthStr = Integer.toString(month);
+        if(monthStr.length() == 1)
+            monthStr = "0" + monthStr;
+        String dayStr = Integer.toString(day);
+        if(dayStr.length() == 1)
+            dayStr = "0" + dayStr;
+        String hourStr = Integer.toString(hour);
+        if(hourStr.length() == 1)
+            hourStr = "0" + hourStr;
+        String minuteStr = Integer.toString(minute);
+        if(minuteStr.length() == 1)
+            minuteStr = "0" + minuteStr;
+
+        fileName += yearStr;
+        fileName += monthStr;
+        fileName += dayStr;
+        fileName += hourStr;
+        fileName += minuteStr;
+
+        fileName += ".csv";
+        return fileName;
     }
 
 }
