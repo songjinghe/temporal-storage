@@ -4,9 +4,6 @@ import java.util.Map.Entry;
 import java.util.Comparator;
 
 import com.google.common.collect.AbstractIterator;
-import org.act.temporalProperty.helper.DebugAssertTimeIncIterator;
-import org.act.temporalProperty.helper.EqualValFilterIterator;
-import org.act.temporalProperty.helper.InvalidEntityFilterIterator;
 import org.act.temporalProperty.impl.InternalKey;
 import org.act.temporalProperty.impl.ValueType;
 import org.act.temporalProperty.impl.SeekingIterator;
@@ -21,7 +18,7 @@ public class TwoLevelMergeIterator extends AbstractIterator<Entry<Slice,Slice>> 
 {
     private SeekingIterator<Slice,Slice> latest;
     private SeekingIterator<Slice,Slice> old;
-    private Comparator<Slice> comparator;
+    private Comparator<Slice> cp;
 
     public TwoLevelMergeIterator(SeekingIterator<Slice,Slice> latest, SeekingIterator<Slice,Slice> old, Comparator<Slice> comparator )
     {
@@ -29,7 +26,7 @@ public class TwoLevelMergeIterator extends AbstractIterator<Entry<Slice,Slice>> 
 //        this.old = new DebugAssertTimeIncIterator(old);
         this.latest = latest;
         this.old = old;
-        this.comparator = comparator;
+        this.cp = comparator;
     }
 
     @Override
@@ -38,7 +35,7 @@ public class TwoLevelMergeIterator extends AbstractIterator<Entry<Slice,Slice>> 
             Entry<Slice,Slice> mem = latest.peek();
             Entry<Slice,Slice> disk = old.peek();
 
-            if (comparator.compare(disk.getKey(), mem.getKey()) < 0){
+            if (cp.compare(disk.getKey(), mem.getKey()) < 0){
                 return old.next();
             } else {
                 InternalKey memKey = new InternalKey(mem.getKey());
@@ -46,7 +43,7 @@ public class TwoLevelMergeIterator extends AbstractIterator<Entry<Slice,Slice>> 
                     latest.next();
                 } else {
                     Entry<Slice, Slice> tmp = latest.next();
-                    delOld();
+                    delOld(tmp.getKey());
                     return tmp;
                 }
             }
@@ -60,12 +57,27 @@ public class TwoLevelMergeIterator extends AbstractIterator<Entry<Slice,Slice>> 
         }
     }
 
-    private void delOld() {
+    private void delOld(Slice key) {
+        InternalKey k = new InternalKey(key);
         if(latest.hasNext()){
             Slice until = latest.peek().getKey();
             while(old.hasNext()){
-                if(comparator.compare(old.peek().getKey(), until)<0){
+                Slice o = old.peek().getKey();
+                InternalKey oldKey = new InternalKey(o);
+                if(oldKey.getId().equals(k.getId()) && cp.compare(o, until)<0){
                     old.next();
+                }else{
+                    return;
+                }
+            }
+        }else{
+            while(old.hasNext()) {
+                Slice o = old.peek().getKey();
+                InternalKey oldKey = new InternalKey(o);
+                if(oldKey.getId().equals(k.getId())) {
+                    old.next();
+                }else{
+                    return;
                 }
             }
         }
@@ -90,6 +102,7 @@ public class TwoLevelMergeIterator extends AbstractIterator<Entry<Slice,Slice>> 
     }
 
     public static SeekingIterator<Slice,Slice> toDisk(SeekingIterator<Slice,Slice> latest, SeekingIterator<Slice,Slice> old){
-        return new InvalidEntityFilterIterator(new EqualValFilterIterator(new TwoLevelMergeIterator(latest, old, TableComparator.instance())));
+        return merge(latest, old);
+//        return new InvalidEntityFilterIterator(new TwoLevelMergeIterator(latest, old, TableComparator.instance()));
     }
 }

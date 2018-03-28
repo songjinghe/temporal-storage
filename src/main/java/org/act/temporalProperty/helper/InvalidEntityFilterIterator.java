@@ -1,19 +1,17 @@
 package org.act.temporalProperty.helper;
 
-import com.google.common.collect.AbstractIterator;
 import org.act.temporalProperty.impl.InternalKey;
 import org.act.temporalProperty.impl.SeekingIterator;
 import org.act.temporalProperty.impl.ValueType;
 import org.act.temporalProperty.util.Slice;
 
-import java.util.Map;
 import java.util.Map.Entry;
 
 /**
  * If an entity only contains one entry and the entry is INVALID, then remove such entries.
  * Created by song on 2018-03-28.
  */
-public class InvalidEntityFilterIterator extends PairViewFilterIterator<Entry<Slice,Slice>> implements SeekingIterator<Slice,Slice>{
+public class InvalidEntityFilterIterator extends PairViewFilterByNextIterator<Entry<Slice,Slice>> implements SeekingIterator<Slice,Slice>{
     private boolean lastTwoIDEqual=false;// true if entry[cur-1].id == entry[cur].id
 
     public InvalidEntityFilterIterator(SeekingIterator<Slice,Slice> in) {

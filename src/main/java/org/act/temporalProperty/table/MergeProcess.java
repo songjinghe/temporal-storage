@@ -13,6 +13,7 @@ import org.act.temporalProperty.helper.SameLevelMergeIterator;
 import org.act.temporalProperty.impl.*;
 import org.act.temporalProperty.meta.PropertyMetaData;
 import org.act.temporalProperty.meta.SystemMeta;
+import org.act.temporalProperty.util.MergingIterator;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.TableLatestValueIterator;
 import org.slf4j.Logger;
@@ -187,9 +188,8 @@ public class MergeProcess extends Thread
             if(onlyDumpMemTable()) {
                 return this.mem.iterator();
             }else{
-                SameLevelMergeIterator unstableIter = new SameLevelMergeIterator();
-//                mergeParticipants.sort(Long::compareTo); // sort to 0 1 2 3 4
-//                Lists.reverse(mergeParticipants); // reverse to 4 3 2 1 0
+
+                List<SeekingIterator<Slice,Slice>> list = new ArrayList<>();
 
                 for (Long fileNumber : mergeParticipants) {
 //                    log.debug("merge {}", fileNumber);
@@ -204,12 +204,13 @@ public class MergeProcess extends Thread
                     } else {
                         mergeIterator = table.iterator();
                     }
-                    unstableIter.add(mergeIterator);
+                    list.add(mergeIterator);
 
                     table2evict.add(mergeSource.getAbsolutePath());
                     files2delete.add(mergeSource);
                     channel2close.add(table);
                 }
+                MergingIterator unstableIter = new MergingIterator(list, TableComparator.instance());
                 SeekingIterator<Slice, Slice> diskDataIter;
                 if (createStableFile() && pMeta.hasStable()) {
                     int mergeResultStartTime = pMeta.getUnStableFiles().get(Collections.max(mergeParticipants)).getSmallest();

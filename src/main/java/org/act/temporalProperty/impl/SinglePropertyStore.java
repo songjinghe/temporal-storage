@@ -2,6 +2,7 @@ package org.act.temporalProperty.impl;
 
 import org.act.temporalProperty.TemporalPropertyStore;
 import org.act.temporalProperty.helper.EPAppendIterator;
+import org.act.temporalProperty.helper.SameLevelMergeIterator;
 import org.act.temporalProperty.index.AppendIterator;
 import org.act.temporalProperty.meta.PropertyMetaData;
 import org.act.temporalProperty.table.TwoLevelMergeIterator;
@@ -290,29 +291,29 @@ public class SinglePropertyStore
         return tempFile;
     }
 
-    AppendIterator buildIndexIterator(int startTime, int endTime) {
+    SameLevelMergeIterator buildIndexIterator(int startTime, int endTime) {
         List<FileMetaData> stList = propertyMeta.overlappedStable(startTime, endTime);
         List<FileMetaData> unList = propertyMeta.unFloorTime(endTime);
         stList.sort(Comparator.comparingInt(FileMetaData::getSmallest));
         unList.sort(Comparator.comparingInt(FileMetaData::getSmallest));
 
-        AppendIterator iterator = new AppendIterator();
+        SameLevelMergeIterator iterator = new SameLevelMergeIterator();
         for(FileMetaData meta : stList){
             SeekingIterator<Slice, Slice> fileIterator = this.cache.newIterator(Filename.stPath(proDir, meta.getNumber()));
             FileBuffer buffer = propertyMeta.getStableBuffers( meta.getNumber() );
             if( null != buffer ){
-                iterator.append(new TwoLevelMergeIterator(buffer.iterator(), iterator, TableComparator.instance()));
+                iterator.add(TwoLevelMergeIterator.merge(buffer.iterator(), iterator));
             }else {
-                iterator.append(fileIterator);
+                iterator.add(fileIterator);
             }
         }
         for( FileMetaData meta : unList ){
             SeekingIterator<Slice, Slice> fileIterator = this.cache.newIterator(Filename.unPath(proDir, meta.getNumber()));
             FileBuffer buffer = propertyMeta.getUnstableBuffers( meta.getNumber() );
             if( null != buffer ){
-                iterator.append(new TwoLevelMergeIterator(buffer.iterator(), iterator, TableComparator.instance()));
+                iterator.add(TwoLevelMergeIterator.merge(buffer.iterator(), iterator));
             }else {
-                iterator.append(fileIterator);
+                iterator.add(fileIterator);
             }
         }
         return iterator;

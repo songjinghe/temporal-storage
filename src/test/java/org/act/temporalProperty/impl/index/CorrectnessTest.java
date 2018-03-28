@@ -50,7 +50,7 @@ public class CorrectnessTest {
     @Before
     public void initDB() throws Throwable {
         stBuilder = new StoreBuilder(dbDir(), true);
-        importer = new TrafficDataImporter(stBuilder.store(), dataPath(), 10);
+        importer = new TrafficDataImporter(stBuilder.store(), dataPath(), 1000);
         sourceEntry = new SourceCompare(dataPath(), 10); //fileCount = 10; no entry in timeRange, but query results can be found in Index and Range? --- endTime (<=endTime --> < endTime?)
         log.info("time: {} - {}", importer.getMinTime(), importer.getMaxTime());
         store = stBuilder.store();

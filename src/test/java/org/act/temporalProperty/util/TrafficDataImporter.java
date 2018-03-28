@@ -63,7 +63,7 @@ public class TrafficDataImporter {
                     input(time, line);
                 }
             }
-//            log.info("input files done {} {}", file.getName(), time);
+            if(i%10==0) log.info("input {} files, current {}, time {}", i, file.getName(), time);
         }
         log.info("input files done, {} roads", this.roadIdMap.size());
     }
