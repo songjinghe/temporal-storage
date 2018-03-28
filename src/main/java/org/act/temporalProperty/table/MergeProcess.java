@@ -9,9 +9,8 @@ import java.nio.file.Files;
 import java.util.*;
 import java.util.Map.Entry;
 
-import com.google.common.collect.Lists;
+import org.act.temporalProperty.helper.SameLevelMergeIterator;
 import org.act.temporalProperty.impl.*;
-import org.act.temporalProperty.index.AppendIterator;
 import org.act.temporalProperty.meta.PropertyMetaData;
 import org.act.temporalProperty.meta.SystemMeta;
 import org.act.temporalProperty.util.Slice;
@@ -188,7 +187,7 @@ public class MergeProcess extends Thread
             if(onlyDumpMemTable()) {
                 return this.mem.iterator();
             }else{
-                AppendIterator unstableIter = new AppendIterator();
+                SameLevelMergeIterator unstableIter = new SameLevelMergeIterator();
 //                mergeParticipants.sort(Long::compareTo); // sort to 0 1 2 3 4
 //                Lists.reverse(mergeParticipants); // reverse to 4 3 2 1 0
 
@@ -205,7 +204,7 @@ public class MergeProcess extends Thread
                     } else {
                         mergeIterator = table.iterator();
                     }
-                    unstableIter.append(mergeIterator);
+                    unstableIter.add(mergeIterator);
 
                     table2evict.add(mergeSource.getAbsolutePath());
                     files2delete.add(mergeSource);
@@ -213,13 +212,12 @@ public class MergeProcess extends Thread
                 }
                 SeekingIterator<Slice, Slice> diskDataIter;
                 if (createStableFile() && pMeta.hasStable()) {
-                    log.debug("mergeParticipants.max(): {}",Collections.max(mergeParticipants));
                     int mergeResultStartTime = pMeta.getUnStableFiles().get(Collections.max(mergeParticipants)).getSmallest();
                     diskDataIter = TwoLevelMergeIterator.merge(unstableIter, stableLatestValIter(mergeResultStartTime));
                 } else {
                     diskDataIter = unstableIter;
                 }
-                return TwoLevelMergeIterator.noDelOrEqVal(this.mem.iterator(), diskDataIter);
+                return TwoLevelMergeIterator.toDisk(this.mem.iterator(), diskDataIter);
             }
         }
 

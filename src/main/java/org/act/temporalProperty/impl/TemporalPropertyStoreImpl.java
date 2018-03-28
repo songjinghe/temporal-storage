@@ -267,7 +267,7 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
 
     public SeekingIterator<Slice, Slice> buildIndexIterator(int start, int end, List<Integer> proIds) {
         if(proIds.size()==1) {
-            return TwoLevelMergeIterator.noDelOrEqVal(
+            return TwoLevelMergeIterator.toDisk(
                     getMemTableIter(start, end),
                     meta.getStore(proIds.get(0)).buildIndexIterator(start, end));
         }else{

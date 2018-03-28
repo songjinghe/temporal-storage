@@ -143,7 +143,7 @@ public class TableBuilder
         if (entryCount > 0) {
 //            assert (userComparator.compare(key, lastKey) > 0) : "key must be greater than last key";
             if(userComparator.compare(key, lastKey) <= 0){
-                throw new RuntimeException("key must be greater than last key, "+new InternalKey(lastKey)+" "+new InternalKey(key));
+                throw new AssertionError("key must be greater than last key, "+new InternalKey(lastKey)+" "+new InternalKey(key));
             }
         }
 

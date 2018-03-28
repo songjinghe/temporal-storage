@@ -2,12 +2,11 @@ package org.act.temporalProperty.table;
 
 import java.util.Map.Entry;
 import java.util.Comparator;
-import java.util.NoSuchElementException;
 
 import com.google.common.collect.AbstractIterator;
 import org.act.temporalProperty.helper.DebugAssertTimeIncIterator;
-import org.act.temporalProperty.helper.DeletedEntryFilterIterator;
 import org.act.temporalProperty.helper.EqualValFilterIterator;
+import org.act.temporalProperty.helper.InvalidEntityFilterIterator;
 import org.act.temporalProperty.impl.InternalKey;
 import org.act.temporalProperty.impl.ValueType;
 import org.act.temporalProperty.impl.SeekingIterator;
@@ -26,8 +25,10 @@ public class TwoLevelMergeIterator extends AbstractIterator<Entry<Slice,Slice>> 
 
     public TwoLevelMergeIterator(SeekingIterator<Slice,Slice> latest, SeekingIterator<Slice,Slice> old, Comparator<Slice> comparator )
     {
-        this.latest = new DebugAssertTimeIncIterator(latest);
-        this.old = new DebugAssertTimeIncIterator(old);
+//        this.latest = new DebugAssertTimeIncIterator(latest);
+//        this.old = new DebugAssertTimeIncIterator(old);
+        this.latest = latest;
+        this.old = old;
         this.comparator = comparator;
     }
 
@@ -88,11 +89,7 @@ public class TwoLevelMergeIterator extends AbstractIterator<Entry<Slice,Slice>> 
         return new TwoLevelMergeIterator(latest, old, TableComparator.instance());
     }
 
-    public static SeekingIterator<Slice,Slice> noDelOrEqVal(SeekingIterator<Slice,Slice> latest, SeekingIterator<Slice,Slice> old){
-        return new EqualValFilterIterator(new DeletedEntryFilterIterator(new TwoLevelMergeIterator(latest, old, TableComparator.instance())));
-    }
-
-    public static SeekingIterator<Slice,Slice> noDel(SeekingIterator<Slice,Slice> latest, SeekingIterator<Slice,Slice> old){
-        return new DeletedEntryFilterIterator(new TwoLevelMergeIterator(latest, old, TableComparator.instance()));
+    public static SeekingIterator<Slice,Slice> toDisk(SeekingIterator<Slice,Slice> latest, SeekingIterator<Slice,Slice> old){
+        return new InvalidEntityFilterIterator(new EqualValFilterIterator(new TwoLevelMergeIterator(latest, old, TableComparator.instance())));
     }
 }

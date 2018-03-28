@@ -33,7 +33,7 @@ public class DebugAssertTimeIncIterator extends AbstractIterator<Entry<Slice,Sli
             }else{
                 Slice curT = in.peek().getKey();
                 if(cp.compare(curT, preKey)<0){
-                    throw new TPSNHException("time dec! "+ new InternalKey(preKey) +" "+ new InternalKey(curT));
+                    throw new TPSNHException("key dec! "+ new InternalKey(preKey) +" "+ new InternalKey(curT));
                 }else{
                     preKey = curT;
                     return in.next();

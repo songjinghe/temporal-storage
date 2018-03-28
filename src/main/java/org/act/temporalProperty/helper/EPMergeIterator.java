@@ -42,16 +42,6 @@ public class EPMergeIterator extends AbstractSeekingIterator<Slice, Slice> {
 
     @Override
     protected Entry<Slice, Slice> getNextElement() {
-        // remove head DELETION values in latest
-        while (latest.hasNext()){
-            InternalKey tmpKey = new InternalKey(latest.peek().getKey());
-            if (tmpKey.getValueType()== ValueType.DELETION){
-                latest.next(); // continue next loop;
-            } else{
-                break;
-            }
-        }
-
         if (latest.hasNext() && old.hasNext()){
             Entry<Slice,Slice> mem = latest.peek();
             Entry<Slice,Slice> disk = old.peek();
