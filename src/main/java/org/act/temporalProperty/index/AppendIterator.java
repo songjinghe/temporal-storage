@@ -1,5 +1,6 @@
 package org.act.temporalProperty.index;
 
+import org.act.temporalProperty.impl.InternalKey;
 import org.act.temporalProperty.impl.SeekingIterator;
 import org.act.temporalProperty.util.AbstractSeekingIterator;
 import org.act.temporalProperty.util.Slice;
@@ -7,6 +8,7 @@ import org.act.temporalProperty.util.Slice;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * Created by song on 2018-01-24.
@@ -19,7 +21,15 @@ public class AppendIterator extends AbstractSeekingIterator<Slice,Slice>{
     private int cur = 0;
 
     public void append(SeekingIterator<Slice, Slice> iterator) {
-        iterators.add(iterator);
+        if(iterator.hasNext()){
+            iterators.add(iterator);
+            iterators.sort((o1, o2) -> {
+                InternalKey key1 = new InternalKey(o1.peek().getKey());
+                InternalKey key2 = new InternalKey(o2.peek().getKey());
+                return key1.getStartTime()-key2.getStartTime();
+            });
+        }
+
     }
 
     @Override

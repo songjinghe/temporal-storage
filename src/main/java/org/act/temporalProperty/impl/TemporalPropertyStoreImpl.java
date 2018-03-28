@@ -13,7 +13,7 @@ import org.act.temporalProperty.meta.PropertyMetaData;
 import org.act.temporalProperty.meta.SystemMeta;
 import org.act.temporalProperty.meta.SystemMetaController;
 import org.act.temporalProperty.meta.ValueContentType;
-import org.act.temporalProperty.table.BufferFileAndTableIterator;
+import org.act.temporalProperty.table.TwoLevelMergeIterator;
 import org.act.temporalProperty.table.MergeProcess;
 import org.act.temporalProperty.table.TableBuilder;
 import org.act.temporalProperty.table.TableComparator;
@@ -259,7 +259,7 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
 
     private SeekingIterator<Slice,Slice> getMemTableIter(int start, int end){
         if(this.stableMemTable != null) {
-            return new BufferFileAndTableIterator(memTable.iterator(), stableMemTable.iterator(), TableComparator.instance());
+            return TwoLevelMergeIterator.merge(memTable.iterator(), stableMemTable.iterator());
         }else{
             return memTable.iterator();
         }
@@ -267,10 +267,9 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
 
     public SeekingIterator<Slice, Slice> buildIndexIterator(int start, int end, List<Integer> proIds) {
         if(proIds.size()==1) {
-            return new BufferFileAndTableIterator(
+            return TwoLevelMergeIterator.noDelOrEqVal(
                     getMemTableIter(start, end),
-                    meta.getStore(proIds.get(0)).buildIndexIterator(start, end),
-                    TableComparator.instance());
+                    meta.getStore(proIds.get(0)).buildIndexIterator(start, end));
         }else{
 //            return new BufferFileAndTableIterator(
 //                    getMemTableIter(start, end),

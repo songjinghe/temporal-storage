@@ -77,8 +77,33 @@ public class IndexStore {
             indexMeta = createSingleValIndex(start, end, proIds.get(0), types.get(0));
             addSingleValIndex(indexMeta);
         } else {
-            throw new TGraphNotImplementedException();
+            indexMeta = createMultiValIndex(start, end, proIds, types);
         }
+    }
+
+    private IndexMetaData createMultiValIndex(int start, int end, List<Integer> proIds, List<IndexValueType> types) throws IOException {
+        IndexEntryOperator op = new IndexEntryOperator(Lists.newArrayList(types),4096);
+        SeekingIterator<Slice,Slice> iterator = tpStore.buildIndexIterator(start, end, proIds);
+        IndexBuilderCallback indexBuilderCallback = new IndexBuilderCallback(proIds, op);
+        while(iterator.hasNext()){
+            Map.Entry<Slice, Slice> entry = iterator.next();
+            InternalKey key = new InternalKey(entry.getKey());
+            if(key.getValueType()== ValueType.INVALID) {
+                indexBuilderCallback.onCall(key.getPropertyId(), key.getEntityId(), key.getStartTime(), null);
+            }else{
+                indexBuilderCallback.onCall(key.getPropertyId(), key.getEntityId(), key.getStartTime(), entry.getValue());
+            }
+        }
+        PeekingIterator<IndexEntry> data = indexBuilderCallback.getIterator(end);
+
+        FileChannel channel = new FileOutputStream(new File(this.indexDir, "index")).getChannel();
+        IndexTableWriter writer = new IndexTableWriter(channel, op);
+        while(data.hasNext()){
+            writer.add(data.next());
+        }
+        writer.finish();
+        channel.close();
+        return new IndexMetaData(nextId.getAndIncrement(), MULTI_VALUE, proIds, start, end);
     }
 
     private void addSingleValIndex(IndexMetaData indexMeta) {
@@ -135,8 +160,7 @@ public class IndexStore {
 
     //Fixme, naive version.
     private Iterator<IndexEntry> getQueryIterator(IndexQueryRegion condition) throws IOException {
-        FileChannel channel = new RandomAccessFile(new File(this.indexDir, "index"), "r").getChannel();
-        return new IndexTable(channel).iterator(condition);
+        return cache.getTable(new File(this.indexDir, "index").getAbsolutePath()).iterator(condition);
     }
 
     public void deleteProperty(int propertyId) {

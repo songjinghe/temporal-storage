@@ -1,28 +1,27 @@
 package org.act.temporalProperty.table;
 
-import java.util.Map.Entry;
-import java.util.Comparator;
-import java.util.NoSuchElementException;
-
 import org.act.temporalProperty.impl.InternalKey;
-import org.act.temporalProperty.impl.ValueType;
-import org.act.temporalProperty.impl.MemTable.MemTableIterator;
 import org.act.temporalProperty.impl.SeekingIterator;
+import org.act.temporalProperty.impl.ValueType;
 import org.act.temporalProperty.util.Slice;
+
+import java.util.Comparator;
+import java.util.Map.Entry;
+import java.util.NoSuchElementException;
 
 /**
  * 将某个文件及其Buffer中的内容合并，并组成同意的Iterator。在查询，文件合并的过程中起到作用：包括排除有delete标记的record、从文件中和Buffer中返回正确的值
  *
  */
-public class BufferFileAndTableIterator implements SeekingIterator<Slice,Slice>
+public class OldBufferFileAndTableIterator implements SeekingIterator<Slice,Slice>
 {
 
     private SeekingIterator<Slice,Slice> memIterator;
     private SeekingIterator<Slice,Slice> tableIterator;
     private Entry<Slice,Slice> next;
     private Comparator<Slice> comparator;
-    
-    public BufferFileAndTableIterator( SeekingIterator<Slice,Slice> latest, SeekingIterator<Slice,Slice> old, Comparator<Slice> comparator )
+
+    public OldBufferFileAndTableIterator(SeekingIterator<Slice,Slice> latest, SeekingIterator<Slice,Slice> old, Comparator<Slice> comparator )
     {
         this.memIterator = latest;
         this.tableIterator = old;

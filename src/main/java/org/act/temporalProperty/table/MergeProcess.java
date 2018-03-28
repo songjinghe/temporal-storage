@@ -8,13 +8,12 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.util.*;
 import java.util.Map.Entry;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
 
+import com.google.common.collect.Lists;
 import org.act.temporalProperty.impl.*;
+import org.act.temporalProperty.index.AppendIterator;
 import org.act.temporalProperty.meta.PropertyMetaData;
 import org.act.temporalProperty.meta.SystemMeta;
-import org.act.temporalProperty.util.MergingIterator;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.TableLatestValueIterator;
 import org.slf4j.Logger;
@@ -29,7 +28,7 @@ public class MergeProcess extends Thread
     private final SystemMeta systemMeta;
     private final String storeDir;
     private volatile MemTable memTable = null;
-    private Logger log = LoggerFactory.getLogger( MergeProcess.class );
+    private static Logger log = LoggerFactory.getLogger( MergeProcess.class );
 
     public MergeProcess(String storePath, SystemMeta systemMeta ) {
         this.storeDir = storePath;
@@ -56,10 +55,15 @@ public class MergeProcess extends Thread
                     Thread.sleep(100);
                 }
             }
-        }catch (Throwable e ){
+        } catch (InterruptedException e) {
             e.printStackTrace();
-            log.error( "error happens when dump memtable to disc", e );
+        } catch (IOException e) {
+            e.printStackTrace();
         }
+//        catch (Throwable e ){
+//            e.printStackTrace();
+//            log.error( "error happens when dump memtable to disc", e );
+//        }
     }
 
     /**
@@ -120,7 +124,6 @@ public class MergeProcess extends Thread
         private int entryCount;
         private int minTime;
         private int maxTime;
-        private StableLevel stLevel;
         private FileChannel targetChannel;
 
         /**
@@ -134,11 +137,6 @@ public class MergeProcess extends Thread
             this.pMeta = proMeta;
             this.cache = cache;
             this.mergeParticipants = getFile2Merge(proMeta.getUnStableFiles());
-
-            this.mergeIterators.add(this.mem.iterator());
-            if(createStableFile() && pMeta.hasStable()){
-                this.mergeIterators.add(stableLatestValIter());
-            }
         }
 
         private TableBuilder mergeInit(String targetFileName) throws IOException
@@ -186,33 +184,51 @@ public class MergeProcess extends Thread
             return toMerge;
         }
 
-        private MergingIterator getDataIterator(){
-            for( Long fileNumber : mergeParticipants ){
-                File mergeSource = new File( propStoreDir, Filename.unStableFileName( fileNumber ) );
-                Table table = cache.newTable( mergeSource.getAbsolutePath() );
-                SeekingIterator<Slice,Slice> mergeIterator;
-                FileBuffer filebuffer = pMeta.getUnstableBuffers( fileNumber );
-                if( null != filebuffer ){
-                    mergeIterator = new BufferFileAndTableIterator(
-                            filebuffer.iterator(),
-                            table.iterator(),
-                            TableComparator.instance() );
-                    channel2close.add( filebuffer );
-                    files2delete.add( new File( propStoreDir, Filename.bufferFileName( fileNumber ) ) );
-                }else{
-                    mergeIterator = table.iterator();
-                }
-                mergeIterators.add( mergeIterator );
+        private SeekingIterator<Slice,Slice> getDataIterator(){
+            if(onlyDumpMemTable()) {
+                return this.mem.iterator();
+            }else{
+                AppendIterator unstableIter = new AppendIterator();
+//                mergeParticipants.sort(Long::compareTo); // sort to 0 1 2 3 4
+//                Lists.reverse(mergeParticipants); // reverse to 4 3 2 1 0
 
-                table2evict.add( mergeSource.getAbsolutePath() );
-                files2delete.add( mergeSource );
-                channel2close.add( table );
+                for (Long fileNumber : mergeParticipants) {
+//                    log.debug("merge {}", fileNumber);
+                    File mergeSource = new File(propStoreDir, Filename.unStableFileName(fileNumber));
+                    Table table = cache.newTable(mergeSource.getAbsolutePath());
+                    SeekingIterator<Slice, Slice> mergeIterator;
+                    FileBuffer filebuffer = pMeta.getUnstableBuffers(fileNumber);
+                    if (null != filebuffer) {
+                        mergeIterator = TwoLevelMergeIterator.merge(filebuffer.iterator(), table.iterator());
+                        channel2close.add(filebuffer);
+                        files2delete.add(new File(propStoreDir, Filename.bufferFileName(fileNumber)));
+                    } else {
+                        mergeIterator = table.iterator();
+                    }
+                    unstableIter.append(mergeIterator);
+
+                    table2evict.add(mergeSource.getAbsolutePath());
+                    files2delete.add(mergeSource);
+                    channel2close.add(table);
+                }
+                SeekingIterator<Slice, Slice> diskDataIter;
+                if (createStableFile() && pMeta.hasStable()) {
+                    log.debug("mergeParticipants.max(): {}",Collections.max(mergeParticipants));
+                    int mergeResultStartTime = pMeta.getUnStableFiles().get(Collections.max(mergeParticipants)).getSmallest();
+                    diskDataIter = TwoLevelMergeIterator.merge(unstableIter, stableLatestValIter(mergeResultStartTime));
+                } else {
+                    diskDataIter = unstableIter;
+                }
+                return TwoLevelMergeIterator.noDelOrEqVal(this.mem.iterator(), diskDataIter);
             }
-            return new MergingIterator( mergeIterators, TableComparator.instance() );
         }
 
         public boolean createStableFile(){
             return mergeParticipants.size()>=5;
+        }
+
+        public boolean onlyDumpMemTable(){
+            return mergeParticipants.isEmpty();
         }
 
         public void buildNewFile() throws IOException {
@@ -228,7 +244,7 @@ public class MergeProcess extends Thread
             }
 
             TableBuilder builder = this.mergeInit(targetFileName);
-            MergingIterator buildIterator = getDataIterator();
+            SeekingIterator<Slice,Slice> buildIterator = getDataIterator();
             while( buildIterator.hasNext() ){
                 Entry<Slice,Slice> entry = buildIterator.next();
                 InternalKey key = new InternalKey( entry.getKey() );
@@ -269,16 +285,18 @@ public class MergeProcess extends Thread
         }
 
         // this should only be called when pMeta.hasStable() is true.
-        private TableLatestValueIterator stableLatestValIter() {
+        private SeekingIterator<Slice, Slice> stableLatestValIter(int mergeResultStartTime) {
             FileMetaData meta = pMeta.latestStableMeta();
             String filePath = Filename.stPath(propStoreDir, meta.getNumber());
             SeekingIterator<Slice, Slice> fileIterator = cache.newTable(filePath).iterator();
             FileBuffer buffer = pMeta.getStableBuffers( meta.getNumber() );
             if( null != buffer ){
-                fileIterator = new BufferFileAndTableIterator(buffer.iterator(), fileIterator, TableComparator.instance());
+                fileIterator = TwoLevelMergeIterator.merge(buffer.iterator(), fileIterator);
             }
-            return new TableLatestValueIterator(fileIterator);
+            return TableLatestValueIterator.setNewStart(fileIterator, mergeResultStartTime);
         }
+
+
     }
 
 }

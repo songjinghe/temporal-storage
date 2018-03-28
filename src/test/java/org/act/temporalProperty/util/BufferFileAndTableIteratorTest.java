@@ -13,7 +13,7 @@ import org.act.temporalProperty.impl.FileBuffer;
 import org.act.temporalProperty.impl.MemTable;
 import org.act.temporalProperty.impl.Options;
 import org.act.temporalProperty.impl.SeekingIterator;
-import org.act.temporalProperty.table.BufferFileAndTableIterator;
+import org.act.temporalProperty.table.TwoLevelMergeIterator;
 import org.act.temporalProperty.table.MMapTable;
 import org.act.temporalProperty.table.Table;
 import org.act.temporalProperty.table.TableBuilder;
@@ -80,7 +80,7 @@ public class BufferFileAndTableIteratorTest
     public void test()
     {
         List<SeekingIterator<Slice,Slice>> list = new LinkedList<SeekingIterator<Slice,Slice>>(); 
-        BufferFileAndTableIterator iterator = new BufferFileAndTableIterator( buffer.iterator(), table.iterator(), TableComparator.instance() );
+        TwoLevelMergeIterator iterator = new TwoLevelMergeIterator( buffer.iterator(), table.iterator(), TableComparator.instance() );
         list.add( iterator );
         list.add( memTable.iterator() );
         MergingIterator merge = new MergingIterator( list, TableComparator.instance() );

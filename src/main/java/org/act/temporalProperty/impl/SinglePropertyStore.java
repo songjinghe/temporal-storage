@@ -1,12 +1,10 @@
 package org.act.temporalProperty.impl;
 
-import com.google.common.collect.Lists;
 import org.act.temporalProperty.TemporalPropertyStore;
 import org.act.temporalProperty.helper.EPAppendIterator;
 import org.act.temporalProperty.index.AppendIterator;
-import org.act.temporalProperty.index.PropertyFilterIterator;
 import org.act.temporalProperty.meta.PropertyMetaData;
-import org.act.temporalProperty.table.BufferFileAndTableIterator;
+import org.act.temporalProperty.table.TwoLevelMergeIterator;
 import org.act.temporalProperty.table.MergeProcess.MergeTask;
 import org.act.temporalProperty.table.Table;
 import org.act.temporalProperty.table.TableBuilder;
@@ -100,7 +98,7 @@ public class SinglePropertyStore
             SeekingIterator<Slice, Slice> fileIterator = this.cache.newIterator(Filename.stPath(proDir, meta.getNumber()));
             FileBuffer buffer = propertyMeta.getStableBuffers( meta.getNumber() );
             if( null != buffer ){
-                iterator.append(new BufferFileAndTableIterator(buffer.iterator(), iterator, TableComparator.instance()));
+                iterator.append(TwoLevelMergeIterator.merge(buffer.iterator(), iterator));
             }else {
                 iterator.append(fileIterator);
             }
@@ -109,7 +107,7 @@ public class SinglePropertyStore
             SeekingIterator<Slice, Slice> fileIterator = this.cache.newIterator(Filename.unPath(proDir, meta.getNumber()));
             FileBuffer buffer = propertyMeta.getUnstableBuffers( meta.getNumber() );
             if( null != buffer ){
-                iterator.append(new BufferFileAndTableIterator(buffer.iterator(), iterator, TableComparator.instance()));
+                iterator.append(TwoLevelMergeIterator.merge(buffer.iterator(), iterator));
             }else {
                 iterator.append(fileIterator);
             }
@@ -124,7 +122,7 @@ public class SinglePropertyStore
             SeekingIterator<Slice, Slice> iterator = this.cache.newIterator(Filename.unPath(proDir, meta.getNumber()));
             FileBuffer buffer = propertyMeta.getUnstableBuffers(meta.getNumber());
             if (null != buffer) {
-                iterator = new BufferFileAndTableIterator(buffer.iterator(), iterator, TableComparator.instance());
+                iterator = TwoLevelMergeIterator.noDel(buffer.iterator(), iterator);
             }
             iterator.seek(searchKey.encode());
             Entry<Slice, Slice> entry;
@@ -151,7 +149,7 @@ public class SinglePropertyStore
         SeekingIterator<Slice, Slice> iterator = this.cache.newIterator(Filename.stPath(proDir, meta.getNumber()));
         FileBuffer buffer = propertyMeta.getStableBuffers(meta.getNumber());
         if (null != buffer) {
-            iterator = new BufferFileAndTableIterator(buffer.iterator(), iterator, TableComparator.instance());
+            iterator = TwoLevelMergeIterator.noDel(buffer.iterator(), iterator);
         }
         iterator.seek(searchKey.encode());
         Entry<Slice, Slice> entry;
@@ -275,7 +273,7 @@ public class SinglePropertyStore
         FileChannel channel = stream.getChannel();
         TableBuilder builder = new TableBuilder(new Options(), channel, TableComparator.instance());
         Table table = this.cache.newTable(filePath);
-        SeekingIterator<Slice, Slice> iterator = new BufferFileAndTableIterator(buffer.iterator(), table.iterator(), TableComparator.instance());
+        SeekingIterator<Slice, Slice> iterator = new TwoLevelMergeIterator(buffer.iterator(), table.iterator(), TableComparator.instance());
         while (iterator.hasNext()) {
             Entry<Slice, Slice> entry = iterator.next();
             builder.add(entry.getKey(), entry.getValue());
@@ -303,7 +301,7 @@ public class SinglePropertyStore
             SeekingIterator<Slice, Slice> fileIterator = this.cache.newIterator(Filename.stPath(proDir, meta.getNumber()));
             FileBuffer buffer = propertyMeta.getStableBuffers( meta.getNumber() );
             if( null != buffer ){
-                iterator.append(new BufferFileAndTableIterator(buffer.iterator(), iterator, TableComparator.instance()));
+                iterator.append(new TwoLevelMergeIterator(buffer.iterator(), iterator, TableComparator.instance()));
             }else {
                 iterator.append(fileIterator);
             }
@@ -312,7 +310,7 @@ public class SinglePropertyStore
             SeekingIterator<Slice, Slice> fileIterator = this.cache.newIterator(Filename.unPath(proDir, meta.getNumber()));
             FileBuffer buffer = propertyMeta.getUnstableBuffers( meta.getNumber() );
             if( null != buffer ){
-                iterator.append(new BufferFileAndTableIterator(buffer.iterator(), iterator, TableComparator.instance()));
+                iterator.append(new TwoLevelMergeIterator(buffer.iterator(), iterator, TableComparator.instance()));
             }else {
                 iterator.append(fileIterator);
             }

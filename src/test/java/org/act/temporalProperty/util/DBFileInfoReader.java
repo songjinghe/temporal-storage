@@ -32,7 +32,7 @@ public class DBFileInfoReader
         if(SystemUtils.IS_OS_WINDOWS){
             return "temporal.property.test";
         }else{
-            return "/tmp/temporal.property.test/index";
+            return "/tmp/temporal.property.test";
         }
     }
 
