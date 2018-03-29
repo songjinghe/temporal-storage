@@ -125,6 +125,54 @@ public class SourceCompare {
         return mergeEntryList(startTime, endTime, valueMin, valueMax);
     }
 
+    public List<IndexEntry> mergeIndexResult(List<IndexEntry> indexResult) {
+
+        List<IndexEntry> mergeList = new ArrayList<>();
+
+        List<IndexEntry> entityIdList = new ArrayList<>();
+        for (int i = 0; i < indexResult.size(); i++) {
+
+            IndexEntry entry = indexResult.get(i);
+            entityIdList.add(entry);
+
+            if ((i + 1 == indexResult.size()) || !indexResult.get(i + 1).getEntityId().equals(entry.getEntityId())) {
+
+                entityIdList.sort(Comparator.comparing(IndexEntry::getStart));
+
+                for(int j = 0; j < entityIdList.size(); ) {
+
+                    IndexEntry entity = entityIdList.get(j);
+                    Long entityId = entity.getEntityId();
+                    int sTime = entity.getStart();
+                    Slice value = entity.getValue(0);
+
+                    while(j < entityIdList.size()) {
+
+                        if((j + 1 == entityIdList.size()) || (!entityIdList.get(j).getValue(0).equals(entityIdList.get(j + 1).getValue(0)))
+                                || (entityIdList.get(j).getEnd() + 1 != entityIdList.get(j + 1).getStart())) {
+
+                            entity = new IndexEntry(entityId, sTime,
+                                    entityIdList.get(j).getEnd(), new Slice[]{value});
+
+                            mergeList.add(entity);
+                            j++;
+                            break;
+                        }
+
+                        j++;
+                    }
+                }
+
+                entityIdList.clear();
+            }
+        }
+
+        entityIdList.clear();
+        entityIdList = null;
+
+        return mergeList;
+    }
+
     private List<IndexEntry> mergeEntryList(int startTime, int endTime, int valueMin, int valueMax) {
 
         List<IndexEntry> mergeList = new ArrayList<>();

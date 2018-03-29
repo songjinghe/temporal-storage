@@ -25,7 +25,7 @@ import java.util.*;
  * Created by song on 2018-01-27.
  */
 public class CorrectnessTest {
-    private static Logger log = LoggerFactory.getLogger(BuildAndQueryTest.class);
+    private static Logger log = LoggerFactory.getLogger(CorrectnessTest.class);
 
     private static String dataPath(){
          if(SystemUtils.IS_OS_WINDOWS){
@@ -51,7 +51,7 @@ public class CorrectnessTest {
     public void initDB() throws Throwable {
         stBuilder = new StoreBuilder(dbDir(), true);
         importer = new TrafficDataImporter(stBuilder.store(), dataPath(), 1000);
-        sourceEntry = new SourceCompare(dataPath(), 10); //fileCount = 10; no entry in timeRange, but query results can be found in Index and Range? --- endTime (<=endTime --> < endTime?)
+        sourceEntry = new SourceCompare(dataPath(), 1000); //fileCount = 10; no entry in timeRange, but query results can be found in Index and Range? --- endTime (<=endTime --> < endTime?)
         log.info("time: {} - {}", importer.getMinTime(), importer.getMaxTime());
         store = stBuilder.store();
         buildIndex();
@@ -74,13 +74,13 @@ public class CorrectnessTest {
 
     private void compare(int startTime, int endTime, int valMin, int valMax){
 
-
         List<IndexEntry> rangeResult = sourceEntry.queryBySource(startTime, endTime, valMin, valMax);
         rangeResult.sort(cmp);
 
         List<IndexEntry> indexResult = queryByIndex(startTime, endTime, valMin, valMax);//27000
         indexResult.sort(cmp);
         log.info("index query complete");
+        List<IndexEntry> indexResult2 = sourceEntry.mergeIndexResult(indexResult);
 
 //        List<IndexEntry> rangeResult = queryByRange( startTime, endTime, valMin, valMax);
 //        rangeResult.sort(cmp);
