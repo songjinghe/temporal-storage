@@ -55,9 +55,9 @@ public class TableCache
      * @param filePath 文件编号
      * @return 相应文件的Iterator
      */
-    public SeekingIterator<Slice,Slice> newIterator(String filePath)
+    public SearchableIterator newIterator(String filePath)
     {
-        return getTable(filePath).iterator();
+        return new PackInternalKeyIterator(getTable(filePath).iterator());
     }
 
     public Table newTable( String filePath )

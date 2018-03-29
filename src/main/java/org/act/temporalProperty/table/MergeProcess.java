@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.util.*;
 import java.util.Map.Entry;
 
+import org.act.temporalProperty.helper.SameLevelMergeIterator;
 import org.act.temporalProperty.impl.*;
 import org.act.temporalProperty.meta.PropertyMetaData;
 import org.act.temporalProperty.meta.SystemMeta;
@@ -72,15 +73,15 @@ public class MergeProcess extends Thread
      */
     private void startMergeProcess( MemTable temp ) throws IOException
     {
-        SeekingIterator<Slice,Slice> iterator = temp.iterator();
+        SearchableIterator iterator = new PackInternalKeyIterator(temp.iterator());
         Map<Integer, MemTable> tables = new HashMap<>();
         while( iterator.hasNext() ){
-            Entry<Slice,Slice> entry = iterator.next();
-            InternalKey key = new InternalKey( entry.getKey() );
+            InternalEntry entry = iterator.next();
+            InternalKey key = entry.getKey();
             if(!tables.containsKey(key.getPropertyId())){
                 tables.put(key.getPropertyId(), new MemTable( TableComparator.instance() ));
             }
-            tables.get(key.getPropertyId()).add(entry.getKey(), entry.getValue());
+            tables.get(key.getPropertyId()).add(entry.getKey().encode(), entry.getValue());
         }
 
         List<MergeTask> taskList = new LinkedList<>();
@@ -115,7 +116,7 @@ public class MergeProcess extends Thread
         private final List<Long> mergeParticipants;
         private final PropertyMetaData pMeta;
 
-        private final List<SeekingIterator<Slice,Slice>> mergeIterators = new LinkedList<>();
+        private final List<SearchableIterator> mergeIterators = new LinkedList<>();
         private final List<Closeable> channel2close = new LinkedList<>();
         private final List<File> files2delete = new LinkedList<>();
         private final List<String> table2evict = new LinkedList<>();
@@ -183,41 +184,38 @@ public class MergeProcess extends Thread
             return toMerge;
         }
 
-        private SeekingIterator<Slice,Slice> getDataIterator(){
+        private SearchableIterator getDataIterator(){
             if(onlyDumpMemTable()) {
-                return this.mem.iterator();
+                return new PackInternalKeyIterator(this.mem.iterator());
             }else{
-
-                List<SeekingIterator<Slice,Slice>> list = new ArrayList<>();
-
+                SameLevelMergeIterator unstableIter = new SameLevelMergeIterator();
                 for (Long fileNumber : mergeParticipants) {
 //                    log.debug("merge {}", fileNumber);
                     File mergeSource = new File(propStoreDir, Filename.unStableFileName(fileNumber));
                     Table table = cache.newTable(mergeSource.getAbsolutePath());
-                    SeekingIterator<Slice, Slice> mergeIterator;
+                    SearchableIterator mergeIterator;
                     FileBuffer filebuffer = pMeta.getUnstableBuffers(fileNumber);
                     if (null != filebuffer) {
                         mergeIterator = TwoLevelMergeIterator.merge(filebuffer.iterator(), table.iterator());
                         channel2close.add(filebuffer);
                         files2delete.add(new File(propStoreDir, Filename.unbufferFileName(fileNumber)));
                     } else {
-                        mergeIterator = table.iterator();
+                        mergeIterator = new PackInternalKeyIterator(table.iterator());
                     }
-                    list.add(mergeIterator);
+                    unstableIter.add(mergeIterator);
 
                     table2evict.add(mergeSource.getAbsolutePath());
                     files2delete.add(mergeSource);
                     channel2close.add(table);
                 }
-                MergingIterator unstableIter = new MergingIterator(list, TableComparator.instance());
-                SeekingIterator<Slice, Slice> diskDataIter;
+                SearchableIterator diskDataIter;
                 if (createStableFile() && pMeta.hasStable()) {
                     int mergeResultStartTime = pMeta.getUnStableFiles().get(Collections.max(mergeParticipants)).getSmallest();
                     diskDataIter = TwoLevelMergeIterator.merge(unstableIter, stableLatestValIter(mergeResultStartTime));
                 } else {
                     diskDataIter = unstableIter;
                 }
-                return TwoLevelMergeIterator.toDisk(this.mem.iterator(), diskDataIter);
+                return TwoLevelMergeIterator.toDisk(new PackInternalKeyIterator(this.mem.iterator()), diskDataIter);
             }
         }
 
@@ -242,13 +240,13 @@ public class MergeProcess extends Thread
             }
 
             TableBuilder builder = this.mergeInit(targetFileName);
-            SeekingIterator<Slice,Slice> buildIterator = getDataIterator();
+            SearchableIterator buildIterator = getDataIterator();
             while( buildIterator.hasNext() ){
-                Entry<Slice,Slice> entry = buildIterator.next();
-                InternalKey key = new InternalKey( entry.getKey() );
+                InternalEntry entry = buildIterator.next();
+                InternalKey key = entry.getKey();
                 if( key.getStartTime() < minTime ) minTime = key.getStartTime();
                 if( key.getStartTime() > maxTime ) maxTime = key.getStartTime();
-                builder.add( entry.getKey(), entry.getValue() );
+                builder.add( entry.getKey().encode(), entry.getValue() );
                 entryCount++;
             }
             builder.finish();
@@ -283,10 +281,10 @@ public class MergeProcess extends Thread
         }
 
         // this should only be called when pMeta.hasStable() is true.
-        private SeekingIterator<Slice, Slice> stableLatestValIter(int mergeResultStartTime) {
+        private SearchableIterator stableLatestValIter(int mergeResultStartTime) {
             FileMetaData meta = pMeta.latestStableMeta();
             String filePath = Filename.stPath(propStoreDir, meta.getNumber());
-            SeekingIterator<Slice, Slice> fileIterator = cache.newTable(filePath).iterator();
+            SearchableIterator fileIterator = cache.newIterator(filePath);
             FileBuffer buffer = pMeta.getStableBuffers( meta.getNumber() );
             if( null != buffer ){
                 fileIterator = TwoLevelMergeIterator.merge(buffer.iterator(), fileIterator);

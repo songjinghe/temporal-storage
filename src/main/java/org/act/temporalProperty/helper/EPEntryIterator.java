@@ -1,8 +1,7 @@
 package org.act.temporalProperty.helper;
 
-import org.act.temporalProperty.impl.InternalKey;
-import org.act.temporalProperty.impl.SeekingIterator;
-import org.act.temporalProperty.impl.ValueType;
+import com.google.common.collect.AbstractIterator;
+import org.act.temporalProperty.impl.*;
 import org.act.temporalProperty.util.AbstractSeekingIterator;
 import org.act.temporalProperty.util.Slice;
 
@@ -12,41 +11,36 @@ import java.util.Map.Entry;
 /**
  * Created by song on 2018-01-24.
  */
-public class EPEntryIterator extends AbstractSeekingIterator<Slice, Slice> {
+public class EPEntryIterator extends AbstractSearchableIterator {
 
-    private final SeekingIterator<Slice, Slice> iter;
+    private final SearchableIterator iter;
     private final Slice id;
 
-    public EPEntryIterator(Slice entityPropertyId, SeekingIterator<Slice, Slice> iterator){
+    public EPEntryIterator(Slice entityPropertyId, SearchableIterator iterator){
+        super(iterator);
         this.id = entityPropertyId;
         this.iter = iterator;
-        this.seekToFirstInternal();
+        this.seekToFirst();
     }
 
     @Override
-    protected void seekToFirstInternal() {
+    public void seekToFirst() {
         InternalKey earliestKey = new InternalKey(id, 0, 0, ValueType.VALUE);
-        iter.seek(earliestKey.encode());
+        iter.seek(earliestKey);
+    }
+
+    private boolean validId(InternalEntry entry) {
+        return entry.getKey().getId().equals(id);
     }
 
     @Override
-    protected void seekInternal(Slice targetKey) {
-        iter.seek(targetKey);
-    }
-
-    @Override
-    protected Entry<Slice, Slice> getNextElement() {
+    protected InternalEntry computeNext() {
         while(iter.hasNext()){
-            Entry<Slice, Slice> entry = iter.next();
+            InternalEntry entry = iter.next();
             if(validId(entry)){
                 return entry;
             }
         }
         return null;
-    }
-
-    private boolean validId(Entry<Slice, Slice> entry) {
-        InternalKey tmpKey = new InternalKey(entry.getKey());
-        return tmpKey.getId().equals(id);
     }
 }

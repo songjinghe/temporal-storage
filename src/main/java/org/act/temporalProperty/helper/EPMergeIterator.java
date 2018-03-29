@@ -1,8 +1,7 @@
 package org.act.temporalProperty.helper;
 
-import org.act.temporalProperty.impl.InternalKey;
-import org.act.temporalProperty.impl.SeekingIterator;
-import org.act.temporalProperty.impl.ValueType;
+import com.google.common.collect.AbstractIterator;
+import org.act.temporalProperty.impl.*;
 import org.act.temporalProperty.util.AbstractSeekingIterator;
 import org.act.temporalProperty.util.Slice;
 
@@ -11,40 +10,52 @@ import java.util.Map.Entry;
 /**
  * Created by song on 2018-01-24.
  */
-public class EPMergeIterator extends AbstractSeekingIterator<Slice, Slice> {
+public class EPMergeIterator extends AbstractIterator<InternalEntry> implements SearchableIterator {
     private final Slice id;
-    private final SeekingIterator<Slice, Slice> latest;
-    private final SeekingIterator<Slice, Slice> old;
+    private final SearchableIterator latest;
+    private final SearchableIterator old;
 
-    public EPMergeIterator(Slice idSlice, SeekingIterator<Slice, Slice> old, SeekingIterator<Slice, Slice> latest) {
+    public EPMergeIterator(Slice idSlice, SearchableIterator old, SearchableIterator latest) {
         this.id = idSlice;
         this.old = isEP(old)? old : new EPEntryIterator(idSlice, old);
         this.latest = isEP(latest) ? latest : new EPEntryIterator(idSlice, latest);
     }
 
-    private boolean isEP(SeekingIterator<Slice, Slice> iterator) {
+    private boolean isEP(SearchableIterator iterator) {
         return  (iterator instanceof EPEntryIterator) ||
                 (iterator instanceof EPAppendIterator) ||
                 (iterator instanceof EPMergeIterator);
     }
 
     @Override
-    protected void seekToFirstInternal() {
+    public void seekToFirst() {
         this.old.seekToFirst();
         this.latest.seekToFirst();
     }
 
     @Override
-    protected void seekInternal(Slice targetKey) {
+    public void seek(InternalKey targetKey) {
         this.old.seek(targetKey);
         this.latest.seek(targetKey);
     }
 
+    private int time(InternalEntry entry){
+        return entry.getKey().getStartTime();
+    }
+
+    private void pollUntil(SearchableIterator iter, int time){
+        InternalKey tmp = new InternalKey(id, time, 0, ValueType.VALUE);
+        iter.seek(tmp);
+        while(iter.hasNext() && time(iter.peek()) < time){
+            iter.next();
+        }
+    }
+
     @Override
-    protected Entry<Slice, Slice> getNextElement() {
+    protected InternalEntry computeNext() {
         if (latest.hasNext() && old.hasNext()){
-            Entry<Slice,Slice> mem = latest.peek();
-            Entry<Slice,Slice> disk = old.peek();
+            InternalEntry mem = latest.peek();
+            InternalEntry disk = old.peek();
 
             if (time(mem) <= time(disk)){
                 latest.next();
@@ -64,19 +75,6 @@ public class EPMergeIterator extends AbstractSeekingIterator<Slice, Slice> {
             return old.next();
         } else{ // both ran out
             return null;
-        }
-    }
-
-    private int time(Entry<Slice,Slice> entry){
-        InternalKey key = new InternalKey(entry.getKey());
-        return key.getStartTime();
-    }
-
-    private void pollUntil(SeekingIterator<Slice,Slice> iter, int time){
-        InternalKey tmp = new InternalKey(id, time, 0, ValueType.VALUE);
-        iter.seek(tmp.encode());
-        while(iter.hasNext() && time(iter.peek()) < time){
-            iter.next();
         }
     }
 }

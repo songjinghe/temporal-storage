@@ -9,10 +9,8 @@ import java.util.Map.Entry;
 
 import junit.framework.Assert;
 
-import org.act.temporalProperty.impl.FileBuffer;
-import org.act.temporalProperty.impl.MemTable;
-import org.act.temporalProperty.impl.Options;
-import org.act.temporalProperty.impl.SeekingIterator;
+import org.act.temporalProperty.helper.SameLevelMergeIterator;
+import org.act.temporalProperty.impl.*;
 import org.act.temporalProperty.table.TwoLevelMergeIterator;
 import org.act.temporalProperty.table.MMapTable;
 import org.act.temporalProperty.table.Table;
@@ -79,16 +77,15 @@ public class BufferFileAndTableIteratorTest
     @Test
     public void test()
     {
-        List<SeekingIterator<Slice,Slice>> list = new LinkedList<SeekingIterator<Slice,Slice>>(); 
-        TwoLevelMergeIterator iterator = new TwoLevelMergeIterator( buffer.iterator(), table.iterator(), TableComparator.instance() );
+        SameLevelMergeIterator list = new SameLevelMergeIterator();
+        TwoLevelMergeIterator iterator = TwoLevelMergeIterator.merge( buffer.iterator(), table.iterator());
         list.add( iterator );
-        list.add( memTable.iterator() );
-        MergingIterator merge = new MergingIterator( list, TableComparator.instance() );
+        list.add( new PackInternalKeyIterator(memTable.iterator()) );
         int expected = 0;
-        while( merge.hasNext() )
+        while( list.hasNext() )
         {
-            Entry<Slice,Slice> entry = merge.next();
-            Assert.assertEquals( expected, entry.getKey().getInt( 0 ) );
+            InternalEntry entry = list.next();
+            Assert.assertEquals( expected, entry.getKey().encode().getInt( 0 ) );
             Assert.assertEquals( expected, entry.getValue().getInt( 0 ) );
             expected++;
         }

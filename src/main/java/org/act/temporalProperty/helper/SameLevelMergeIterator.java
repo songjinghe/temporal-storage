@@ -2,6 +2,9 @@ package org.act.temporalProperty.helper;
 
 import com.google.common.collect.AbstractIterator;
 import org.act.temporalProperty.exception.TPSNHException;
+import org.act.temporalProperty.impl.InternalEntry;
+import org.act.temporalProperty.impl.InternalKey;
+import org.act.temporalProperty.impl.SearchableIterator;
 import org.act.temporalProperty.impl.SeekingIterator;
 import org.act.temporalProperty.table.TableComparator;
 import org.act.temporalProperty.util.Slice;
@@ -16,24 +19,24 @@ import java.util.PriorityQueue;
  *
  * Created by song on 2018-03-28.
  */
-public class SameLevelMergeIterator extends AbstractIterator<Entry<Slice,Slice>> implements SeekingIterator<Slice,Slice> {
-    private PriorityQueue<SeekingIterator<Slice,Slice>> heap = new PriorityQueue<>((o1, o2) -> {
+public class SameLevelMergeIterator extends AbstractIterator<InternalEntry> implements SearchableIterator {
+    private PriorityQueue<SearchableIterator> heap = new PriorityQueue<>((o1, o2) -> {
         if(o1.hasNext() && o2.hasNext()){
-            return TableComparator.instance().compare(o1.peek().getKey(), o2.peek().getKey());
+            return o1.peek().getKey().compareTo(o2.peek().getKey());
         }else{
             throw new TPSNHException("iterators which ran out should not in heap!");
         }
     });
 
-    public void add(SeekingIterator<Slice, Slice> in){
+    public void add(SearchableIterator in){
         if(in.hasNext()) heap.add(in);
     }
 
     @Override
-    protected Entry<Slice, Slice> computeNext() {
-        SeekingIterator<Slice, Slice> iter = heap.poll();
+    protected InternalEntry computeNext() {
+        SearchableIterator iter = heap.poll();
         if(iter!=null){
-            Entry<Slice, Slice> entry = iter.next();
+            InternalEntry entry = iter.next();
             if (iter.hasNext()) {
                 heap.add(iter);
             }
@@ -49,7 +52,7 @@ public class SameLevelMergeIterator extends AbstractIterator<Entry<Slice,Slice>>
     }
 
     @Override
-    public void seek(Slice targetKey) {
+    public void seek(InternalKey targetKey) {
         throw new UnsupportedOperationException();
     }
 }

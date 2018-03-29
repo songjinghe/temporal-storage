@@ -3,10 +3,7 @@ package org.act.temporalProperty.index;
 import com.google.common.collect.Lists;
 import com.google.common.collect.PeekingIterator;
 import org.act.temporalProperty.exception.TGraphNotImplementedException;
-import org.act.temporalProperty.impl.InternalKey;
-import org.act.temporalProperty.impl.SeekingIterator;
-import org.act.temporalProperty.impl.TemporalPropertyStoreImpl;
-import org.act.temporalProperty.impl.ValueType;
+import org.act.temporalProperty.impl.*;
 import org.act.temporalProperty.index.rtree.IndexEntry;
 import org.act.temporalProperty.index.rtree.IndexEntryOperator;
 import org.act.temporalProperty.util.Slice;
@@ -83,11 +80,11 @@ public class IndexStore {
 
     private IndexMetaData createMultiValIndex(int start, int end, List<Integer> proIds, List<IndexValueType> types) throws IOException {
         IndexEntryOperator op = new IndexEntryOperator(Lists.newArrayList(types),4096);
-        SeekingIterator<Slice,Slice> iterator = tpStore.buildIndexIterator(start, end, proIds);
+        SearchableIterator iterator = tpStore.buildIndexIterator(start, end, proIds);
         IndexBuilderCallback indexBuilderCallback = new IndexBuilderCallback(proIds, op);
         while(iterator.hasNext()){
-            Map.Entry<Slice, Slice> entry = iterator.next();
-            InternalKey key = new InternalKey(entry.getKey());
+            InternalEntry entry = iterator.next();
+            InternalKey key = entry.getKey();
             if(key.getValueType()== ValueType.INVALID) {
                 indexBuilderCallback.onCall(key.getPropertyId(), key.getEntityId(), key.getStartTime(), null);
             }else{
@@ -126,11 +123,11 @@ public class IndexStore {
 
     private IndexMetaData createSingleValIndex(int start, int end, int proId, IndexValueType types) throws IOException {
         IndexEntryOperator op = new IndexEntryOperator(Lists.newArrayList(types),4096);
-        SeekingIterator<Slice,Slice> iterator = tpStore.buildIndexIterator(start, end, Lists.newArrayList(proId));
+        SearchableIterator iterator = tpStore.buildIndexIterator(start, end, Lists.newArrayList(proId));
         IndexBuilderCallback indexBuilderCallback = new IndexBuilderCallback(Lists.newArrayList(proId), op);
         while(iterator.hasNext()){
-            Map.Entry<Slice, Slice> entry = iterator.next();
-            InternalKey key = new InternalKey(entry.getKey());
+            InternalEntry entry = iterator.next();
+            InternalKey key = entry.getKey();
             if(key.getValueType()== ValueType.INVALID) {
                 indexBuilderCallback.onCall(key.getPropertyId(), key.getEntityId(), key.getStartTime(), null);
             }else{

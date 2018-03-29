@@ -5,27 +5,29 @@ import java.util.NoSuchElementException;
 import java.util.Map.Entry;
 
 import com.google.common.collect.AbstractIterator;
+import org.act.temporalProperty.impl.InternalEntry;
 import org.act.temporalProperty.impl.InternalKey;
+import org.act.temporalProperty.impl.SearchableIterator;
 import org.act.temporalProperty.impl.SeekingIterator;
 import org.act.temporalProperty.table.BlockEntry;
 
 /**
  * 在生成新的StableFile的时候，需要把上一个tableFile的每个动态属性的最新的值加入到新的文件中，这个类就是提取StableFile中每个动态属性的最近值的工具
  */
-public class TableLatestValueIterator implements SeekingIterator<Slice, Slice>
+public class TableLatestValueIterator implements SearchableIterator
 {
     
-    private SeekingIterator<Slice,Slice> iterator;
-    private Entry<Slice,Slice> next = null;
-    private Entry<Slice,Slice> next_next = null; 
+    private SearchableIterator iterator;
+    private InternalEntry next = null;
+    private InternalEntry next_next = null; 
     
-    public TableLatestValueIterator(SeekingIterator<Slice,Slice> iterator)
+    public TableLatestValueIterator(SearchableIterator iterator)
     {
         this.iterator = iterator;
     }
 
     @Override
-    public Entry<Slice,Slice> peek()
+    public InternalEntry peek()
     {
         if( hasNext() )
             return next;
@@ -34,11 +36,11 @@ public class TableLatestValueIterator implements SeekingIterator<Slice, Slice>
     }
 
     @Override
-    public Entry<Slice,Slice> next()
+    public InternalEntry next()
     {
         if( hasNext() )
         {
-            Entry<Slice,Slice> toret = this.next;
+            InternalEntry toret = this.next;
             this.next = null;
             return toret;
         }
@@ -54,7 +56,7 @@ public class TableLatestValueIterator implements SeekingIterator<Slice, Slice>
             {
                 this.next = this.iterator.next();
                 this.next_next = this.iterator.next();
-                while( this.next.getKey().copySlice( 0, 12 ).equals( this.next_next.getKey().copySlice( 0, 12 ) ) )
+                while( this.next.getKey().getId().equals( this.next_next.getKey().getId() ) )
                 {
                     this.next = this.next_next;
                     this.next_next = this.iterator.next();
@@ -69,7 +71,7 @@ public class TableLatestValueIterator implements SeekingIterator<Slice, Slice>
             try
             {
                 this.next_next = this.iterator.next();
-                while( this.next.getKey().copySlice( 0, 12 ).equals( this.next_next.getKey().copySlice( 0, 12 ) ) )
+                while( this.next.getKey().getId().equals( this.next_next.getKey().getId() ) )
                 {
                     this.next = this.next_next;
                     this.next_next = this.iterator.next();
@@ -108,13 +110,16 @@ public class TableLatestValueIterator implements SeekingIterator<Slice, Slice>
     }
 
     @Override
-    public void seek( Slice targetKey )
+    public void seek( InternalKey targetKey )
     {
         throw new UnsupportedOperationException();
     }
 
-    private static class ChangeTimeIterator extends AbstractIterator<Entry<Slice,Slice>> implements SeekingIterator<Slice,Slice>{
-        private final SeekingIterator<Slice, Slice> input;
+    /**
+     * By Sjh 2018
+     */
+    private static class ChangeTimeIterator extends AbstractIterator<InternalEntry> implements SearchableIterator{
+        private final SearchableIterator input;
         private final int startTime;
 
         /**
@@ -122,18 +127,18 @@ public class TableLatestValueIterator implements SeekingIterator<Slice, Slice>
          * @param input
          * @param startTime
          */
-        ChangeTimeIterator(SeekingIterator<Slice,Slice> input, int startTime){
+        ChangeTimeIterator(SearchableIterator input, int startTime){
             this.input = input;
             this.startTime = startTime;
         }
 
         @Override
-        protected Entry<Slice, Slice> computeNext() {
+        protected InternalEntry computeNext() {
             if(input.hasNext()){
-                Entry<Slice, Slice> entry = input.next();
-                InternalKey key = new InternalKey(entry.getKey());
+                InternalEntry entry = input.next();
+                InternalKey key = entry.getKey();
                 InternalKey newKey = new InternalKey(key.getId(), startTime, key.getValueLength(), key.getValueType());
-                return new BlockEntry(newKey.encode(), entry.getValue());
+                return new InternalEntry(newKey, entry.getValue());
             }else{
                 return endOfData();
             }
@@ -145,12 +150,12 @@ public class TableLatestValueIterator implements SeekingIterator<Slice, Slice>
         }
 
         @Override
-        public void seek(Slice targetKey) {
+        public void seek(InternalKey targetKey) {
             throw new UnsupportedOperationException();
         }
     }
 
-    public static SeekingIterator<Slice,Slice> setNewStart(SeekingIterator<Slice,Slice> input, int time){
+    public static SearchableIterator setNewStart(SearchableIterator input, int time){
         return new ChangeTimeIterator(new TableLatestValueIterator(input), time);
     }
 }

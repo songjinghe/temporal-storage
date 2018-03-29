@@ -110,16 +110,16 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
         try{
             Slice idSlice = toSlice(proId, id);
 
-            SeekingIterator<Slice,Slice> memIter = new EPEntryIterator(idSlice, memTable.iterator());
-            if(this.stableMemTable!=null) memIter = new EPMergeIterator(idSlice, stableMemTable.iterator(), memIter);
-            SeekingIterator<Slice,Slice> diskIter = meta.getStore(proId).getRangeValueIter(idSlice, startTime, endTime);
-            SeekingIterator<Slice,Slice> mergedIterator = new EPMergeIterator(idSlice, diskIter, memIter);
+            SearchableIterator memIter = new EPEntryIterator(idSlice, new PackInternalKeyIterator(memTable.iterator()));
+            if(this.stableMemTable!=null) memIter = new EPMergeIterator(idSlice, new PackInternalKeyIterator(stableMemTable.iterator()), memIter);
+            SearchableIterator diskIter = meta.getStore(proId).getRangeValueIter(idSlice, startTime, endTime);
+            SearchableIterator mergedIterator = new EPMergeIterator(idSlice, diskIter, memIter);
 
             InternalKey searchKey = new InternalKey( idSlice, startTime );
-            mergedIterator.seek(searchKey.encode());
+            mergedIterator.seek(searchKey);
             while(mergedIterator.hasNext()){
-                Entry<Slice,Slice> entry = mergedIterator.next();
-                InternalKey key = new InternalKey( entry.getKey() );
+                InternalEntry entry = mergedIterator.next();
+                InternalKey key = entry.getKey();
                 if( key.getStartTime() <= endTime && key.getValueType() == ValueType.VALUE){
                     callback.onCall(key.getStartTime(), entry.getValue());
                 }else break;
@@ -257,15 +257,15 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
         }
     }
 
-    private SeekingIterator<Slice,Slice> getMemTableIter(int start, int end){
+    private SearchableIterator getMemTableIter(int start, int end){
         if(this.stableMemTable != null) {
             return TwoLevelMergeIterator.merge(memTable.iterator(), stableMemTable.iterator());
         }else{
-            return memTable.iterator();
+            return new PackInternalKeyIterator(memTable.iterator());
         }
     }
 
-    public SeekingIterator<Slice, Slice> buildIndexIterator(int start, int end, List<Integer> proIds) {
+    public SearchableIterator buildIndexIterator(int start, int end, List<Integer> proIds) {
         if(proIds.size()==1) {
             return TwoLevelMergeIterator.toDisk(
                     getMemTableIter(start, end),
@@ -305,10 +305,10 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
             FileOutputStream outputStream = new FileOutputStream( tempFile );
             FileChannel channel = outputStream.getChannel();
             TableBuilder builer = new TableBuilder( new Options(), channel, TableComparator.instance() );
-            SeekingIterator<Slice,Slice> iterator = this.memTable.iterator();
+            SearchableIterator iterator = new PackInternalKeyIterator(this.memTable.iterator());
             while( iterator.hasNext() ){
-                Entry<Slice,Slice> entry = iterator.next();
-                builer.add( entry.getKey(), entry.getValue() );
+                InternalEntry entry = iterator.next();
+                builer.add( entry.getKey().encode(), entry.getValue() );
             }
             builer.finish();
             channel.close();

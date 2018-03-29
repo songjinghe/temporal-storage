@@ -1,6 +1,8 @@
 package org.act.temporalProperty.helper;
 
+import org.act.temporalProperty.impl.InternalEntry;
 import org.act.temporalProperty.impl.InternalKey;
+import org.act.temporalProperty.impl.SearchableIterator;
 import org.act.temporalProperty.impl.SeekingIterator;
 import org.act.temporalProperty.util.Slice;
 
@@ -11,17 +13,17 @@ import java.util.Map.Entry;
  * only the first (earlier) entry is retained.
  * Created by song on 2018-03-28.
  */
-public class EqualValFilterIterator extends PairViewFilterByPreIterator<Entry<Slice,Slice>> implements SeekingIterator<Slice,Slice> {
+public class EqualValFilterIterator extends PairViewFilterByPreIterator<InternalEntry> implements SearchableIterator {
 
-    public EqualValFilterIterator(SeekingIterator<Slice,Slice> in) {
+    public EqualValFilterIterator(SearchableIterator in) {
         super(in);
     }
 
     @Override
-    protected boolean shouldReturnSecond(Entry<Slice, Slice> lastReturned, Entry<Slice, Slice> cur) {
+    protected boolean shouldReturnSecond(InternalEntry lastReturned, InternalEntry cur) {
         if(lastReturned!=null){
-            InternalKey preKey = new InternalKey(lastReturned.getKey());
-            InternalKey curKey = new InternalKey(cur.getKey());
+            InternalKey preKey = lastReturned.getKey();
+            InternalKey curKey = cur.getKey();
             if (curKey.getId().equals(preKey.getId()) && cur.getValue().equals(lastReturned.getValue())) {
                 return false;
             } else {
@@ -38,7 +40,7 @@ public class EqualValFilterIterator extends PairViewFilterByPreIterator<Entry<Sl
     }
 
     @Override
-    public void seek(Slice targetKey) {
+    public void seek(InternalKey targetKey) {
         throw new UnsupportedOperationException();
     }
 }

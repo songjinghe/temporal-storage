@@ -38,16 +38,16 @@ public class MergePerformanceComparison {
 //        appendIterator.append(myIters.get(5));
 //        appendIterator.append(myIters.get(6));
 //        appendIterator.append(myIters.get(3));
-        TwoLevelMergeIterator my0 = new TwoLevelMergeIterator(myIters.get(0), myIters.get(1), TableComparator.instance());
-        TwoLevelMergeIterator my1 = new TwoLevelMergeIterator(myIters.get(2), myIters.get(3), TableComparator.instance());
-        TwoLevelMergeIterator my2 = new TwoLevelMergeIterator(myIters.get(4), myIters.get(5), TableComparator.instance());
-        TwoLevelMergeIterator my3 = new TwoLevelMergeIterator(my0, myIters.get(6), TableComparator.instance());
-        TwoLevelMergeIterator my4 = new TwoLevelMergeIterator(my1, my2, TableComparator.instance());
-        TwoLevelMergeIterator myIter = new TwoLevelMergeIterator(my3, my4, TableComparator.instance());
-        myIter = new TwoLevelMergeIterator(myIter, myIters.get(4), TableComparator.instance());
+        TwoLevelMergeIterator my0 = TwoLevelMergeIterator.merge(myIters.get(0), myIters.get(1));
+        TwoLevelMergeIterator my1 = TwoLevelMergeIterator.merge(myIters.get(2), myIters.get(3));
+        TwoLevelMergeIterator my2 = TwoLevelMergeIterator.merge(myIters.get(4), myIters.get(5));
+        TwoLevelMergeIterator my3 = TwoLevelMergeIterator.merge(my0, myIters.get(6));
+        TwoLevelMergeIterator my4 = TwoLevelMergeIterator.merge(my1, my2);
+        TwoLevelMergeIterator myIter = TwoLevelMergeIterator.merge(my3, my4);
+        myIter = TwoLevelMergeIterator.merge(myIter, myIters.get(4));
         log.info("iterators assembled");
 
-        List<Entry<Slice, Slice>> rMerging = new ArrayList<>();
+        List<Entry<Slice,Slice>> rMerging = new ArrayList<>();
         log.info("time {}", System.currentTimeMillis());
         while(mergingIter.hasNext()){
             rMerging.add(mergingIter.next());
@@ -55,7 +55,7 @@ public class MergePerformanceComparison {
         log.info("time {}", System.currentTimeMillis());
         log.info("merging iterator done");
         log.info("time {}", System.currentTimeMillis());
-        List<Entry<Slice, Slice>> rMy = new ArrayList<>();
+        List<InternalEntry> rMy = new ArrayList<>();
         while(myIter.hasNext()){
             rMy.add(myIter.next());
         }
@@ -65,7 +65,7 @@ public class MergePerformanceComparison {
         validateResult(data, rMerging, rMy);
     }
 
-    private void validateResult(List<List<Integer>> data, List<Entry<Slice, Slice>> rMerging, List<Entry<Slice, Slice>> rMy) {
+    private void validateResult(List<List<Integer>> data, List<Entry<Slice, Slice>> rMerging, List<InternalEntry> rMy) {
         Set<Integer> resultSet = new HashSet<>();
         for(List<Integer> l : data){
             resultSet.addAll(l);

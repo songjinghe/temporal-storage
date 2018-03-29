@@ -2,6 +2,7 @@ package org.act.temporalProperty.util;
 
 import org.act.temporalProperty.impl.InternalKey;
 import org.act.temporalProperty.impl.MemTable;
+import org.act.temporalProperty.impl.PackInternalKeyIterator;
 import org.act.temporalProperty.impl.ValueType;
 import org.act.temporalProperty.table.TableComparator;
 import org.junit.Before;
@@ -32,10 +33,10 @@ public class TableLatestValueIteratorTest
     @Test
     public void test()
     {
-        TableLatestValueIterator iterator = new TableLatestValueIterator( table.iterator() );
+        TableLatestValueIterator iterator = new TableLatestValueIterator( new PackInternalKeyIterator(table.iterator() ));
         while( iterator.hasNext() )
         {
-            InternalKey key = new InternalKey( iterator.next().getKey() );
+            InternalKey key = iterator.next().getKey();
             System.out.println( key );
         }
     }

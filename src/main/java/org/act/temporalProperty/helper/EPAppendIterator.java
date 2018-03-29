@@ -1,7 +1,7 @@
 package org.act.temporalProperty.helper;
 
-import org.act.temporalProperty.impl.InternalKey;
-import org.act.temporalProperty.impl.SeekingIterator;
+import com.google.common.collect.AbstractIterator;
+import org.act.temporalProperty.impl.*;
 import org.act.temporalProperty.util.AbstractSeekingIterator;
 import org.act.temporalProperty.util.Slice;
 
@@ -17,9 +17,9 @@ import java.util.Map;
  * 注意：不同文件的时间虽然无overlap，但内部Key(entity id, pro Id, time)是有overlap的
  * should call seek() or seekToFirst() to initialize all sub-iterators.
  */
-public class EPAppendIterator extends AbstractSeekingIterator<Slice,Slice> {
+public class EPAppendIterator extends AbstractIterator<InternalEntry> implements SearchableIterator {
     // each sub iterator's time should be inc (e.g. 0 is the earliest time)
-    private List<SeekingIterator<Slice,Slice>> iterators = new ArrayList<>();
+    private List<SearchableIterator> iterators = new ArrayList<>();
     private int cur = 0;
     private Slice id;
 
@@ -27,7 +27,7 @@ public class EPAppendIterator extends AbstractSeekingIterator<Slice,Slice> {
         this.id = idSlice;
     }
 
-    public void append(SeekingIterator<Slice,Slice> iterator) {
+    public void append(SearchableIterator iterator) {
         if(isEP(iterator)){
             iterators.add(iterator);
         }else {
@@ -35,25 +35,25 @@ public class EPAppendIterator extends AbstractSeekingIterator<Slice,Slice> {
         }
     }
 
-    private boolean isEP(SeekingIterator<Slice, Slice> iterator) {
+    private boolean isEP(SearchableIterator iterator) {
         return  (iterator instanceof EPEntryIterator) ||
                 (iterator instanceof EPAppendIterator) ||
                 (iterator instanceof EPMergeIterator);
     }
 
     @Override
-    protected void seekToFirstInternal() {
-        for(SeekingIterator<Slice, Slice> iterator : iterators) {
+    public void seekToFirst() {
+        for(SearchableIterator iterator : iterators) {
             iterator.seekToFirst();
         }
     }
 
     @Override
-    protected void seekInternal(Slice targetKey) {
+    public void seek(InternalKey targetKey) {
         checkIfValidKey(targetKey);
         cur=0;
         while(cur<iterators.size()){
-            SeekingIterator<Slice,Slice> iterator = iterators.get(cur);
+            SearchableIterator iterator = iterators.get(cur);
             iterator.seek(targetKey);
             if(iterator.hasNext()){
                 return;
@@ -63,13 +63,17 @@ public class EPAppendIterator extends AbstractSeekingIterator<Slice,Slice> {
         }
     }
 
-    private void checkIfValidKey(Slice targetKey) {
-        InternalKey target = new InternalKey(targetKey);
+    private void checkIfValidKey(InternalKey target) {
         if(!target.getId().equals(id)) throw new IllegalArgumentException("target should has same entity id and same property id");
     }
 
+
+    public int size() {
+        return iterators.size();
+    }
+
     @Override
-    protected Map.Entry<Slice, Slice> getNextElement() {
+    protected InternalEntry computeNext() {
         while(cur<iterators.size()){
             if(iterators.get(cur).hasNext()){
                 return iterators.get(cur).next();
@@ -77,10 +81,6 @@ public class EPAppendIterator extends AbstractSeekingIterator<Slice,Slice> {
                 cur++;
             }
         }
-        return null;
-    }
-
-    public int size() {
-        return iterators.size();
+        return endOfData();
     }
 }
