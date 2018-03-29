@@ -75,6 +75,7 @@ public class IndexStore {
             addSingleValIndex(indexMeta);
         } else {
             indexMeta = createMultiValIndex(start, end, proIds, types);
+            addMultiValIndex(indexMeta);
         }
     }
 

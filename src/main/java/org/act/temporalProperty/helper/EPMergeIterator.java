@@ -74,7 +74,7 @@ public class EPMergeIterator extends AbstractIterator<InternalEntry> implements 
         } else if (old.hasNext()){ // memIter run out
             return old.next();
         } else{ // both ran out
-            return null;
+            return endOfData();
         }
     }
 }

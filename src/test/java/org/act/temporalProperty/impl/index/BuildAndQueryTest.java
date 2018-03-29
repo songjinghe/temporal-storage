@@ -47,6 +47,9 @@ public class BuildAndQueryTest {
     public void buildIndex(){
         List<Integer> proIds = new ArrayList<>();
         proIds.add(1);
+        proIds.add(2);
+        proIds.add(3);
+        proIds.add(4);
 //        store.createValueIndex(1288803660, 1288824660, proIds, types);
 //        store.createValueIndex(1288800300, 1288802460, proIds, types);
         store.createValueIndex(1560, 27360, proIds);
@@ -56,7 +59,7 @@ public class BuildAndQueryTest {
     @Test
     public void main() throws Throwable {
         testRangeQuery(store);
-        List<Long> iterResult = queryByIter( 18300, 27000, 0, 200);
+//        List<Long> iterResult = queryByIter( 18300, 27000, 0, 200);
 
         List<Long> indexResult = queryByIndex(18300, 27000, 0, 200);
 

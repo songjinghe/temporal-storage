@@ -3,6 +3,7 @@ package org.act.temporalProperty.impl;
 import org.act.temporalProperty.TemporalPropertyStore;
 import org.act.temporalProperty.exception.TGraphNotImplementedException;
 import org.act.temporalProperty.exception.TPSRuntimeException;
+import org.act.temporalProperty.helper.SameLevelMergeIterator;
 import org.act.temporalProperty.helper.StoreInitial;
 import org.act.temporalProperty.helper.EPEntryIterator;
 import org.act.temporalProperty.helper.EPMergeIterator;
@@ -271,11 +272,14 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
                     getMemTableIter(start, end),
                     meta.getStore(proIds.get(0)).buildIndexIterator(start, end));
         }else{
-//            return new BufferFileAndTableIterator(
-//                    getMemTableIter(start, end),
-//                    meta.getStore(pro)
-//            );
-            throw new TGraphNotImplementedException();
+            SameLevelMergeIterator merged = new SameLevelMergeIterator();
+            for(Integer pid : proIds){
+                merged.add(meta.getStore(pid).buildIndexIterator(start, end));
+            }
+            return new TwoLevelMergeIterator(
+                    getMemTableIter(start, end),
+                    merged
+            );
         }
     }
 

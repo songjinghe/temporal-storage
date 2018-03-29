@@ -41,6 +41,6 @@ public class EPEntryIterator extends AbstractSearchableIterator {
                 return entry;
             }
         }
-        return null;
+        return endOfData();
     }
 }

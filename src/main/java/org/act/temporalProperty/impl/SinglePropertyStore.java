@@ -98,7 +98,7 @@ public class SinglePropertyStore
             SearchableIterator fileIterator = this.cache.newIterator(Filename.stPath(proDir, meta.getNumber()));
             FileBuffer buffer = propertyMeta.getStableBuffers( meta.getNumber() );
             if( null != buffer ){
-                iterator.append(TwoLevelMergeIterator.merge(buffer.iterator(), iterator));
+                iterator.append(TwoLevelMergeIterator.merge(buffer.iterator(), fileIterator));
             }else {
                 iterator.append(fileIterator);
             }
@@ -107,7 +107,7 @@ public class SinglePropertyStore
             SearchableIterator fileIterator = this.cache.newIterator(Filename.unPath(proDir, meta.getNumber()));
             FileBuffer buffer = propertyMeta.getUnstableBuffers( meta.getNumber() );
             if( null != buffer ){
-                iterator.append(TwoLevelMergeIterator.merge(buffer.iterator(), iterator));
+                iterator.append(TwoLevelMergeIterator.merge(buffer.iterator(), fileIterator));
             }else {
                 iterator.append(fileIterator);
             }
