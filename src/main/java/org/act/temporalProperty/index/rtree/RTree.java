@@ -1,6 +1,7 @@
 package org.act.temporalProperty.index.rtree;
 
 import com.google.common.base.Preconditions;
+import org.act.temporalProperty.exception.TPSNHException;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -61,7 +62,7 @@ public class RTree {
         }else if(upperLevelNodes.size()==1){
             return upperLevelNodes.get(0);
         }else{
-            throw new RuntimeException("should not happen");
+            throw new TPSNHException("nothing to pack");
         }
     }
 

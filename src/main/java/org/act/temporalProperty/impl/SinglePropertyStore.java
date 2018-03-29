@@ -302,7 +302,7 @@ public class SinglePropertyStore
             SeekingIterator<Slice, Slice> fileIterator = this.cache.newIterator(Filename.stPath(proDir, meta.getNumber()));
             FileBuffer buffer = propertyMeta.getStableBuffers( meta.getNumber() );
             if( null != buffer ){
-                iterator.add(TwoLevelMergeIterator.merge(buffer.iterator(), iterator));
+                iterator.add(TwoLevelMergeIterator.merge(buffer.iterator(), fileIterator));
             }else {
                 iterator.add(fileIterator);
             }
@@ -311,7 +311,7 @@ public class SinglePropertyStore
             SeekingIterator<Slice, Slice> fileIterator = this.cache.newIterator(Filename.unPath(proDir, meta.getNumber()));
             FileBuffer buffer = propertyMeta.getUnstableBuffers( meta.getNumber() );
             if( null != buffer ){
-                iterator.add(TwoLevelMergeIterator.merge(buffer.iterator(), iterator));
+                iterator.add(TwoLevelMergeIterator.merge(buffer.iterator(), fileIterator));
             }else {
                 iterator.add(fileIterator);
             }
