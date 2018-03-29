@@ -1,4 +1,4 @@
-package org.act.temporalProperty.impl.index;
+package org.act.temporalProperty.impl.index.singleval;
 
 import org.act.temporalProperty.TemporalPropertyStore;
 import org.act.temporalProperty.impl.RangeQueryCallBack;
@@ -7,7 +7,6 @@ import org.act.temporalProperty.index.IndexTableIterator;
 import org.act.temporalProperty.index.IndexValueType;
 import org.act.temporalProperty.index.PropertyValueInterval;
 import org.act.temporalProperty.index.rtree.IndexEntry;
-import org.act.temporalProperty.index.rtree.RTreeNode;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.StoreBuilder;
 import org.act.temporalProperty.util.TrafficDataImporter;

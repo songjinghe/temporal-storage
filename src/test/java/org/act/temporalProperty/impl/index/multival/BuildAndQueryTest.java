@@ -1,10 +1,7 @@
-package org.act.temporalProperty.impl.index;
+package org.act.temporalProperty.impl.index.multival;
 
 import org.act.temporalProperty.TemporalPropertyStore;
-import org.act.temporalProperty.TemporalPropertyStoreFactory;
-import org.act.temporalProperty.impl.InternalKey;
 import org.act.temporalProperty.impl.RangeQueryCallBack;
-import org.act.temporalProperty.impl.ValueType;
 import org.act.temporalProperty.index.IndexQueryRegion;
 import org.act.temporalProperty.index.IndexValueType;
 import org.act.temporalProperty.index.PropertyValueInterval;
@@ -18,10 +15,8 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Created by song on 2018-01-22.

@@ -1,4 +1,4 @@
-package org.act.temporalProperty.impl.index;
+package org.act.temporalProperty.impl.index.singleval;
 
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.Table;

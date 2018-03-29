@@ -1,4 +1,4 @@
-package org.act.temporalProperty.impl.index;
+package org.act.temporalProperty.impl.index.singleval;
 
 import org.act.temporalProperty.util.BasicSliceOutput;
 import org.act.temporalProperty.util.Slice;
