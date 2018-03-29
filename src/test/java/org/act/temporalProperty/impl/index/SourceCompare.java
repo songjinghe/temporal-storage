@@ -112,7 +112,7 @@ public class SourceCompare {
                         //int eTime = getEndTime(i + 1, endTime);
                         Slice value = new Slice(ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(travelTime).array());
 
-                        entryList.add(new IndexEntry(entityId, sTime, endTime, new Slice[]{value}));
+                        entryList.add(new IndexEntry(entityId, sTime, NOW_TIME, new Slice[]{value}));
 
                    // }
 
@@ -153,7 +153,8 @@ public class SourceCompare {
                     while(j < entityIdList.size()) {
 
                         if(j + 1 == entityIdList.size()) {
-                            eTime = entity.getEnd();
+                            //eTime = entity.getEnd();
+                            eTime = endTime;
 
                             if((travelTime >= valueMin) && (travelTime <= valueMax) &&
                                     (sTime <= endTime) && (eTime >= startTime)) {
