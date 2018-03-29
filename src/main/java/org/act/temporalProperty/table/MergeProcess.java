@@ -9,7 +9,6 @@ import java.nio.file.Files;
 import java.util.*;
 import java.util.Map.Entry;
 
-import org.act.temporalProperty.helper.SameLevelMergeIterator;
 import org.act.temporalProperty.impl.*;
 import org.act.temporalProperty.meta.PropertyMetaData;
 import org.act.temporalProperty.meta.SystemMeta;
@@ -200,7 +199,7 @@ public class MergeProcess extends Thread
                     if (null != filebuffer) {
                         mergeIterator = TwoLevelMergeIterator.merge(filebuffer.iterator(), table.iterator());
                         channel2close.add(filebuffer);
-                        files2delete.add(new File(propStoreDir, Filename.bufferFileName(fileNumber)));
+                        files2delete.add(new File(propStoreDir, Filename.unbufferFileName(fileNumber)));
                     } else {
                         mergeIterator = table.iterator();
                     }

@@ -40,9 +40,9 @@ public final class Filename
         return makeFileName( number, "stbuf" );
     }
     
-    public static String bufferFileName(long number)
+    public static String unbufferFileName(long number)
     {
-        return makeFileName( number, "buf" );
+        return makeFileName( number, "unbuf" );
     }
     
     /**

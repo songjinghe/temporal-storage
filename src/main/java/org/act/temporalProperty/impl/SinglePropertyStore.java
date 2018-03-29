@@ -3,7 +3,6 @@ package org.act.temporalProperty.impl;
 import org.act.temporalProperty.TemporalPropertyStore;
 import org.act.temporalProperty.helper.EPAppendIterator;
 import org.act.temporalProperty.helper.SameLevelMergeIterator;
-import org.act.temporalProperty.index.AppendIterator;
 import org.act.temporalProperty.meta.PropertyMetaData;
 import org.act.temporalProperty.table.TwoLevelMergeIterator;
 import org.act.temporalProperty.table.MergeProcess.MergeTask;
@@ -49,7 +48,7 @@ public class SinglePropertyStore
 
     private void loadBuffers() throws IOException {
         for(FileMetaData meta : propertyMeta.getUnStableFiles().values()){
-            File bufferFile = new File(this.proDir, Filename.bufferFileName(meta.getNumber()));
+            File bufferFile = new File(this.proDir, Filename.unbufferFileName(meta.getNumber()));
             if (bufferFile.exists()) {
                 FileBuffer buffer = new FileBuffer(bufferFile);
                 propertyMeta.addUnstableBuffer(meta.getNumber(), buffer);
@@ -224,7 +223,7 @@ public class SinglePropertyStore
 
         FileBuffer buffer = propertyMeta.getUnstableBuffers( meta.getNumber() );
         if( null == buffer ) {
-            buffer = new FileBuffer(new File(this.proDir, Filename.bufferFileName(meta.getNumber())));
+            buffer = new FileBuffer(new File(this.proDir, Filename.unbufferFileName(meta.getNumber())));
             propertyMeta.addUnstableBuffer(meta.getNumber(), buffer);
         }
         buffer.add( key.encode(), value );
@@ -239,7 +238,7 @@ public class SinglePropertyStore
 
         FileBuffer buffer = propertyMeta.getStableBuffers( meta.getNumber() );
         if( null == buffer ) {
-            buffer = new FileBuffer(new File(this.proDir, Filename.bufferFileName(meta.getNumber())));
+            buffer = new FileBuffer(new File(this.proDir, Filename.stbufferFileName(meta.getNumber())));
             propertyMeta.addStableBuffer(meta.getNumber(), buffer);
         }
         buffer.add( key.encode(), value );
@@ -251,7 +250,7 @@ public class SinglePropertyStore
 
     private void unBufferToFile(FileMetaData meta, FileBuffer buffer) throws IOException {
         String filePath = Filename.unPath(proDir, meta.getNumber());
-        String bufferPath = Filename.bufferFileName(meta.getNumber());
+        String bufferPath = Filename.unbufferFileName(meta.getNumber());
         File tempFile = buffer2file(filePath, bufferPath, buffer);
         propertyMeta.delUnstableBuffer(meta.getNumber());
         if(!tempFile.renameTo(new File(filePath))) throw new IOException("rename failed!");
