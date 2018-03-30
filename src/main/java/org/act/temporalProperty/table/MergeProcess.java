@@ -11,10 +11,9 @@ import java.util.Map.Entry;
 
 import org.act.temporalProperty.helper.SameLevelMergeIterator;
 import org.act.temporalProperty.impl.*;
+import org.act.temporalProperty.index.IndexStore;
 import org.act.temporalProperty.meta.PropertyMetaData;
 import org.act.temporalProperty.meta.SystemMeta;
-import org.act.temporalProperty.util.MergingIterator;
-import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.TableLatestValueIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,10 +28,12 @@ public class MergeProcess extends Thread
     private final String storeDir;
     private volatile MemTable memTable = null;
     private static Logger log = LoggerFactory.getLogger( MergeProcess.class );
+    private final IndexStore index;
 
-    public MergeProcess(String storePath, SystemMeta systemMeta ) {
+    public MergeProcess(String storePath, SystemMeta systemMeta, IndexStore index) {
         this.storeDir = storePath;
         this.systemMeta = systemMeta;
+        this.index = index;
     }
 
     // this is called from a writer thread.
@@ -82,6 +83,7 @@ public class MergeProcess extends Thread
                 tables.put(key.getPropertyId(), new MemTable( TableComparator.instance() ));
             }
             tables.get(key.getPropertyId()).add(entry.getKey().encode(), entry.getValue());
+            index.updateEntry(entry);
         }
 
         List<MergeTask> taskList = new LinkedList<>();
@@ -253,26 +255,38 @@ public class MergeProcess extends Thread
         }
 
         public void updateMetaInfo() throws IOException {
-            // remove old meta
-            for( Long fileNumber : mergeParticipants ){
-                pMeta.delUnstable( fileNumber );
-                pMeta.delUnstableBuffer( fileNumber );
-            }
+            // build new meta
+            FileMetaData targetMeta;
 
-            // add new meta to level
-            long fileNumber; int startTime;
-            if(createStableFile()){
-                fileNumber = pMeta.nextStableId();
-                if(pMeta.hasStable()) {
-                    startTime=pMeta.stMaxTime()+1;
+            if(onlyDumpMemTable()){
+                int startTime;
+                if(pMeta.hasDiskFile()) {
+                    startTime=pMeta.diskFileMaxTime()+1;
                 }else{
                     startTime=0;
                 }
-                FileMetaData targetMeta = new FileMetaData( fileNumber, targetChannel.size(), startTime, maxTime );
+                targetMeta = new FileMetaData( 0, targetChannel.size(), startTime, maxTime );
+            }else{
+                long fileNumber;
+                if(createStableFile()){
+                    fileNumber = pMeta.nextStableId();
+                }else {
+                    fileNumber = mergeParticipants.size();
+                }
+                int mergedMinTime = pMeta.getUnStableFiles().get(Collections.max(mergeParticipants)).getSmallest();
+                assert mergedMinTime<=minTime:"start time should <= minTime! ("+mergedMinTime+", min:"+minTime+")";
+                targetMeta = new FileMetaData( fileNumber, targetChannel.size(), mergedMinTime, maxTime );
+            }
+
+            // remove old meta
+            for( Long fileNum : mergeParticipants ){
+                pMeta.delUnstable( fileNum );
+                pMeta.delUnstableBuffer( fileNum );
+            }
+
+            if(createStableFile()){
                 pMeta.addStable(targetMeta);
             }else{
-                fileNumber = mergeParticipants.size();
-                FileMetaData targetMeta = new FileMetaData( fileNumber, targetChannel.size(), minTime, maxTime );
                 pMeta.addUnstable(targetMeta);
             }
 

@@ -1,6 +1,7 @@
 package org.act.temporalProperty.meta;
 
-import com.google.common.collect.Lists;
+import com.google.common.base.Preconditions;
+import org.act.temporalProperty.exception.TPSNHException;
 import org.act.temporalProperty.impl.FileBuffer;
 import org.act.temporalProperty.impl.FileMetaData;
 import org.act.temporalProperty.util.Slice;
@@ -25,8 +26,6 @@ public class PropertyMetaData {
     //所有UnStableFile对应的Buffer
     private final TreeMap<Long, FileBuffer> unStableFileBuffers = new TreeMap<>();
     //    private final TreeMap<Long, FileMetaData> memLogs = new TreeMap<>();
-
-    private int memTableMinTime;
 
     public PropertyMetaData(int propertyId, ValueContentType type){
         this.propertyId = propertyId;
@@ -67,16 +66,6 @@ public class PropertyMetaData {
         stableByTime.put(file.getSmallest(), file);
     }
 
-    public int memMinTime() {
-        return memTableMinTime;
-    }
-
-    public void updateMemTableMinTime(int memTableMinTime) {
-        if(memTableMinTime > this.memTableMinTime) {
-            this.memTableMinTime = memTableMinTime;
-        }
-    }
-
     public FileMetaData latestStableMeta(){
         Entry<Integer, FileMetaData> entry = stableByTime.lastEntry();
         if(entry!=null) return entry.getValue();
@@ -114,15 +103,6 @@ public class PropertyMetaData {
     }
 
     // returned meta's time is ASC order
-    public List<FileMetaData> overlappedUnstable(int startTime, int endTime) {
-        Integer start = unstableByTime.floorKey(startTime);
-        if(start!=null) {
-            startTime = start;
-        }
-        return new ArrayList<>(unstableByTime.subMap(startTime, true, endTime, true).values());
-    }
-
-    // returned meta's time is ASC order
     public List<FileMetaData> overlappedStable(int startTime, int endTime) {
         Integer start = stableByTime.floorKey(startTime);
         if(start!=null) {
@@ -156,48 +136,55 @@ public class PropertyMetaData {
             return stableByTime.get(start);
         }
     }
+
+    public int diskFileMaxTime(){
+        if(hasUnstable()) return unMaxTime();
+        else if(hasStable()) return stMaxTime();
+        else throw new TPSNHException("no disk file!");
+    }
+
     /**
      * 返回StableLevel存储的数据的最晚有效时间
      * @return -1 if no stable file available.
      */
     public int stMaxTime(){
-        long lastNumber;
-        try{
-            lastNumber = stableFiles.lastKey();
-            return stableFiles.get( lastNumber ).getLargest();
-        }catch( NoSuchElementException e ){
-            return -1;
-        }
-    }
-
-    // return the stable meta which contains the time.
-    public FileMetaData stHasTime(int time) {
-        Integer start = stableByTime.floorKey(time);
-        if(start==null) {
-            return null;
+        if(hasStable()){
+            return stableByTime.lastEntry().getValue().getLargest();
         }else{
-            return unstableByTime.get(start);
+            throw new TPSNHException("no stable file available!");
         }
-    }
-
-    public int unMinTime() {
-        try {
-            return unstableByTime.firstKey();
-        }catch (NoSuchElementException e) {
-            return 0;
-        }
-    }
-
-    public boolean hasStable(){
-        return stableFiles.size()>0;
-    }
-
-    public boolean hasUnstable(){
-        return unStableFiles.size()>0;
     }
 
     public int unMaxTime() {
-        return 0;
+        if(hasUnstable()){
+            return unstableByTime.lastEntry().getValue().getLargest();
+        }else{
+            throw new TPSNHException("no unstable files!");
+        }
+    }
+
+    /**
+     * @param time is usually larger than stMaxTime.
+     * @return the stable meta which contains the time.
+     */
+    public FileMetaData getStContainsTime(int time) {
+        assert hasStable():"no stable file!";
+        assert 0<=time:"time should >0 !";
+        Integer start = stableByTime.floorKey(time);
+        Preconditions.checkNotNull(start, new TPSNHException("should have 0<=time but get null"));
+        return stableByTime.get(start);
+    }
+
+    public boolean hasStable(){
+        return !stableFiles.isEmpty();
+    }
+
+    public boolean hasUnstable(){
+        return !unStableFiles.isEmpty();
+    }
+
+    public boolean hasDiskFile(){
+        return hasUnstable() || hasStable();
     }
 
     public void addUnstableBuffer(long number, FileBuffer buffer) {
@@ -217,7 +204,6 @@ public class PropertyMetaData {
                 ", stableFileBuffers=" + stableFileBuffers +
                 ", unStableFiles=" + unStableFiles +
                 ", unStableFileBuffers=" + unStableFileBuffers +
-                ", memTableMinTime=" + memTableMinTime +
                 '}';
     }
 }

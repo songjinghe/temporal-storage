@@ -69,20 +69,18 @@ public class SinglePropertyStore
     public Slice getPointValue(Slice idSlice, int time )
     {
         InternalKey searchKey = new InternalKey(idSlice, time);
-        if( time > propertyMeta.stMaxTime() ){
+        if( propertyMeta.hasUnstable() && time > propertyMeta.stMaxTime() ){
             Slice result = this.unPointValue( searchKey );
             if( null == result || result.length() == 0 ) {
                 return null;
             }else {
                 return result;
             }
-        }else {
-            FileMetaData meta = propertyMeta.stHasTime(time);
-            if(meta!=null) {
-                return this.stPointValue(meta, searchKey);
-            }else{
-                return null;
-            }
+        }else if(propertyMeta.hasStable() && time <= propertyMeta.stMaxTime()){
+            FileMetaData meta = propertyMeta.getStContainsTime(time);
+            return this.stPointValue(meta, searchKey);
+        }else{
+            return null;
         }
     }
 
@@ -203,7 +201,6 @@ public class SinglePropertyStore
             }
         }
         if(!stableMemTable.isEmpty()){
-            propertyMeta.updateMemTableMinTime( stableMemTable.getEndTime()+1 );
             return new MergeTask(proDir, stableMemTable, propertyMeta, this.cache);
         }else{
             return null;
