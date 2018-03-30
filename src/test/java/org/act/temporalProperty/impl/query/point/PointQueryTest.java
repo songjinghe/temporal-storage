@@ -50,7 +50,7 @@ public class PointQueryTest {
         StoreBuilder stBuilder = new StoreBuilder(dbDir, true);
         store = stBuilder.store();
         store.createProperty(0, ValueContentType.INT);
-        for(int time=10; time<Integer.MAX_VALUE/100-6; time+=5){
+        for(int time=10; time<Integer.MAX_VALUE/10000-6; time+=5){
             for(long entityId=1; entityId<5; entityId++){
                 StoreBuilder.setIntProperty(store, time, entityId, 0, time);
             }
@@ -64,6 +64,7 @@ public class PointQueryTest {
     public void test2fail2() throws Throwable {
         StoreBuilder stBuilder = new StoreBuilder(dbDir, true);
         store = stBuilder.store();
+        store.createProperty(0, ValueContentType.INT);
         for(long entityId=1; entityId<5; entityId++){
             for(int proId=0; proId<Integer.MAX_VALUE/1000-6; proId+=5){
                 StoreBuilder.setIntProperty(store, 0, entityId, proId, 0);

@@ -130,9 +130,11 @@ public class SinglePropertyStore
                 continue;
             }
             InternalKey resultKey = entry.getKey();
-            if (resultKey.getId().equals(searchKey.getId()) && resultKey.getValueType() == ValueType.VALUE) {
+            if (    resultKey.getId().equals(searchKey.getId()) &&
+                    resultKey.getValueType() == ValueType.VALUE &&
+                    resultKey.getStartTime() <= searchKey.getStartTime()) {
                 return entry.getValue();
-            }
+            } // else continue
         }
         // search unstable complete but not found. now search latest stable file
         FileMetaData meta = propertyMeta.latestStableMeta();
@@ -157,7 +159,9 @@ public class SinglePropertyStore
             return null;
         }
         InternalKey resultKey = entry.getKey();
-        if (resultKey.getId().equals(searchKey.getId()) && resultKey.getValueType() == ValueType.VALUE) {
+        if (    resultKey.getId().equals(searchKey.getId()) &&
+                resultKey.getStartTime()<=searchKey.getStartTime() &&
+                resultKey.getValueType() == ValueType.VALUE) {
             return entry.getValue();
         }else{
             return null;
