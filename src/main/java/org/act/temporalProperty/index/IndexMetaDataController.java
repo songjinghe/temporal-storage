@@ -1,6 +1,5 @@
 package org.act.temporalProperty.index;
 
-import org.act.temporalProperty.index.IndexMetaData.*;
 import org.act.temporalProperty.util.DynamicSliceOutput;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.SliceInput;
@@ -23,6 +22,7 @@ public class IndexMetaDataController {
         out.writeInt(meta.getType().getId());
         out.writeInt(meta.getTimeStart());
         out.writeInt(meta.getTimeEnd());
+        out.writeLong(meta.getFileSize());
         out.writeInt(meta.getPropertyIdList().size());
         for(Integer pid : meta.getPropertyIdList()){
             out.writeInt(pid);
@@ -34,12 +34,13 @@ public class IndexMetaDataController {
         IndexType tid = IndexType.decode(in.readInt());
         int start = in.readInt();
         int end = in.readInt();
+        long fileSize = in.readLong();
         int count = in.readInt();
         List<Integer> pidList = new ArrayList<>();
         for (int i = 0; i < count; i++) {
             pidList.add(in.readInt());
         }
-        return new IndexMetaData(id, tid, pidList, start, end);
+        return new IndexMetaData(id, tid, pidList, start, end, fileSize);
     }
 
     public static IndexMetaData decode(Slice in){

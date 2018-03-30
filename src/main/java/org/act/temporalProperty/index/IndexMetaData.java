@@ -11,13 +11,15 @@ public class IndexMetaData {
     private List<Integer> propertyIdList;
     private int timeStart;
     private int timeEnd;
+    private long fileSize;
 
-    public IndexMetaData(int id, IndexType type, List<Integer> pidList, int start, int end) {
+    public IndexMetaData(int id, IndexType type, List<Integer> pidList, int start, int end, long fileSize) {
         this.metaId = id;
         this.type = type;
         this.propertyIdList = pidList;
         this.timeStart = start;
         this.timeEnd = end;
+        this.fileSize = fileSize;
     }
 
     public int getId() {
@@ -40,7 +42,11 @@ public class IndexMetaData {
         return propertyIdList;
     }
 
-//    /**
+    public long getFileSize() {
+        return fileSize;
+    }
+
+    //    /**
 //     * Created by song on 2018-03-19.
 //     */
 //    public static class MultiValIndexMeta extends IndexMetaData {

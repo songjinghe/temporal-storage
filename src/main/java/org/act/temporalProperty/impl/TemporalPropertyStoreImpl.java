@@ -276,18 +276,16 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
 
     public SearchableIterator buildIndexIterator(int start, int end, List<Integer> proIds) {
         if(proIds.size()==1) {
-            return TwoLevelMergeIterator.toDisk(
-                    getMemTableIter(start, end),
-                    meta.getStore(proIds.get(0)).buildIndexIterator(start, end));
+            return new PropertyFilterIterator(proIds,
+                    TwoLevelMergeIterator.toDisk(
+                            getMemTableIter(start, end),
+                            meta.getStore(proIds.get(0)).buildIndexIterator(start, end)));
         }else{
             SameLevelMergeIterator merged = new SameLevelMergeIterator();
             for(Integer pid : proIds){
                 merged.add(meta.getStore(pid).buildIndexIterator(start, end));
             }
-            return new TwoLevelMergeIterator(
-                    getMemTableIter(start, end),
-                    merged
-            );
+            return new PropertyFilterIterator(proIds, new TwoLevelMergeIterator( getMemTableIter(start, end), merged));
         }
     }
 

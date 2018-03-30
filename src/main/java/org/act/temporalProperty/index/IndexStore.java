@@ -2,16 +2,13 @@ package org.act.temporalProperty.index;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.PeekingIterator;
-import org.act.temporalProperty.exception.TGraphNotImplementedException;
 import org.act.temporalProperty.impl.*;
 import org.act.temporalProperty.index.rtree.IndexEntry;
 import org.act.temporalProperty.index.rtree.IndexEntryOperator;
-import org.act.temporalProperty.util.Slice;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -94,14 +91,14 @@ public class IndexStore {
         }
         PeekingIterator<IndexEntry> data = indexBuilderCallback.getIterator(end);
 
-        FileChannel channel = new FileOutputStream(new File(this.indexDir, "index")).getChannel();
-        IndexTableWriter writer = new IndexTableWriter(channel, op);
-        while(data.hasNext()){
-            writer.add(data.next());
+        try(FileChannel channel = new FileOutputStream(new File(this.indexDir, "index")).getChannel()) {
+            IndexTableWriter writer = new IndexTableWriter(channel, op);
+            while (data.hasNext()) {
+                writer.add(data.next());
+            }
+            writer.finish();
+            return new IndexMetaData(nextId.getAndIncrement(), MULTI_VALUE, proIds, start, end, channel.size());
         }
-        writer.finish();
-        channel.close();
-        return new IndexMetaData(nextId.getAndIncrement(), MULTI_VALUE, proIds, start, end);
     }
 
     private void addSingleValIndex(IndexMetaData indexMeta) {
@@ -137,14 +134,14 @@ public class IndexStore {
         }
         PeekingIterator<IndexEntry> data = indexBuilderCallback.getIterator(end);
 
-        FileChannel channel = new FileOutputStream(new File(this.indexDir, "index")).getChannel();
-        IndexTableWriter writer = new IndexTableWriter(channel, op);
-        while(data.hasNext()){
-            writer.add(data.next());
+        try(FileChannel channel = new FileOutputStream(new File(this.indexDir, "index")).getChannel()) {
+            IndexTableWriter writer = new IndexTableWriter(channel, op);
+            while (data.hasNext()) {
+                writer.add(data.next());
+            }
+            writer.finish();
+            return new IndexMetaData(nextId.getAndIncrement(), SINGLE_VALUE, Lists.newArrayList(proId), start, end, channel.size());
         }
-        writer.finish();
-        channel.close();
-        return new IndexMetaData(nextId.getAndIncrement(), SINGLE_VALUE, Lists.newArrayList(proId), start, end);
     }
 
     public List<IndexEntry> valueIndexQuery(IndexQueryRegion condition) throws IOException {
