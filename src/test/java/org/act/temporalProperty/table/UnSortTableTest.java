@@ -27,7 +27,7 @@ public class UnSortTableTest
             if( file.exists() )
                 file.delete();
             file.createNewFile();
-            table = new UnSortedTable( fileName, file );
+            table = new UnSortedTable( file );
             for( int i = 0; i<DATA_SIZE; i++ )
             {
                 Slice key = new Slice( 20 );

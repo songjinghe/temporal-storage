@@ -19,10 +19,10 @@ public class IndexMetaDataController {
     }
 
     public static void encode(SliceOutput out, IndexMetaData meta){
-        out.writeInt(meta.getId());
         out.writeInt(meta.getType().getId());
         out.writeInt(meta.getTimeStart());
         out.writeInt(meta.getTimeEnd());
+        out.writeLong(meta.getFileSize());
         out.writeInt(meta.getPropertyIdList().size());
         for(Integer pid : meta.getPropertyIdList()){
             out.writeInt(pid);
@@ -34,12 +34,13 @@ public class IndexMetaDataController {
         IndexType tid = IndexType.decode(in.readInt());
         int start = in.readInt();
         int end = in.readInt();
+        long fileSize = in.readLong();
         int count = in.readInt();
         List<Integer> pidList = new ArrayList<>();
-        for(int i=0; i<count; i++){
+        for (int i = 0; i < count; i++) {
             pidList.add(in.readInt());
         }
-        return new IndexMetaData(id, tid, pidList, start, end);
+        return new IndexMetaData(id, tid, pidList, start, end, fileSize);
     }
 
     public static IndexMetaData decode(Slice in){

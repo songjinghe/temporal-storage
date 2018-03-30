@@ -1,242 +1,249 @@
 package org.act.temporalProperty.impl;
 
-import java.io.*;
+import org.act.temporalProperty.TemporalPropertyStore;
+import org.act.temporalProperty.exception.TPSNHException;
+import org.act.temporalProperty.exception.TPSRuntimeException;
+import org.act.temporalProperty.helper.SameLevelMergeIterator;
+import org.act.temporalProperty.helper.StoreInitial;
+import org.act.temporalProperty.helper.EPEntryIterator;
+import org.act.temporalProperty.helper.EPMergeIterator;
+import org.act.temporalProperty.index.*;
+import org.act.temporalProperty.index.rtree.IndexEntry;
+import org.act.temporalProperty.index.rtree.IndexEntryOperator;
+import org.act.temporalProperty.meta.PropertyMetaData;
+import org.act.temporalProperty.meta.SystemMeta;
+import org.act.temporalProperty.meta.SystemMetaController;
+import org.act.temporalProperty.meta.ValueContentType;
+import org.act.temporalProperty.table.TwoLevelMergeIterator;
+import org.act.temporalProperty.table.MergeProcess;
+import org.act.temporalProperty.table.TableBuilder;
+import org.act.temporalProperty.table.TableComparator;
+import org.act.temporalProperty.util.Slice;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.nio.channels.FileChannel;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map.Entry;
 import java.util.Set;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import org.act.temporalProperty.TemporalPropertyStore;
-import org.act.temporalProperty.index.*;
-import org.act.temporalProperty.index.rtree.IndexEntry;
-import org.act.temporalProperty.table.MergeProcess;
-import org.act.temporalProperty.util.Slice;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 /**
- * DynPropertyStore的实现类
+ * TemporalPropertyStore的实现类
  *
  */
 public class TemporalPropertyStoreImpl implements TemporalPropertyStore
 {
-    private UnstableLevel unLevel;
-    private StableLevel stlevel;
+    private SystemMeta meta;
     private MergeProcess mergeProcess;
-    private String dbDir;
-    private TemporalValueIndex index;
-    private ReadWriteLock fileMetaLock;
-    private Logger log = LoggerFactory.getLogger( TemporalPropertyStoreImpl.class );
-    
+    private File dbDir;
+    private TableCache cache;
+    private MemTable memTable;
+    private MemTable stableMemTable; // a full memtable, which only used for query and (to be) merged, never write.
+    private IndexStore index;
+
+    private boolean forbiddenWrite=false;
+
+
     /**
-     * 实例化方法
      * @param dbDir 存储动态属性数据的目录地址
      */
-    public TemporalPropertyStoreImpl(String dbDir ) throws Throwable
-    {
+    public TemporalPropertyStoreImpl( File dbDir ) throws Throwable{
         this.dbDir = dbDir;
-        this.fileMetaLock = new ReentrantReadWriteLock( true );
-        this.stlevel = new StableLevel( dbDir,fileMetaLock );
-        this.mergeProcess = new MergeProcess( dbDir, this.stlevel,fileMetaLock );
-        this.unLevel = new UnstableLevel( dbDir, this.mergeProcess,fileMetaLock, this.stlevel );
-        this.mergeProcess.setUnStableLevel(this.unLevel);
-//        Runtime.getRuntime().addShutdownHook( new Thread(){
-//            public void run()
-//            {
-//                TemporalPropertyStoreImpl.this.stop();
-//            }
-//        });
-        start();
+        this.init();
+        this.cache = new TableCache( 25, TableComparator.instance(), false);
+        this.meta.initStore(dbDir, cache);
+        this.index = new IndexStore(new File(dbDir, "index"), this, meta.getIndexes());
+        this.mergeProcess = new MergeProcess(dbDir.getAbsolutePath(), meta, index);
+        this.mergeProcess.start();
     }
-    
-    
-    public void shutDown()
-    {
-    	this.stop();
-    }
-    
-    /**
-     * 退出系统时调用，主要作用是将内存中的数据写入磁盘。
-     */
-    private void stop()
-    {
-        this.unLevel.dumpMemTable2disc();
-        this.unLevel.dumpFileMeta2disc();
-        this.stlevel.dumpFileMeta2disc();
-    }
-    
+
     /**
      * 系统启动时调用，主要作用是将上次系统关闭时写入磁盘的数据读入内存
      */
-    private void start() throws Throwable
+    private void init() throws Throwable
     {
-        List<FileMetaData> unstableFiles = readMetaInfo("unstable");
-        List<FileMetaData> stableFiles = readMetaInfo("stable");
+        StoreInitial starter = new StoreInitial(dbDir);
+        this.meta = starter.getMetaInfo();
+        this.memTable = starter.getMemTable();
 
-        for(FileMetaData file : unstableFiles){
-            this.unLevel.initFromDisk( file );
-        }
-
-        for(FileMetaData file: stableFiles){
-            this.stlevel.initFromDisk( file );
-        }
-
-        Files.deleteIfExists(new File(this.dbDir+'/'+Filename.tempFileName(6)).toPath());
-        Files.deleteIfExists(new File(this.dbDir+'/'+Filename.tempFileName(7)).toPath());
-
-        this.unLevel.restoreMemTable();
     }
 
-    private List<FileMetaData> readMetaInfo(String stableOrUnStable) throws IOException {
-        List<FileMetaData> metaDataList = new ArrayList<>();
-        File metaFile = getValidMetaFile(stableOrUnStable);
-        if( metaFile.exists() )
-        {
-            FileInputStream inputStream = new FileInputStream( metaFile );
-            FileChannel channel = inputStream.getChannel();
-            LogReader logReader = new LogReader( channel, null, false, 0 );
-            for( Slice logRecord = logReader.readRecord(); logRecord != null; logRecord = logReader.readRecord() )
-            {
-                VersionEdit edit = new VersionEdit( logRecord );
-                for( Entry<Integer,FileMetaData> entry : edit.getNewFiles().entries() )
-                {
-                    metaDataList.add(entry.getValue());
-                }
-            }
-            inputStream.close();
-            channel.close();
-        }
-        return metaDataList;
+    /**
+     * 退出系统时调用，主要作用是将内存中的数据写入磁盘。
+     */
+    public void shutDown()
+    {
+        this.flushMemTable2Disk();
+        this.flushMetaInfo2Disk();
     }
 
-    private File getValidMetaFile(String stableOrUnStable) throws IOException {
-        File oldMetaFile = new File( this.dbDir + "/"+stableOrUnStable+".meta" );
-        File newMetaFile = new File( this.dbDir + "/"+stableOrUnStable+".new.meta" );
-        if( oldMetaFile.exists()) { // old exist then use old.
-            if(newMetaFile.exists() && !newMetaFile.delete()){ // delete new.
-                throw new IOException("Recovery: can not delete " + stableOrUnStable + ".new.meta file!");
-            }
-            return oldMetaFile;
-        }else if(newMetaFile.exists()){
-            if(isValidMetaFile(newMetaFile)) {
-                // old not exist and new exist & valid. so rename to old
-                if (!newMetaFile.renameTo(oldMetaFile)) {
-                    throw new IOException("Recovery: can not rename " + stableOrUnStable + ".new.meta file!");
+
+    @Override
+    public Slice getPointValue(long entityId, int proId, int time ) {
+        Slice idSlice = toSlice(proId, entityId);
+        InternalKey searchKey = new InternalKey( idSlice, time );
+        this.meta.lockShared();
+        try {
+            Slice result = memTable.get(searchKey.encode());
+            if (result != null && result.length() > 0) {
+                return result;
+            } else if (this.stableMemTable != null) {
+                result = stableMemTable.get(searchKey.encode());
+                if (result != null && result.length() > 0) {
+                    return result;
+                } else {
+                    return meta.getStore(proId).getPointValue(idSlice, time);
                 }
+            } else {
+                return meta.getStore(proId).getPointValue(idSlice, time);
+            }
+        }finally {
+            this.meta.unLockShared();
+        }
+    }
+
+    @Override
+    public Object getRangeValue( long id, int proId, int startTime, int endTime, RangeQueryCallBack callback ) {
+        meta.lockShared();
+        try{
+            Slice idSlice = toSlice(proId, id);
+
+            SearchableIterator memIter = new EPEntryIterator(idSlice, new PackInternalKeyIterator(memTable.iterator()));
+            if(this.stableMemTable!=null) memIter = new EPMergeIterator(idSlice, new PackInternalKeyIterator(stableMemTable.iterator()), memIter);
+            SearchableIterator diskIter = meta.getStore(proId).getRangeValueIter(idSlice, startTime, endTime);
+            SearchableIterator mergedIterator = new EPMergeIterator(idSlice, diskIter, memIter);
+
+            InternalKey searchKey = new InternalKey( idSlice, startTime );
+            mergedIterator.seek(searchKey);
+            while(mergedIterator.hasNext()){
+                InternalEntry entry = mergedIterator.next();
+                InternalKey key = entry.getKey();
+                if( key.getStartTime() <= endTime && key.getValueType() == ValueType.VALUE){
+                    callback.onCall(key.getStartTime(), entry.getValue());
+                }else break;
+            }
+            return callback.onReturn();
+        }finally{
+            meta.unLockShared();
+        }
+    }
+
+    @Override
+    public boolean createProperty(int propertyId, ValueContentType type) {
+        SinglePropertyStore prop = meta.proStores().get(propertyId);
+        if(prop==null){
+            try {
+                PropertyMetaData pMeta = new PropertyMetaData(propertyId, type);
+                meta.addStore(propertyId, new SinglePropertyStore(pMeta, dbDir,cache));
+                meta.addProperty(pMeta);
+                return true;
+            } catch (Throwable ignore) {
+                return false;
+            }
+        }else{
+            PropertyMetaData pMeta = meta.getProperties().get(propertyId);
+            if(pMeta!=null && pMeta.getType()==type){
+                // already exist, maybe in recovery. so just delete all property then create again.
+                deleteProperty(propertyId);
+                createProperty(propertyId, type);
+                return true;
             }else{
-                // old not exist and new invalid. so db is damaged.
-                throw new IOException("Recovery: invalid " + stableOrUnStable + ".new.meta , db is damaged!");
+                throw new TPSRuntimeException("create temporal property failed, exist property with same id but diff type!");
             }
-            return oldMetaFile;
-        }else { // both old new not exist. is a empty folder. do nothing.
-            return oldMetaFile;
         }
     }
 
-    private boolean isValidMetaFile(File newMetaFile) throws IOException {
-        String EOF = "EOF!EOF!EOF!";
-        long index = newMetaFile.length() - EOF.length();
-        if( index > 0 ) {
-            RandomAccessFile raf = new RandomAccessFile(newMetaFile, "r");
-            raf.seek(index);// Seek to the end of file
-            byte[] bytes = new byte[EOF.length()];
-            raf.read(bytes, 0, EOF.length());// Read it out.
-            raf.close();
-            return new String(bytes).equals(EOF);
-        }else{
+    @Override
+    public boolean setProperty( Slice key, byte[] value ){
+        InternalKey internalKey = new InternalKey(key);
+        if(!meta.getProperties().containsKey(internalKey.getPropertyId())){
+            throw new TPSNHException("no such property id: "+internalKey.getPropertyId()+". should create first!");
+        }
+
+        meta.lockExclusive();
+        try{
+            if(forbiddenWrite) meta.waitWriteCondition.await();
+            this.memTable.add(key, new Slice(value));
+            if( this.memTable.approximateMemUsage() >= 4*1024*1024 ){
+                forbiddenWrite = true;
+                this.stableMemTable = this.memTable;
+                this.mergeProcess.add( this.stableMemTable ); // may await at current line.
+                this.memTable = new MemTable( TableComparator.instance() );
+                forbiddenWrite = false;
+            }
+            meta.waitWriteCondition.signal();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
             return false;
+        } finally {
+            meta.unLockExclusive();
         }
-    }
-
-
-    /**
-     * 进行时间点查询，参考{@link TemporalPropertyStore}中的说明
-     */
-    @Override
-    public Slice getPointValue( long id, int proId, int time )
-    {
-        Slice idSlice = new Slice( 12 );
-        idSlice.setLong( 0, id );
-        idSlice.setInt( 8, proId );
-        if( time >= this.stlevel.getTimeBoundary() )
-        {
-            Slice toret = this.unLevel.getPointValue( idSlice, time );
-            if( null == toret )
-                return this.stlevel.getPointValue( idSlice, time );
-            else if( toret.length() == 0 )
-                return null;
-            else
-                return toret;
-        }
-        else
-            return this.stlevel.getPointValue( idSlice, time );
-    }
-    
-    /**
-     * 进行实践段查询，参考{@link TemporalPropertyStore}中的说明
-     */
-    @Override
-    public Object getRangeValue( long id, int proId, int startTime, int endTime, RangeQueryCallBack callback )
-    {
-        this.fileMetaLock.readLock().lock();
-        Slice idSlice = new Slice( 12 );
-        idSlice.setLong( 0, id );
-        idSlice.setInt( 8, proId );
-
-        EPAppendIterator diskFileIter = new EPAppendIterator(idSlice);
-        if( startTime < this.stlevel.getTimeBoundary() ) {
-            diskFileIter.append(this.stlevel.getRangeValueIter(idSlice, startTime, Math.min((int) this.stlevel.getTimeBoundary(), endTime)));
-        }
-        if( endTime >= this.stlevel.getTimeBoundary() ) {
-            diskFileIter.append(this.unLevel.getRangeValueIter(idSlice, Math.max((int) this.stlevel.getTimeBoundary(), startTime), endTime));
-        }
-
-        SeekingIterator<Slice,Slice> mergedIterator;
-        if(diskFileIter.size()>0){
-            mergedIterator = new EPMergeIterator(idSlice, diskFileIter, this.unLevel.getMemTableIter(idSlice));
-        }else{
-            mergedIterator = this.unLevel.getMemTableIter(idSlice);
-        }
-
-        InternalKey searchKey = new InternalKey( idSlice, startTime, 0, ValueType.VALUE );
-        mergedIterator.seek(searchKey.encode());
-        while(mergedIterator.hasNext()){
-            Entry<Slice,Slice> entry = mergedIterator.next();
-            InternalKey key = new InternalKey( entry.getKey() );
-            if( key.getStartTime() <= endTime && key.getValueType() == ValueType.VALUE){
-                callback.onCall(key.getStartTime(), entry.getValue());
-            }else break;
-        }
-        this.fileMetaLock.readLock().unlock();
-        return callback.onReturn();
-    }
-
-    
-    /**
-     * 写数据，参考{@link TemporalPropertyStore}中的说明
-     */
-    @Override
-    public boolean setProperty( Slice key, byte[] value )
-    {
-        Slice valueSlice = new Slice( value );
-        InternalKey internalKey = new InternalKey( key );
-        return this.unLevel.set( internalKey, valueSlice );
+        return true;
     }
 
     @Override
-    public boolean delete( Slice id )
-    {
-        // TODO Auto-generated method stub
+    public boolean deleteProperty(int propertyId) {
+        meta.lockExclusive();
+        try{
+            meta.getProperties().remove(propertyId);
+            meta.getStore(propertyId).destroy();
+            Set<IndexMetaData> indexSet = meta.getIndexes();
+            for(IndexMetaData iMeta : indexSet){
+                Set<Integer> pids = new HashSet<>(iMeta.getPropertyIdList());
+                if(pids.contains(propertyId)) indexSet.remove(iMeta);
+            }
+            index.deleteProperty(propertyId);
+            return true;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
+        } finally {
+            meta.unLockExclusive();
+        }
+    }
+
+    @Override
+    public boolean deleteEntityProperty(Slice id) {
+        //TODO
         return false;
     }
 
     @Override
-    public void createValueIndex(int start, int end, List<Integer> proIds, List<IndexValueType> types) {
-        unLevel.createValueIndex(start, end, proIds, types);
+    public void createValueIndex(int start, int end, List<Integer> proIds) {
+        List<IndexValueType> types = new ArrayList<>();
+        for(Integer pid : proIds){
+            PropertyMetaData pMeta = meta.getProperties().get(pid);
+            if(pMeta!=null) {
+                types.add(IndexValueType.convertFrom(pMeta.getType()));
+            }else{
+                throw new TPSRuntimeException("storage not contains property id "+pid);
+            }
+        }
+        createValueIndex(start, end, proIds, types);
+    }
+
+    private void createValueIndex(int start, int end, List<Integer> proIds, List<IndexValueType> types){
+        if(proIds.isEmpty()) throw new RuntimeException("should have at least one proId");
+        meta.lockShared();
+        try {
+            index.createValueIndex(start, end, proIds, types);
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            meta.unLockShared();
+        }
+    }
+
+
+
+    private IndexEntryOperator extractOperator(IndexQueryRegion regions) {
+        List<IndexValueType> types = new ArrayList<>();
+        for(PropertyValueInterval p : regions.getPropertyValueIntervals()){
+            types.add(p.getType());
+        }
+        return new IndexEntryOperator(types, 4096);
     }
 
     @Override
@@ -252,32 +259,84 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
     @Override
     public List<IndexEntry> getEntries(IndexQueryRegion condition) {
         try {
-            return unLevel.valueIndexQuery(condition);
+            return index.valueIndexQuery(condition);
         } catch (IOException e) {
             e.printStackTrace();
             throw new RuntimeException(e);
         }
     }
 
+    private SearchableIterator getMemTableIter(int start, int end){
+        if(this.stableMemTable != null) {
+            return TwoLevelMergeIterator.merge(memTable.iterator(), stableMemTable.iterator());
+        }else{
+            return new PackInternalKeyIterator(memTable.iterator());
+        }
+    }
+
+    public SearchableIterator buildIndexIterator(int start, int end, List<Integer> proIds) {
+        if(proIds.size()==1) {
+            return new PropertyFilterIterator(proIds,
+                    TwoLevelMergeIterator.toDisk(
+                            getMemTableIter(start, end),
+                            meta.getStore(proIds.get(0)).buildIndexIterator(start, end)));
+        }else{
+            SameLevelMergeIterator merged = new SameLevelMergeIterator();
+            for(Integer pid : proIds){
+                merged.add(meta.getStore(pid).buildIndexIterator(start, end));
+            }
+            return new PropertyFilterIterator(proIds, new TwoLevelMergeIterator( getMemTableIter(start, end), merged));
+        }
+    }
+
+
+    private static Slice toSlice(int proId, long id) {
+        Slice result = new Slice(12);
+        result.setLong( 0, id );
+        result.setInt( 8, proId );
+        return result;
+    }
+
+
 
     /**
+     * 在系统关闭时，将MemTable中的数据写入磁盘
      * @Author Sjh
      * this is called when we need to manually start a merge process which force all data in memory to unstable file
      * on disk. we than create a new empty MemTable.
      * note that this method blocks current thread until all operation done.
      */
     @Override
-    public void flushMemTable2Disk()
-    {
-        this.unLevel.forceMemTableMerge();
+    public void flushMemTable2Disk(){
+        try{
+            File tempFile = new File( this.dbDir + "/" + Filename.tempFileName( 0 ));
+            if( !tempFile.exists() )
+                tempFile.createNewFile();
+            FileOutputStream outputStream = new FileOutputStream( tempFile );
+            FileChannel channel = outputStream.getChannel();
+            TableBuilder builer = new TableBuilder( new Options(), channel, TableComparator.instance() );
+            SearchableIterator iterator = new PackInternalKeyIterator(this.memTable.iterator());
+            while( iterator.hasNext() ){
+                InternalEntry entry = iterator.next();
+                builer.add( entry.getKey().encode(), entry.getValue() );
+            }
+            builer.finish();
+            channel.close();
+            outputStream.close();
+        }catch( IOException e ){
+            e.printStackTrace();
+            throw new TPSRuntimeException("memTable flush failed", e);
+        }
     }
 
-
     @Override
-    public void flushMetaInfo2Disk()
-    {
-        this.unLevel.forceFileMetaToDisk();
-        this.stlevel.dumpFileMeta2disc();
+    public void flushMetaInfo2Disk(){
+        try {
+            SystemMetaController.forceToDisk(this.dbDir, this.meta);
+        } catch (IOException e) {
+            e.printStackTrace();
+            throw new TPSRuntimeException("meta flush to disk failed", e);
+        }
     }
 
 

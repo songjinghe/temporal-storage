@@ -1,4 +1,4 @@
-package org.act.temporalProperty.impl.index;
+package org.act.temporalProperty.impl.index.singleval;
 
 import com.google.common.collect.Table;
 import org.act.temporalProperty.TemporalPropertyStore;
@@ -9,7 +9,6 @@ import org.act.temporalProperty.index.PropertyValueInterval;
 import org.act.temporalProperty.index.rtree.IndexEntry;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.StoreBuilder;
-import org.act.temporalProperty.util.TimeIntervalUtil;
 import org.act.temporalProperty.util.TrafficDataImporter;
 import org.apache.commons.lang3.SystemUtils;
 import org.junit.After;
@@ -24,7 +23,7 @@ import java.util.*;
  * Created by song on 2018-01-27.
  */
 public class CorrectnessTest {
-    private static Logger log = LoggerFactory.getLogger(BuildAndQueryTest.class);
+    private static Logger log = LoggerFactory.getLogger(CorrectnessTest.class);
 
     private static String dataPath(){
          if(SystemUtils.IS_OS_WINDOWS){
@@ -49,8 +48,8 @@ public class CorrectnessTest {
     @Before
     public void initDB() throws Throwable {
         stBuilder = new StoreBuilder(dbDir(), true);
-        importer = new TrafficDataImporter(stBuilder.store(), dataPath(), 10);
-        sourceEntry = new SourceCompare(dataPath(), 10); //fileCount = 10; no entry in timeRange, but query results can be found in Index and Range? --- endTime (<=endTime --> < endTime?)
+        importer = new TrafficDataImporter(stBuilder.store(), dataPath(), 1000);
+        sourceEntry = new SourceCompare(dataPath(), 1000); //fileCount = 10; no entry in timeRange, but query results can be found in Index and Range? --- endTime (<=endTime --> < endTime?)
         log.info("time: {} - {}", importer.getMinTime(), importer.getMaxTime());
         store = stBuilder.store();
         buildIndex();
@@ -59,11 +58,9 @@ public class CorrectnessTest {
     private void buildIndex(){
         List<Integer> proIds = new ArrayList<>();
         proIds.add(1);
-        List<IndexValueType> types = new ArrayList<>();
-        types.add(IndexValueType.INT);
 //        store.createValueIndex(1288803660, 1288824660, proIds, types);
 //        store.createValueIndex(1288800300, 1288802460, proIds, types);
-        store.createValueIndex(1560, 27360, proIds, types);
+        store.createValueIndex(1560, 27360, proIds);
         log.info("create index done");
     }
 
@@ -75,33 +72,32 @@ public class CorrectnessTest {
 
     private void compare(int startTime, int endTime, int valMin, int valMax){
 
-
         List<IndexEntry> rangeResult = sourceEntry.queryBySource(startTime, endTime, valMin, valMax);
         rangeResult.sort(cmp);
 
         List<IndexEntry> indexResult = queryByIndex(startTime, endTime, valMin, valMax);//27000
         indexResult.sort(cmp);
         log.info("index query complete");
+        List<IndexEntry> indexResult2 = sourceEntry.mergeIndexResult(indexResult);
 
 //        List<IndexEntry> rangeResult = queryByRange( startTime, endTime, valMin, valMax);
 //        rangeResult.sort(cmp);
 //        log.info("range query complete");
 
         log.info("size: range({}) vs index({})", rangeResult.size(), indexResult.size());
-
+//
         sameEntities(rangeResult, indexResult);
 
-        int i;
-        for(i=0; i<rangeResult.size() && i<indexResult.size(); i++){
-            IndexEntry rangeE = rangeResult.get(i);
-            IndexEntry indexE = indexResult.get(i);
-            if(!rangeE.equals(indexE)){
-                if(!partialEqual(rangeE, indexE, startTime, endTime)) {
-                    log.debug("entry not equal. index({}) vs range({})", indexE, rangeE);
-                }
-            }
-            if(i>1000) return;
-        }
+//        for(int i=0; i<rangeResult.size() && i<indexResult.size(); i++){
+//            IndexEntry rangeE = rangeResult.get(i);
+//            IndexEntry indexE = indexResult.get(i);
+//            if(!rangeE.equals(indexE)){
+//                if(!partialEqual(rangeE, indexE, startTime, endTime)) {
+//                    log.debug("entry not equal. index({}) vs range({})", indexE, rangeE);
+//                }
+//            }
+//            if(i>1000) return;
+//        }
 
 //        log.info("begin validation");
 //        for(IndexEntry entry : indexResult){
@@ -129,6 +125,14 @@ public class CorrectnessTest {
         log.debug("eid only in index: {}", indexEntities);
 
         List<Table<IndexEntry, String, String>> diffLists = sourceEntry.listDiffer(rangeEntities, rangeResult);
+
+        for(Table<IndexEntry, String, String> entity : diffLists){
+            for(IndexEntry rowId : entity.rowKeySet()){
+                for(Map.Entry<String, String> x : entity.row(rowId).entrySet()) {
+                    log.debug("{} {} {}", rowId, x.getKey(), x.getValue());
+                }
+            }
+        }
 
 
         return rangeEntities.isEmpty() && indexEntities.isEmpty();
@@ -177,6 +181,7 @@ public class CorrectnessTest {
 
     private List<IndexEntry> queryByRange(int timeMin, int timeMax, int valueMin, int valueMax){
         List<IndexEntry> result = new ArrayList<>();
+        int count=0;
         for(Long entityId : importer.getRoadIdMap().values()){
             store.getRangeValue(entityId, 1, timeMin, timeMax,
                     new CustomCallBack(entityId){
@@ -205,9 +210,8 @@ public class CorrectnessTest {
                             return null;
                         }
                     });
-
+            if(++count%500==0) log.info("iterate range query result count {}", result.size());
         }
-//        log.info("iterate result count {}", result.size());
         return result;
     }
 
@@ -247,6 +251,27 @@ public class CorrectnessTest {
             return false;
         }
         return true;
+    }
+
+    @Test
+    public void manualValidate(){
+        int timeMin=0,  timeMax=9999999;
+        long entityId = 353;
+
+        store.getRangeValue(entityId, 1, timeMin, timeMax,
+                new CustomCallBack(entityId){
+                    public void onCall(int time, Slice value) {
+                        log.debug("time({}) val({})", time, value.getInt(0));
+                    }
+                    public Object onReturn() {
+                        return null;
+                    }
+                });
+        List<IndexEntry> indexResult = queryByIndex(18300, 20000, 380, 400);
+        log.debug("result size {}", indexResult.size());
+        for(IndexEntry entry : indexResult) {
+            log.debug("{}", entry);
+        }
     }
 
     private static boolean overlap(int t1min, int t1max, int t2min, int t2max){return (t1min<=t2max && t2min<=t1max);}

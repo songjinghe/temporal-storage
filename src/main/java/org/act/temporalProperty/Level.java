@@ -29,17 +29,5 @@ public interface Level
      */
     void getRangeValue( Slice idSlice, int startTime, int endTime, RangeQueryCallBack callback );
     
-    /**
-     * 向level中写入动态属性数据
-     * @param key
-     * @param value
-     * @return
-     */
-    boolean set( InternalKey key, Slice value );
-    
-    /**
-     * 在系统启动阶段，初始化属于自己level的存储文件
-     * @param metaData
-     */
-    void initFromDisk(FileMetaData metaData );
+
 }

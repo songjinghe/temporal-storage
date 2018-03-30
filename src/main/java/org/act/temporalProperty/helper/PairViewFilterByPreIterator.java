@@ -1,0 +1,37 @@
+package org.act.temporalProperty.helper;
+
+import com.google.common.collect.AbstractIterator;
+import com.google.common.collect.PeekingIterator;
+
+import java.util.Iterator;
+
+/**
+ * Created by song on 2018-03-28.
+ */
+public abstract class PairViewFilterByPreIterator<T> extends AbstractIterator<T> {
+    private final PeekingIterator<T> in;
+    private T lastReturned;
+
+    public PairViewFilterByPreIterator(PeekingIterator<T> in){
+        this.in = in;
+        lastReturned = null;
+    }
+
+    @Override
+    protected T computeNext() {
+        while(in.hasNext() && !shouldReturnSecond(lastReturned, in.peek())){
+            in.next();
+        }
+        if(in.hasNext()){
+            lastReturned = in.peek();
+            return in.next();
+        }else{
+            return endOfData();
+        }
+    }
+
+    protected boolean shouldReturnSecond(T pre, T cur) {
+        throw new UnsupportedOperationException("method `shouldReturnSecond` should be override!");
+    }
+
+}

@@ -1,6 +1,7 @@
 package org.act.temporalProperty.util;
 
 import org.act.temporalProperty.TemporalPropertyStore;
+import org.act.temporalProperty.meta.ValueContentType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,6 +28,10 @@ public class TrafficDataImporter {
     public TrafficDataImporter(TemporalPropertyStore store, String dataPath, int inputFileCount) throws IOException {
         this.store = store;
         this.dataPath = new File(dataPath);
+        store.createProperty(1, ValueContentType.INT);
+//        store.createProperty(2, ValueContentType.INT);
+//        store.createProperty(3, ValueContentType.INT);
+//        store.createProperty(4, ValueContentType.INT);
         this.inputData(inputFileCount);
     }
 
@@ -46,7 +51,6 @@ public class TrafficDataImporter {
         List<File> dataFileList = new ArrayList<>();
         getFileRecursive(dataPath, dataFileList, 5);
         dataFileList.sort((Comparator.comparing(File::getName)));
-
         for (int i = 0; i < dataFileList.size() && i<inputFileCount; i++) {
             File file = dataFileList.get(i);
             int time = timeStr2int(file.getName().substring(9, 21)) - 1288800000;
@@ -59,7 +63,7 @@ public class TrafficDataImporter {
                     input(time, line);
                 }
             }
-//            log.info("input files done {} {}", file.getName(), time);
+            if(i%10==0) log.info("input {} files, current {}, time {}", i, file.getName(), time);
         }
         log.info("input files done, {} roads", this.roadIdMap.size());
     }
@@ -97,9 +101,9 @@ public class TrafficDataImporter {
         long roadId = getId(gridId, chainId);
 //        log.debug("eid({}), time({}), travelTime({})", roadId, time, travelTime);
         setIntProperty(store, time, roadId, 1, travelTime);
-        setIntProperty(store, time, roadId, 2, fullStatus);
-        setIntProperty(store, time, roadId, 3, vehicleCount);
-        setIntProperty(store, time, roadId, 4, segmentCount);
+//        setIntProperty(store, time, roadId, 2, fullStatus);
+//        setIntProperty(store, time, roadId, 3, vehicleCount);
+//        setIntProperty(store, time, roadId, 4, segmentCount);
     }
 
     private long getId(String gridId, String chainId) {

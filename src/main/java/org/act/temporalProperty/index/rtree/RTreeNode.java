@@ -35,7 +35,7 @@ public abstract class RTreeNode
     }
 
     public String toString(){
-        return "RTreeNode[bound="+bound.toString()+"]";
+        return "RTreeNode[bound="+(bound==null?"null":bound.toString())+"]";
     }
 
     // method only for index nodes ================

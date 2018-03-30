@@ -1,13 +1,11 @@
-package org.act.temporalProperty.impl.index;
+package org.act.temporalProperty.impl.index.multival;
 
 import org.act.temporalProperty.TemporalPropertyStore;
-import org.act.temporalProperty.TemporalPropertyStoreFactory;
-import org.act.temporalProperty.impl.InternalKey;
 import org.act.temporalProperty.impl.RangeQueryCallBack;
-import org.act.temporalProperty.impl.ValueType;
 import org.act.temporalProperty.index.IndexQueryRegion;
 import org.act.temporalProperty.index.IndexValueType;
 import org.act.temporalProperty.index.PropertyValueInterval;
+import org.act.temporalProperty.index.rtree.IndexEntry;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.StoreBuilder;
 import org.act.temporalProperty.util.TrafficDataImporter;
@@ -18,10 +16,8 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Created by song on 2018-01-22.
@@ -47,21 +43,24 @@ public class BuildAndQueryTest {
     public void buildIndex(){
         List<Integer> proIds = new ArrayList<>();
         proIds.add(1);
-        List<IndexValueType> types = new ArrayList<>();
-        types.add(IndexValueType.INT);
+        proIds.add(2);
+        proIds.add(3);
+        proIds.add(4);
 //        store.createValueIndex(1288803660, 1288824660, proIds, types);
 //        store.createValueIndex(1288800300, 1288802460, proIds, types);
-        store.createValueIndex(1560, 27360, proIds, types);
+        store.createValueIndex(1560, 27360, proIds);
         log.info("create index done");
     }
 
     @Test
     public void main() throws Throwable {
-        testRangeQuery(store);
-        List<Long> iterResult = queryByIter( 18300, 27000, 0, 200);
+//        testRangeQuery(store);
+//        List<Long> iterResult = queryByIter( 18300, 27000, 0, 200);
 
-        List<Long> indexResult = queryByIndex(18300, 27000, 0, 200);
-
+        List<IndexEntry> indexResult = queryByIndex(18300, 27000, 0, 200);
+        for(int i=0; i<100; i++){
+            log.debug("{}", indexResult.get(i));
+        }
 
 //        for(int time=0; time<=18300; time+=100){
 //            for(int value=0; value<=400; value+=20){
@@ -71,14 +70,14 @@ public class BuildAndQueryTest {
         store.shutDown();
     }
 
-    private List<Long> queryByIndex(int timeMin, int timeMax, int valueMin, int valueMax){
+    private List<IndexEntry> queryByIndex(int timeMin, int timeMax, int valueMin, int valueMax){
         IndexQueryRegion condition = new IndexQueryRegion(timeMin, timeMax);
         Slice minValue = new Slice(4);
         minValue.setInt(0, valueMin);
         Slice maxValue = new Slice(4);
         maxValue.setInt(0, valueMax);
         condition.add(new PropertyValueInterval(1, minValue, maxValue, IndexValueType.INT));
-        List<Long> result = store.getEntities(condition);
+        List<IndexEntry> result = store.getEntries(condition);
         log.info("index result count {}", result.size());
         return result;
     }
@@ -107,7 +106,7 @@ public class BuildAndQueryTest {
 
 
     private static void testRangeQuery(TemporalPropertyStore store) {
-        store.getRangeValue(2, 2, 1560, 27000, new RangeQueryCallBack() {
+        store.getRangeValue(2, 1, 1560, 27000, new RangeQueryCallBack() {
             public void setValueType(String valueType) {}
             public void onCall(int time, Slice value) {
                 log.info("{} {}", time, value.getInt(0));

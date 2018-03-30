@@ -39,6 +39,8 @@ public class IndexTableWriter {
     }
 
     public void finish() throws IOException {
+        if(dataEntries.isEmpty()) return;
+
         RTree tree = new RTree(dataEntries, op);
 
         ByteBuffer startPos = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN);

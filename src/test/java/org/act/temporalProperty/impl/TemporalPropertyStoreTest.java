@@ -26,7 +26,7 @@ public class TemporalPropertyStoreTest
     public void writeData() throws Throwable
     {
         makeDir();
-		store = TemporalPropertyStoreFactory.newPropertyStore( dbDir );
+		store = TemporalPropertyStoreFactory.newPropertyStore( new File(dbDir) );
         long start = System.currentTimeMillis();
         singleThreadWrite();
         //singleThreadRecureWrite();

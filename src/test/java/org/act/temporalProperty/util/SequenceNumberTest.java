@@ -32,9 +32,9 @@ public class SequenceNumberTest
             if( times[i] % 3 == 0 )
                 valueTypes[i] = ValueType.VALUE;
             else if( times[i] % 3 == 1 )
-                valueTypes[i] = ValueType.DELETION;
-            else
                 valueTypes[i] = ValueType.INVALID;
+            else
+                valueTypes[i] = ValueType.UNKNOWN;
             sequences[i] = SequenceNumber.packSequenceAndValueType( times[i], valueLengths[i], valueTypes[i] );
         }
     }

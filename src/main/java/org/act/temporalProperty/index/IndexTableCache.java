@@ -20,47 +20,32 @@ import java.util.concurrent.ExecutionException;
  */
 public class IndexTableCache {
 
-    private final LoadingCache<Long, IndexTableFile> cache;
+    private final LoadingCache<String, IndexTableFile> cache;
 
-    public IndexTableCache(final File databaseDir, int tableCacheSize)
+    public IndexTableCache(final File indexDir, int tableCacheSize)
     {
-        Preconditions.checkNotNull(databaseDir, "databaseName is null");
+        Preconditions.checkNotNull(indexDir, "databaseName is null");
         cache = CacheBuilder.newBuilder()
                 .maximumSize(tableCacheSize)
-                .build(new CacheLoader<Long, IndexTableFile>(){
+                .build(new CacheLoader<String, IndexTableFile>(){
                     @Override
-                    public IndexTableFile load(Long fileNumber) throws IOException{
-                        return new IndexTableFile(databaseDir, fileNumber);
+                    public IndexTableFile load(String fileAbsPath) throws IOException{
+                        return new IndexTableFile(fileAbsPath);
                     }
                 });
     }
 
-//    public Iterator<Slice> newIterator(IndexFileMeta file)
-//    {
-//        return newIterator(file.getNo());
-//    }
-//
-//    /**
-//     * 通过文件的编号，得到相应文件的Iterator
-//     * @param number 文件编号
-//     * @return 相应文件的Iterator
-//     */
-//    public Iterator<Slice> newIterator(long number)
-//    {
-//        return getTable(number).iterator();
-//    }
-
-    private IndexTable getTable(long number)
+    public IndexTable getTable(String absPath)
     {
         IndexTable table;
         try {
-            table = cache.get(number).getTable();
+            table = cache.get(absPath).getTable();
         } catch (ExecutionException e) {
             Throwable cause = e;
             if (e.getCause() != null) {
                 cause = e.getCause();
             }
-            throw new RuntimeException("Could not open table " + number, cause);
+            throw new RuntimeException("Could not open table " + absPath, cause);
         }
         return table;
     }
@@ -74,10 +59,10 @@ public class IndexTableCache {
 
     /**
      * 将某个文件从缓存中排除
-     * @param number 文件编号
+     * @param fileAbsPath 文件编号
      */
-    public void evict(long number){
-        cache.invalidate(number);
+    public void evict(String fileAbsPath){
+        cache.invalidate(fileAbsPath);
     }
 
     private static final class IndexTableFile
@@ -85,10 +70,8 @@ public class IndexTableCache {
         private final IndexTable table;
         private final FileChannel fileChannel;
 
-        private IndexTableFile(File databaseDir, long fileNumber) throws IOException{
-            String tableFileName = Filename.unStableFileName(fileNumber);
-            File tableFile = new File(databaseDir, tableFileName);
-            fileChannel = new RandomAccessFile(tableFile,"rw").getChannel();
+        private IndexTableFile(String fileAbsPath) throws IOException{
+            fileChannel = new RandomAccessFile(new File(fileAbsPath),"rw").getChannel();
             table = new IndexTable(fileChannel);
         }
 

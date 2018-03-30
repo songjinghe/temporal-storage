@@ -144,8 +144,31 @@ public class IndexEntry {
         return "IndexEntry{" +
                 "start=" + start +
                 ", end=" + end +
-                ", value=" + value[0].getInt(0) +
+                ", value=" + value2Str() +
                 ", entityId=" + entityId +
                 '}';
+    }
+
+    private String value2Str(){
+        if(value==null){
+            return "null";
+        }else if(value.length==0){
+            return "[empty]";
+        }else{
+            StringBuilder sb = new StringBuilder();
+            sb.append("[");
+            for(int i=0; i<value.length; i++) {
+                if (value[i] != null) {
+                    sb.append(value[i].getInt(0));
+                } else {
+                    sb.append("null");
+                }
+                if(i<value.length-1) {
+                    sb.append(", ");
+                }
+            }
+            sb.append("]");
+            return sb.toString();
+        }
     }
 }

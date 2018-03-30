@@ -13,7 +13,7 @@ import com.google.common.base.Preconditions;
 public final class SequenceNumber
 {
     
-    public static final int MAX_VALUE_LENGTH = 1073741823;
+    public static final int MAX_VALUE_LENGTH = 0x3fffffff;
 
     private SequenceNumber()
     {
@@ -45,6 +45,6 @@ public final class SequenceNumber
     
     public static int unpackTime( long num )
     {
-        return (int)( (num >> 2) & (4294967295L) );
+        return (int)( (num >> 2) & (0xffffffff) );
     }
 }

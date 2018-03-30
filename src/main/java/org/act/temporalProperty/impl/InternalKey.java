@@ -1,6 +1,7 @@
 
 package org.act.temporalProperty.impl;
 
+import org.act.temporalProperty.table.FixedIdComparator;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.SliceOutput;
 import org.act.temporalProperty.util.Slices;
@@ -13,7 +14,7 @@ import static org.act.temporalProperty.util.SizeOf.SIZE_OF_LONG;
  * InternalKey是将一个动态属性的点/边id，属性id，某个时间以及相关控制位编码为一个键值对中的键的机制。在设计文档中，我们将一个动态属性的数据分为多个record，而InternalKey就
  * 是一个record的key
  */
-public class InternalKey
+public class InternalKey implements Comparable<InternalKey>
 {
     /**
      * 属性id
@@ -39,8 +40,6 @@ public class InternalKey
      * 此key对应的record类型
      */
     private final ValueType valueType;
-
-    
     /**
      * 新建一个InternalKey，将相关信息传入，用于编码后生成一个Slice
      * @param Id
@@ -61,6 +60,15 @@ public class InternalKey
         this.startTime = startTime;
         this.valueType = valueType;
         this.valueLength = valueLength;
+    }
+    /**
+     * 新建一个InternalKey，将相关信息传入，用于编码后生成一个Slice，通常用于查找
+     * @param Id
+     * @param startTime
+     */
+    public InternalKey(Slice Id, int startTime)
+    {
+        this(Id, startTime, 0, ValueType.VALUE);
     }
 
     /**
@@ -204,5 +212,15 @@ public class InternalKey
     private static Slice getId(Slice data)
     {
         return data.slice(0, 12);
+    }
+
+    @Override
+    public int compareTo(InternalKey o) {
+        int result = FixedIdComparator.compareId( this.getId(), o.getId() );
+        if( 0 != result ) {
+            return result;
+        }else {
+            return Long.compare(this.getStartTime(), o.getStartTime());
+        }
     }
 }

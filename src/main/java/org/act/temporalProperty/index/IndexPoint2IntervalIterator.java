@@ -75,8 +75,12 @@ public class IndexPoint2IntervalIterator extends AbstractIterator<IndexEntry> im
                 }
             }
         }
-        reachEnd=true;
-        return outputEntry(endTime);
+        if(map.isEmpty()){
+            return endOfData();
+        }else {
+            reachEnd = true;
+            return outputEntry(endTime);
+        }
     }
 
     private IndexEntry outputEntry(int endTime) {

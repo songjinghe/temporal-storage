@@ -1,4 +1,4 @@
-package org.act.temporalProperty.index;
+package org.act.temporalProperty.exception;
 
 /**
  * Created by song on 2018-01-20.

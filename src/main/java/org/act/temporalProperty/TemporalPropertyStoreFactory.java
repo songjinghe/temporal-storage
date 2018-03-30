@@ -1,6 +1,9 @@
 package org.act.temporalProperty;
 
 import org.act.temporalProperty.impl.TemporalPropertyStoreImpl;
+
+import java.io.File;
+
 /**
  * 新建动态属性存储的工厂类
  *
@@ -12,7 +15,7 @@ public class TemporalPropertyStoreFactory
 	 * @param dbDir 保存动态属性存储文件的目录
 	 * @return
 	 */
-    public static TemporalPropertyStore newPropertyStore(String dbDir ) throws Throwable {
+    public static TemporalPropertyStore newPropertyStore(File dbDir ) throws Throwable {
         return new TemporalPropertyStoreImpl( dbDir );
     }
 }

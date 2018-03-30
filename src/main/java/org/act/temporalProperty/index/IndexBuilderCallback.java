@@ -23,8 +23,8 @@ public class IndexBuilderCallback {
     }
 
     public void onCall(int propertyId, long entityId, int startTime, Slice value) {
-        data.add(new TimePointEntry(propertyId, entityId, startTime, value));
         if(!proIdSet.contains(propertyId)) throw new RuntimeException("SNH: pro not in given list");
+        data.add(new TimePointEntry(propertyId, entityId, startTime, value));
     }
 
     public PeekingIterator<IndexEntry> getIterator(int endTime){

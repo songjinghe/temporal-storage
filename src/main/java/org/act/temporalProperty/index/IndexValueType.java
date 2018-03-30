@@ -1,6 +1,7 @@
 package org.act.temporalProperty.index;
 
 import com.google.common.base.Preconditions;
+import org.act.temporalProperty.meta.ValueContentType;
 import org.act.temporalProperty.util.Slice;
 
 /**
@@ -143,7 +144,7 @@ public enum IndexValueType {
         return id;
     }
 
-    static IndexValueType decode(int id){
+    public static IndexValueType decode(int id){
         Preconditions.checkArgument(0<=id && id<=4);
         switch(id){
             case 0: return INT;
@@ -151,6 +152,16 @@ public enum IndexValueType {
             case 2: return FLOAT;
             case 3: return DOUBLE;
             default:return STRING;
+        }
+    }
+
+    public static IndexValueType convertFrom(ValueContentType type){
+        switch(type){
+            case INT: return IndexValueType.INT;
+            case LONG: return IndexValueType.LONG;
+            case FLOAT: return IndexValueType.FLOAT;
+            case DOUBLE: return IndexValueType.DOUBLE;
+            default:return IndexValueType.STRING;
         }
     }
 

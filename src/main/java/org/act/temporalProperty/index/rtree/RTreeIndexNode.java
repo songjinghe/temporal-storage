@@ -1,5 +1,6 @@
 package org.act.temporalProperty.index.rtree;
 
+import org.act.temporalProperty.exception.TPSNHException;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.SliceInput;
 import org.act.temporalProperty.util.SliceOutput;
@@ -62,6 +63,8 @@ public class RTreeIndexNode extends RTreeNode {
                 bounds.add(node.getBound().getMax());
             }
             this.bound = new RTreeRange(bounds, op);
+        }else{
+            throw new TPSNHException("no children node!");
         }
     }
 

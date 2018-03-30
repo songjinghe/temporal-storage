@@ -44,4 +44,9 @@ public class FixedIdComparator implements UserComparator
         // TODO Auto-generated method stub
         return null;
     }
+
+    private static UserComparator self = new FixedIdComparator();
+    public static int compareId(Slice o1, Slice o2){
+        return self.compare(o1, o2);
+    }
 }
