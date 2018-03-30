@@ -64,17 +64,17 @@ public class PointQueryTest {
     public void test2fail2() throws Throwable {
         StoreBuilder stBuilder = new StoreBuilder(dbDir, true);
         store = stBuilder.store();
-        store.createProperty(0, ValueContentType.INT);
-        for(long entityId=1; entityId<5; entityId++){
-            for(int proId=0; proId<Integer.MAX_VALUE/1000-6; proId+=5){
-                StoreBuilder.setIntProperty(store, 0, entityId, proId, 0);
+        for(int proId=1; proId<5; proId++){
+            store.createProperty(proId, ValueContentType.INT);
+            for(int entity=0; entity<Integer.MAX_VALUE/1000-6; entity+=5){
+                StoreBuilder.setIntProperty(store, 0, entity, proId,  0);
             }
-            for(int proId=0; proId<Integer.MAX_VALUE/1000-6; proId+=3){
-                StoreBuilder.setIntProperty(store, 10, entityId, proId, 10);
+            for(int entity=0; entity<Integer.MAX_VALUE/1000-6; entity+=3){
+                StoreBuilder.setIntProperty(store, 10, entity, proId, 10);
             }
-            log.debug("version {} write finish", entityId);
+            log.debug("version {} write finish", proId);
         }
-        Slice val = store.getPointValue(1, 3, 4); // bug, throws NoSuchElementException
+        Slice val = store.getPointValue(0, 3, 4); // bug, throws NoSuchElementException
         log.debug("{}", val.getInt(0)); // should be 0
     }
 

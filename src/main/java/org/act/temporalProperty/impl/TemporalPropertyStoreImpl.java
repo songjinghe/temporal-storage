@@ -1,6 +1,7 @@
 package org.act.temporalProperty.impl;
 
 import org.act.temporalProperty.TemporalPropertyStore;
+import org.act.temporalProperty.exception.TPSNHException;
 import org.act.temporalProperty.exception.TPSRuntimeException;
 import org.act.temporalProperty.helper.SameLevelMergeIterator;
 import org.act.temporalProperty.helper.StoreInitial;
@@ -156,6 +157,11 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
 
     @Override
     public boolean setProperty( Slice key, byte[] value ){
+        InternalKey internalKey = new InternalKey(key);
+        if(!meta.getProperties().containsKey(internalKey.getPropertyId())){
+            throw new TPSNHException("no such property id: "+internalKey.getPropertyId()+". should create first!");
+        }
+
         meta.lockExclusive();
         try{
             if(forbiddenWrite) meta.waitWriteCondition.await();

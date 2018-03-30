@@ -69,14 +69,15 @@ public class SinglePropertyStore
     public Slice getPointValue(Slice idSlice, int time )
     {
         InternalKey searchKey = new InternalKey(idSlice, time);
-        if( propertyMeta.hasUnstable() && time > propertyMeta.stMaxTime() ){
+        boolean hasStable = propertyMeta.hasStable();
+        if(propertyMeta.hasUnstable() && ((hasStable && time>propertyMeta.stMaxTime()) || (!hasStable && time>=0))){
             Slice result = this.unPointValue( searchKey );
             if( null == result || result.length() == 0 ) {
                 return null;
             }else {
                 return result;
             }
-        }else if(propertyMeta.hasStable() && time <= propertyMeta.stMaxTime()){
+        }else if(hasStable && time <= propertyMeta.stMaxTime()){
             FileMetaData meta = propertyMeta.getStContainsTime(time);
             return this.stPointValue(meta, searchKey);
         }else{
