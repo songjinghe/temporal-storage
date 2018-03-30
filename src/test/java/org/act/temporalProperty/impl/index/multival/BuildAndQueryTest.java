@@ -5,6 +5,7 @@ import org.act.temporalProperty.impl.RangeQueryCallBack;
 import org.act.temporalProperty.index.IndexQueryRegion;
 import org.act.temporalProperty.index.IndexValueType;
 import org.act.temporalProperty.index.PropertyValueInterval;
+import org.act.temporalProperty.index.rtree.IndexEntry;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.StoreBuilder;
 import org.act.temporalProperty.util.TrafficDataImporter;
@@ -53,11 +54,13 @@ public class BuildAndQueryTest {
 
     @Test
     public void main() throws Throwable {
-        testRangeQuery(store);
+//        testRangeQuery(store);
 //        List<Long> iterResult = queryByIter( 18300, 27000, 0, 200);
 
-        List<Long> indexResult = queryByIndex(18300, 27000, 0, 200);
-
+        List<IndexEntry> indexResult = queryByIndex(18300, 27000, 0, 200);
+        for(int i=0; i<100; i++){
+            log.debug("{}", indexResult.get(i));
+        }
 
 //        for(int time=0; time<=18300; time+=100){
 //            for(int value=0; value<=400; value+=20){
@@ -67,14 +70,14 @@ public class BuildAndQueryTest {
         store.shutDown();
     }
 
-    private List<Long> queryByIndex(int timeMin, int timeMax, int valueMin, int valueMax){
+    private List<IndexEntry> queryByIndex(int timeMin, int timeMax, int valueMin, int valueMax){
         IndexQueryRegion condition = new IndexQueryRegion(timeMin, timeMax);
         Slice minValue = new Slice(4);
         minValue.setInt(0, valueMin);
         Slice maxValue = new Slice(4);
         maxValue.setInt(0, valueMax);
         condition.add(new PropertyValueInterval(1, minValue, maxValue, IndexValueType.INT));
-        List<Long> result = store.getEntities(condition);
+        List<IndexEntry> result = store.getEntries(condition);
         log.info("index result count {}", result.size());
         return result;
     }

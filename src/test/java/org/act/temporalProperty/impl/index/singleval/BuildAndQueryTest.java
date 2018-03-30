@@ -32,7 +32,7 @@ public class BuildAndQueryTest {
     @BeforeClass
     public static void initDB() throws Throwable {
         stBuilder = new StoreBuilder(dbDir, true);
-        importer = new TrafficDataImporter(stBuilder.store(), dataPath, 100);
+        importer = new TrafficDataImporter(stBuilder.store(), dataPath, 180);
         log.info("time: {} - {}", importer.getMinTime(), importer.getMaxTime());
         store = stBuilder.store();
     }
@@ -41,9 +41,6 @@ public class BuildAndQueryTest {
     public void buildIndex(){
         List<Integer> proIds = new ArrayList<>();
         proIds.add(1);
-        proIds.add(2);
-        proIds.add(3);
-        proIds.add(4);
 //        store.createValueIndex(1288803660, 1288824660, proIds, types);
 //        store.createValueIndex(1288800300, 1288802460, proIds, types);
         store.createValueIndex(1560, 27360, proIds);
