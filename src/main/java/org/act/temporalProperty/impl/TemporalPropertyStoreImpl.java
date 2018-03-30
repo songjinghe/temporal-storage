@@ -1,7 +1,6 @@
 package org.act.temporalProperty.impl;
 
 import org.act.temporalProperty.TemporalPropertyStore;
-import org.act.temporalProperty.exception.TGraphNotImplementedException;
 import org.act.temporalProperty.exception.TPSRuntimeException;
 import org.act.temporalProperty.helper.SameLevelMergeIterator;
 import org.act.temporalProperty.helper.StoreInitial;
@@ -27,7 +26,6 @@ import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map.Entry;
 import java.util.Set;
 
 /**
@@ -54,10 +52,10 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
         this.dbDir = dbDir;
         this.init();
         this.cache = new TableCache( 25, TableComparator.instance(), false);
-        this.mergeProcess = new MergeProcess(dbDir.getAbsolutePath(), meta);
-        this.mergeProcess.start();
         this.meta.initStore(dbDir, cache);
         this.index = new IndexStore(new File(dbDir, "index"), this, meta.getIndexes());
+        this.mergeProcess = new MergeProcess(dbDir.getAbsolutePath(), meta, index);
+        this.mergeProcess.start();
     }
 
     /**
@@ -211,7 +209,11 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
         List<IndexValueType> types = new ArrayList<>();
         for(Integer pid : proIds){
             PropertyMetaData pMeta = meta.getProperties().get(pid);
-            types.add(IndexValueType.convertFrom(pMeta.getType()));
+            if(pMeta!=null) {
+                types.add(IndexValueType.convertFrom(pMeta.getType()));
+            }else{
+                throw new TPSRuntimeException("storage not contains property id "+pid);
+            }
         }
         createValueIndex(start, end, proIds, types);
     }

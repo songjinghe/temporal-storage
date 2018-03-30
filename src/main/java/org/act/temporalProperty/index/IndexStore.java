@@ -164,4 +164,9 @@ public class IndexStore {
     public void deleteProperty(int propertyId) {
         //Fixme TODO
     }
+
+    public void updateEntry(InternalEntry entry) {
+        InternalKey key = entry.getKey();
+
+    }
 }

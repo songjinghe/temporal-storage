@@ -159,7 +159,7 @@ public class IndexEntry {
             sb.append("[");
             for(int i=0; i<value.length; i++) {
                 if (value[i] != null) {
-                    sb.append(value[0].getInt(0));
+                    sb.append(value[i].getInt(0));
                 } else {
                     sb.append("null");
                 }
