@@ -122,6 +122,7 @@ public class MergeProcess extends Thread
         private final List<Closeable> channel2close = new LinkedList<>();
         private final List<File> files2delete = new LinkedList<>();
         private final List<String> table2evict = new LinkedList<>();
+        private final int mergeParticipantsMinTime;
 
         private int entryCount;
         private int minTime;
@@ -139,6 +140,15 @@ public class MergeProcess extends Thread
             this.pMeta = proMeta;
             this.cache = cache;
             this.mergeParticipants = getFile2Merge(proMeta.getUnStableFiles());
+            if(!onlyDumpMemTable()) {
+                this.mergeParticipantsMinTime = calcMergeMinTime();
+            }else{
+                this.mergeParticipantsMinTime = -1;
+            }
+        }
+
+        private int calcMergeMinTime() {
+            return pMeta.getUnStableFiles().get(Collections.max(mergeParticipants)).getSmallest();
         }
 
         private TableBuilder mergeInit(String targetFileName) throws IOException
@@ -212,8 +222,7 @@ public class MergeProcess extends Thread
                 }
                 SearchableIterator diskDataIter;
                 if (createStableFile() && pMeta.hasStable()) {
-                    int mergeResultStartTime = pMeta.getUnStableFiles().get(Collections.max(mergeParticipants)).getSmallest();
-                    diskDataIter = TwoLevelMergeIterator.merge(unstableIter, stableLatestValIter(mergeResultStartTime));
+                    diskDataIter = TwoLevelMergeIterator.merge(unstableIter, stableLatestValIter(mergeParticipantsMinTime));
                 } else {
                     diskDataIter = unstableIter;
                 }
@@ -273,9 +282,8 @@ public class MergeProcess extends Thread
                 }else {
                     fileNumber = mergeParticipants.size();
                 }
-                int mergedMinTime = pMeta.getUnStableFiles().get(Collections.max(mergeParticipants)).getSmallest();
-                assert mergedMinTime<=minTime:"start time should <= minTime! ("+mergedMinTime+", min:"+minTime+")";
-                targetMeta = new FileMetaData( fileNumber, targetChannel.size(), mergedMinTime, maxTime );
+                assert mergeParticipantsMinTime<=minTime:"start time should <= minTime! ("+mergeParticipantsMinTime+", min:"+minTime+")";
+                targetMeta = new FileMetaData( fileNumber, targetChannel.size(), mergeParticipantsMinTime, maxTime );
             }
 
             // remove old meta
