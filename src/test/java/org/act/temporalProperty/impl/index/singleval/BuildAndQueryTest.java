@@ -5,6 +5,7 @@ import org.act.temporalProperty.impl.RangeQueryCallBack;
 import org.act.temporalProperty.index.IndexQueryRegion;
 import org.act.temporalProperty.index.IndexValueType;
 import org.act.temporalProperty.index.PropertyValueInterval;
+import org.act.temporalProperty.meta.ValueContentType;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.StoreBuilder;
 import org.act.temporalProperty.util.TrafficDataImporter;
@@ -32,7 +33,7 @@ public class BuildAndQueryTest {
     @BeforeClass
     public static void initDB() throws Throwable {
         stBuilder = new StoreBuilder(dbDir, true);
-        importer = new TrafficDataImporter(stBuilder.store(), dataPath, 180);
+        importer = new TrafficDataImporter(stBuilder.store(), dataPath, 100);
         log.info("time: {} - {}", importer.getMinTime(), importer.getMaxTime());
         store = stBuilder.store();
     }
@@ -41,9 +42,10 @@ public class BuildAndQueryTest {
     public void buildIndex(){
         List<Integer> proIds = new ArrayList<>();
         proIds.add(1);
-//        store.createValueIndex(1288803660, 1288824660, proIds, types);
+//        store.createProperty(1, ValueContentType.INT);
+        store.createValueIndex(20, 200, proIds);
 //        store.createValueIndex(1288800300, 1288802460, proIds, types);
-        store.createValueIndex(1560, 27360, proIds);
+//        store.createValueIndex(1560, 27360, proIds);
         log.info("create index done");
     }
 
