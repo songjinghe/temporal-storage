@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.act.temporalProperty.index.IndexType.MULTI_VALUE;
 import static org.act.temporalProperty.index.IndexType.SINGLE_VALUE;
@@ -23,7 +24,7 @@ public class IndexStore {
     private final TemporalPropertyStoreImpl tpStore;
     private IndexTableCache cache;
     private File indexDir;
-    private AtomicInteger nextId = new AtomicInteger(0);
+    private AtomicLong nextId = new AtomicLong(0);
     //meta
     private Map<Integer, TreeMap<Integer, IndexMetaData>> singleVal = new HashMap<>(); // proId, time
     private TreeMap<Integer, List<IndexMetaData>> multiVal = new TreeMap<>(); // time
@@ -66,38 +67,38 @@ public class IndexStore {
     }
 
     public void createValueIndex(int start, int end, List<Integer> proIds, List<IndexValueType> types) throws IOException {
-        IndexMetaData indexMeta;
+        long fileId = nextId.getAndIncrement();
+        long fileSize = createValIndex(start, end, proIds, types, fileId);
         if (proIds.size() == 1) {
-            indexMeta = createSingleValIndex(start, end, proIds.get(0), types.get(0));
-            addSingleValIndex(indexMeta);
+            addSingleValIndex(new IndexMetaData(fileId, SINGLE_VALUE, proIds, start, end, fileSize));
         } else {
-            indexMeta = createMultiValIndex(start, end, proIds, types);
-            addMultiValIndex(indexMeta);
+            addMultiValIndex(new IndexMetaData(fileId, MULTI_VALUE, proIds, start, end, fileSize));
         }
     }
 
-    private IndexMetaData createMultiValIndex(int start, int end, List<Integer> proIds, List<IndexValueType> types) throws IOException {
+    private long createValIndex(int start, int end, List<Integer> proIds, List<IndexValueType> types, long fileId) throws IOException {
         IndexEntryOperator op = new IndexEntryOperator(Lists.newArrayList(types),4096);
         SearchableIterator iterator = tpStore.buildIndexIterator(start, end, proIds);
-        IndexBuilderCallback indexBuilderCallback = new IndexBuilderCallback(proIds, op);
+        IndexBuilderCallback dataCollector = new IndexBuilderCallback(proIds, op);
         while(iterator.hasNext()){
             InternalEntry entry = iterator.next();
             InternalKey key = entry.getKey();
             if(key.getValueType()== ValueType.INVALID) {
-                indexBuilderCallback.onCall(key.getPropertyId(), key.getEntityId(), key.getStartTime(), null);
+                dataCollector.onCall(key.getPropertyId(), key.getEntityId(), key.getStartTime(), null);
             }else{
-                indexBuilderCallback.onCall(key.getPropertyId(), key.getEntityId(), key.getStartTime(), entry.getValue());
+                dataCollector.onCall(key.getPropertyId(), key.getEntityId(), key.getStartTime(), entry.getValue());
             }
         }
-        PeekingIterator<IndexEntry> data = indexBuilderCallback.getIterator(start, end);
+        PeekingIterator<IndexEntry> data = dataCollector.getIterator(start, end);
 
-        try(FileChannel channel = new FileOutputStream(new File(this.indexDir, "index")).getChannel()) {
+        String indexFilePath = Filename.valIndexFileName(fileId);
+        try(FileChannel channel = new FileOutputStream(new File(this.indexDir, indexFilePath)).getChannel()) {
             IndexTableWriter writer = new IndexTableWriter(channel, op);
             while (data.hasNext()) {
                 writer.add(data.next());
             }
             writer.finish();
-            return new IndexMetaData(nextId.getAndIncrement(), MULTI_VALUE, proIds, start, end, channel.size());
+            return channel.size();
         }
     }
 
@@ -116,32 +117,6 @@ public class IndexStore {
         int pid = indexMeta.getPropertyIdList().get(0);
         aggr.computeIfAbsent(pid, k -> new TreeMap<>());
         aggr.get(pid).put(indexMeta.getTimeStart(), indexMeta);
-    }
-
-
-    private IndexMetaData createSingleValIndex(int start, int end, int proId, IndexValueType types) throws IOException {
-        IndexEntryOperator op = new IndexEntryOperator(Lists.newArrayList(types),4096);
-        SearchableIterator iterator = tpStore.buildIndexIterator(start, end, Lists.newArrayList(proId));
-        IndexBuilderCallback indexBuilderCallback = new IndexBuilderCallback(Lists.newArrayList(proId), op);
-        while(iterator.hasNext()){
-            InternalEntry entry = iterator.next();
-            InternalKey key = entry.getKey();
-            if(key.getValueType()== ValueType.INVALID) {
-                indexBuilderCallback.onCall(key.getPropertyId(), key.getEntityId(), key.getStartTime(), null);
-            }else{
-                indexBuilderCallback.onCall(key.getPropertyId(), key.getEntityId(), key.getStartTime(), entry.getValue());
-            }
-        }
-        PeekingIterator<IndexEntry> data = indexBuilderCallback.getIterator(start, end);
-
-        try(FileChannel channel = new FileOutputStream(new File(this.indexDir, "index")).getChannel()) {
-            IndexTableWriter writer = new IndexTableWriter(channel, op);
-            while (data.hasNext()) {
-                writer.add(data.next());
-            }
-            writer.finish();
-            return new IndexMetaData(nextId.getAndIncrement(), SINGLE_VALUE, Lists.newArrayList(proId), start, end, channel.size());
-        }
     }
 
     public List<IndexEntry> valueIndexQuery(IndexQueryRegion condition) throws IOException {

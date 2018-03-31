@@ -87,6 +87,12 @@ public final class Filename
         return new File(proDir, unStableFileName(fileNumber)).getAbsolutePath();
     }
 
+    public static String valIndexFileName(long fileId) {
+        return makeFileName(fileId, "vindex");
+    }
+
+
+
     /**
      * 返回对应编号的描述文件的名称，目前还没有用到。
      */
