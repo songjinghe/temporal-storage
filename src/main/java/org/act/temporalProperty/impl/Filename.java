@@ -88,7 +88,11 @@ public final class Filename
     }
 
     public static String valIndexFileName(long fileId) {
-        return makeFileName(fileId, "vindex");
+        return makeFileName(fileId, "vi");
+    }
+
+    public static String aggrIndexFileName(long fileId) {
+        return makeFileName(fileId, "ai");
     }
 
 

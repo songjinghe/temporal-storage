@@ -2,9 +2,12 @@ package org.act.temporalProperty.index;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.PeekingIterator;
+import org.act.temporalProperty.exception.TPSException;
+import org.act.temporalProperty.exception.TPSRuntimeException;
 import org.act.temporalProperty.impl.*;
 import org.act.temporalProperty.index.rtree.IndexEntry;
 import org.act.temporalProperty.index.rtree.IndexEntryOperator;
+import org.act.temporalProperty.util.TimeIntervalUtil;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -120,7 +123,8 @@ public class IndexStore {
     }
 
     public List<IndexEntry> valueIndexQuery(IndexQueryRegion condition) throws IOException {
-        Iterator<IndexEntry> iter = this.getQueryIterator(condition);
+        IndexMetaData meta = valIndexCoverRegion(condition);
+        Iterator<IndexEntry> iter = this.getQueryIterator(condition, meta);
         List<IndexEntry> result = new ArrayList<>();
         while(iter.hasNext()){
             result.add(iter.next());
@@ -128,9 +132,54 @@ public class IndexStore {
         return result;
     }
 
-    //Fixme, naive version.
-    private Iterator<IndexEntry> getQueryIterator(IndexQueryRegion condition) throws IOException {
-        return cache.getTable(new File(this.indexDir, "index").getAbsolutePath()).iterator(condition);
+    private IndexMetaData valIndexCoverRegion(IndexQueryRegion condition) {
+        List<PropertyValueInterval> proIntervals = condition.getPropertyValueIntervals();
+        if(proIntervals.size()==1){
+            int pid = proIntervals.get(0).getProId();
+            TreeMap<Integer, IndexMetaData> tmap = singleVal.get(pid);
+            if(tmap!=null && !tmap.isEmpty()) {
+                Map.Entry<Integer, IndexMetaData> meta = tmap.floorEntry(condition.getTimeMin());
+                if(meta != null){
+                    int indexStart = meta.getValue().getTimeStart();
+                    int indexEnd = meta.getValue().getTimeEnd();
+                    if(TimeIntervalUtil.contains( indexStart, indexEnd, condition.getTimeMin(), condition.getTimeMax())){
+                        return meta.getValue();
+                    }else{
+                        throw new TPSRuntimeException(
+                                "property {} index range {}-{} not fully cover query region {}-{}!",
+                                pid, indexStart, indexEnd, condition.getTimeMin(), condition.getTimeMax());
+                    }
+                }else{
+                    throw new TPSRuntimeException(
+                            "property {} has no index fully cover query region {}-{}!",
+                            pid, condition.getTimeMin(), condition.getTimeMax());
+                }
+            }else{
+                throw new TPSRuntimeException("property {} has no index!", pid);
+            }
+        }else if(!proIntervals.isEmpty()){
+            Integer t = multiVal.floorKey(condition.getTimeMin());
+            if(t!=null) {
+                List<IndexMetaData> metaList = multiVal.get(t);
+                for(IndexMetaData meta : metaList){
+                    int s = meta.getTimeStart();
+                    int e = meta.getTimeEnd();
+                    if(TimeIntervalUtil.contains( s, e, condition.getTimeMin(), condition.getTimeMax())){
+                        return meta;
+                    }
+                }
+                throw new TPSRuntimeException("no valid index for query!");
+            }else{
+                throw new TPSRuntimeException("no valid index for query!");
+            }
+        }else {
+            throw new TPSRuntimeException("no valid index for query!");
+        }
+    }
+
+    private Iterator<IndexEntry> getQueryIterator(IndexQueryRegion condition, IndexMetaData meta) throws IOException {
+        String fileName = Filename.valIndexFileName(meta.getId());
+        return cache.getTable(new File(this.indexDir, fileName).getAbsolutePath()).iterator(condition);
     }
 
     public void deleteProperty(int propertyId) {
