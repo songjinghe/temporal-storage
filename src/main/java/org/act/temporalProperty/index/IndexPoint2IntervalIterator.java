@@ -65,7 +65,7 @@ public class IndexPoint2IntervalIterator extends AbstractIterator<IndexEntry> im
                 return result;
             }else{ // same entity
                 if(curTime>lastEntry.getTimePoint()){
-                    if(curTime>=startTime) { // should output
+                    if(curTime>startTime) { // should output
                         IndexEntry result = outputEntry(curTime - 1);
                         map.put(curProId, cur);
                         lastEntry = cur;
@@ -108,6 +108,7 @@ public class IndexPoint2IntervalIterator extends AbstractIterator<IndexEntry> im
                 if(entityId==-1) entityId = point.getEntityId();
             }
         }
+        if(latestStartTime<startTime) latestStartTime = startTime;
         return new IndexEntry(entityId, latestStartTime, endTime, vList);
     }
 
