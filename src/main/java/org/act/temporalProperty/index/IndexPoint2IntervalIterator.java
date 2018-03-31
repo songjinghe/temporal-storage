@@ -14,6 +14,7 @@ import java.util.*;
  */
 public class IndexPoint2IntervalIterator extends AbstractIterator<IndexEntry> implements PeekingIterator<IndexEntry>{
     private final Iterator<TimePointEntry> tpIter;
+    private final int startTime;
     private final int endTime;
     private final Map<Integer, TimePointEntry> map = new HashMap<>();
     private final List<Integer> proIdList;
@@ -21,8 +22,9 @@ public class IndexPoint2IntervalIterator extends AbstractIterator<IndexEntry> im
     private TimePointEntry lastEntry;
     private boolean reachEnd=false;
 
-    public IndexPoint2IntervalIterator(List<Integer> proIds, List<TimePointEntry> data, int endTime, IndexEntryOperator op){
+    public IndexPoint2IntervalIterator(List<Integer> proIds, List<TimePointEntry> data, int startTime, int endTime, IndexEntryOperator op){
         this.proIdList = proIds;
+        this.startTime = startTime;
         this.endTime = endTime;
         this.op = op;
         data.sort((o1, o2) -> {
@@ -62,11 +64,16 @@ public class IndexPoint2IntervalIterator extends AbstractIterator<IndexEntry> im
                 lastEntry = cur;
                 return result;
             }else{ // same entity
-                if(curTime>lastEntry.getTimePoint()){ // should output
-                    IndexEntry result = outputEntry(cur.getTimePoint() - 1);
-                    map.put(curProId, cur);
-                    lastEntry = cur;
-                    return result;
+                if(curTime>lastEntry.getTimePoint()){
+                    if(curTime>=startTime) { // should output
+                        IndexEntry result = outputEntry(curTime - 1);
+                        map.put(curProId, cur);
+                        lastEntry = cur;
+                        return result;
+                    }else{
+                        map.put(curProId, cur);
+                        lastEntry = cur;
+                    }
                 }else if(curTime == lastEntry.getTimePoint()){
                     map.put(curProId, cur);
                     lastEntry = cur;

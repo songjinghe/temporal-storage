@@ -89,7 +89,7 @@ public class IndexStore {
                 indexBuilderCallback.onCall(key.getPropertyId(), key.getEntityId(), key.getStartTime(), entry.getValue());
             }
         }
-        PeekingIterator<IndexEntry> data = indexBuilderCallback.getIterator(end);
+        PeekingIterator<IndexEntry> data = indexBuilderCallback.getIterator(start, end);
 
         try(FileChannel channel = new FileOutputStream(new File(this.indexDir, "index")).getChannel()) {
             IndexTableWriter writer = new IndexTableWriter(channel, op);
@@ -132,7 +132,7 @@ public class IndexStore {
                 indexBuilderCallback.onCall(key.getPropertyId(), key.getEntityId(), key.getStartTime(), entry.getValue());
             }
         }
-        PeekingIterator<IndexEntry> data = indexBuilderCallback.getIterator(end);
+        PeekingIterator<IndexEntry> data = indexBuilderCallback.getIterator(start, end);
 
         try(FileChannel channel = new FileOutputStream(new File(this.indexDir, "index")).getChannel()) {
             IndexTableWriter writer = new IndexTableWriter(channel, op);
