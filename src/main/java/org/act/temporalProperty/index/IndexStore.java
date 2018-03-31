@@ -160,12 +160,19 @@ public class IndexStore {
         }else if(!proIntervals.isEmpty()){
             Integer t = multiVal.floorKey(condition.getTimeMin());
             if(t!=null) {
+                Set<Integer> conditionPidSet = new HashSet<>();
+                for(PropertyValueInterval p : proIntervals){
+                    conditionPidSet.add(p.getProId());
+                }
                 List<IndexMetaData> metaList = multiVal.get(t);
                 for(IndexMetaData meta : metaList){
                     int s = meta.getTimeStart();
                     int e = meta.getTimeEnd();
                     if(TimeIntervalUtil.contains( s, e, condition.getTimeMin(), condition.getTimeMax())){
-                        return meta;
+                        Set<Integer> pSetMeta = new HashSet<>(meta.getPropertyIdList());
+                        if(pSetMeta.size()==conditionPidSet.size() && !pSetMeta.retainAll(conditionPidSet)) {
+                            return meta;
+                        }
                     }
                 }
                 throw new TPSRuntimeException("no valid index for query!");
