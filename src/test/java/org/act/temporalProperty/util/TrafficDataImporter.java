@@ -29,9 +29,9 @@ public class TrafficDataImporter {
         this.store = store;
         this.dataPath = new File(dataPath);
         store.createProperty(1, ValueContentType.INT);
-//        store.createProperty(2, ValueContentType.INT);
-//        store.createProperty(3, ValueContentType.INT);
-//        store.createProperty(4, ValueContentType.INT);
+        store.createProperty(2, ValueContentType.INT);
+        store.createProperty(3, ValueContentType.INT);
+        store.createProperty(4, ValueContentType.INT);
         this.inputData(inputFileCount);
     }
 

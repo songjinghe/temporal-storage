@@ -2,6 +2,7 @@ package org.act.temporalProperty.impl.index.multival;
 
 import org.act.temporalProperty.TemporalPropertyStore;
 import org.act.temporalProperty.impl.RangeQueryCallBack;
+import org.act.temporalProperty.impl.index.singleval.CorrectnessTest;
 import org.act.temporalProperty.index.IndexQueryRegion;
 import org.act.temporalProperty.index.IndexValueType;
 import org.act.temporalProperty.index.PropertyValueInterval;
@@ -9,6 +10,7 @@ import org.act.temporalProperty.index.rtree.IndexEntry;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.StoreBuilder;
 import org.act.temporalProperty.util.TrafficDataImporter;
+import org.apache.commons.lang3.SystemUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -17,6 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -25,76 +28,134 @@ import java.util.List;
 public class BuildAndQueryTest {
     private static Logger log = LoggerFactory.getLogger(BuildAndQueryTest.class);
 
-    private static String dataPath = "/home/song/tmp/road data";
-    private static String dbDir = "/tmp/temporal.property.test";
+    List<Integer> proIds = new ArrayList<>(); // the list of the proIds which will be indexed and queried
+
+    private static String dataPath(){
+        if(SystemUtils.IS_OS_WINDOWS){
+            return "C:\\Users\\Administrator\\Desktop\\TGraph-source\\20101104.tar\\20101104";
+        }else{
+            return "/home/song/tmp/road data/20101104";
+        }
+    }
+    private static String dbDir(){
+        if(SystemUtils.IS_OS_WINDOWS){
+            return "temporal.property.test";
+        }else{
+            return "/tmp/temporal.property.test";
+        }
+    }
+
+
+    //private static String dataPath = "/home/song/tmp/road data";
+    //private static String dbDir = "/tmp/temporal.property.test";
     private static TemporalPropertyStore store;
     private static StoreBuilder stBuilder;
     private static TrafficDataImporter importer;
 
     @BeforeClass
     public static void initDB() throws Throwable {
-        stBuilder = new StoreBuilder(dbDir, true);
-        importer = new TrafficDataImporter(stBuilder.store(), dataPath, 100);
+        stBuilder = new StoreBuilder(dbDir(), true);
+        importer = new TrafficDataImporter(stBuilder.store(), dataPath(), 100);
         log.info("time: {} - {}", importer.getMinTime(), importer.getMaxTime());
         store = stBuilder.store();
     }
 
     @Before
     public void buildIndex(){
-        List<Integer> proIds = new ArrayList<>();
+
         proIds.add(1);
         proIds.add(2);
         proIds.add(3);
         proIds.add(4);
-//        store.createValueIndex(1288803660, 1288824660, proIds, types);
-//        store.createValueIndex(1288800300, 1288802460, proIds, types);
         store.createValueIndex(1560, 27360, proIds);
         log.info("create index done");
     }
 
     @Test
     public void main() throws Throwable {
-//        testRangeQuery(store);
-//        List<Long> iterResult = queryByIter( 18300, 27000, 0, 200);
 
-        List<IndexEntry> indexResult = queryByIndex(18300, 27000, 0, 200);
-        for(int i=0; i<100; i++){
-            log.debug("{}", indexResult.get(i));
-        }
+        int proNum = proIds.size();
+        int[][] pValueIntervals = new int[proNum][2];
+        //pId = 1, valueMin = 0, valueMax = 200
+        pValueIntervals[0][0] = 0;
+        pValueIntervals[0][1] = 200;
+        //pId = 2, valueMin = 0, valueMax = 200
+        pValueIntervals[1][0] = 0;
+        pValueIntervals[1][1] = 200;
+        //pId = 3, valueMin = 0, valueMax = 200
+        pValueIntervals[2][0] = 0;
+        pValueIntervals[2][1] = 200;
+        //pId = 4, valueMin = 0, valueMax = 200
+        pValueIntervals[3][0] = 0;
+        pValueIntervals[3][1] = 200;
 
-//        for(int time=0; time<=18300; time+=100){
-//            for(int value=0; value<=400; value+=20){
-//
-//            }
-//        }
+        List<IndexEntry> indexResult = queryByIndex(18300, 27000, pValueIntervals);
+        log.info("index result count {}", indexResult.size());
+
+        List<IndexEntry> rangeResult = queryByRange(18300, 27000, pValueIntervals);
+        log.info("range result count {}", rangeResult.size());
+
         store.shutDown();
     }
 
-    private List<IndexEntry> queryByIndex(int timeMin, int timeMax, int valueMin, int valueMax){
+    private List<IndexEntry> queryByIndex(int timeMin, int timeMax, int[][] pValueIntervals){
         IndexQueryRegion condition = new IndexQueryRegion(timeMin, timeMax);
-        Slice minValue = new Slice(4);
-        minValue.setInt(0, valueMin);
-        Slice maxValue = new Slice(4);
-        maxValue.setInt(0, valueMax);
-        condition.add(new PropertyValueInterval(1, minValue, maxValue, IndexValueType.INT));
+
+        for(int i = 0; i < proIds.size(); i++) {
+
+            int proId = proIds.get(i);
+            Slice valueMin = new Slice(4);
+            valueMin.setInt(0, pValueIntervals[i][0]);
+            Slice valueMax = new Slice(4);
+            valueMax.setInt(0, pValueIntervals[i][1]);
+
+            condition.add(new PropertyValueInterval(proId, valueMin, valueMax, IndexValueType.INT));
+        }
+
         List<IndexEntry> result = store.getEntries(condition);
-        log.info("index result count {}", result.size());
+
         return result;
     }
 
-    private List<Long> queryByIter(int timeMin, int timeMax, int valueMin, int valueMax){
-        List<Long> result = new ArrayList<>();
+    private List<IndexEntry> queryByRange(int timeMin, int timeMax, int[][] pValueIntervals){
+        List<IndexEntry> result = new ArrayList<>();
+
         for(Long entityId : importer.getRoadIdMap().values()){
-            try {
-                store.getRangeValue(entityId, 1, timeMin, timeMax, new EntityIdCallBack(timeMin, timeMax, valueMin, valueMax));
-            }catch (StopLoopException e){
-                result.add(entityId);
-            }catch (RuntimeException e){
-                log.debug("entity id: {} {}", entityId, e.getMessage());
-                result.add(entityId);
+
+            for (int i = 0; i < proIds.size(); i++) {
+                int proIdIndex = i;
+                store.getRangeValue(entityId, proIds.get(i), timeMin, timeMax,
+                        new EntityIdCallBack(entityId) {
+                            private boolean first = true;
+                            private Slice lastVal;
+                            private int lastTime = -1;
+                            public void onCall(int time, Slice value) {
+                                if(first) {
+                                    first = false;
+                                } else if(overlap(lastTime, time - 1, timeMin, timeMax)) {
+                                    int val = lastVal.getInt(0);
+                                    if(pValueIntervals[proIdIndex][0] <= val && val <= pValueIntervals[proIdIndex][1]) {
+                                        result.add(new IndexEntry(entityId, lastTime, time - 1, new Slice[]{lastVal}));
+                                    }
+                                }
+                                lastTime = time;
+                                lastVal = value;
+                            }
+                            public Object onReturn() {
+                                if(!first && lastTime <= timeMax) {
+                                    int val = lastVal.getInt(0);
+                                    if(pValueIntervals[proIdIndex][0] <= val && val <= pValueIntervals[proIdIndex][1]) {
+                                        result.add(new IndexEntry(entityId, lastTime, timeMax, new Slice[]{lastVal}));
+                                    }
+                                }
+                                return null;
+                            }
+                        });
             }
+
+            result.sort(Comparator.comparing(IndexEntry::getEntityId));
         }
-        log.info("iterate result count {}", result.size());
+
         return result;
     }
 
@@ -117,42 +178,18 @@ public class BuildAndQueryTest {
         });
     }
 
-
+    private boolean overlap(int t1min, int t1max, int t2min, int t2max){
+        return (t1min<=t2max && t2min<=t1max);
+    }
 
     private class EntityIdCallBack extends RangeQueryCallBack {
-        private int timeMin, timeMax, valueMin, valueMax, lastTime = -1;
-        private boolean first = true;
+        private long entityId;
 
-        public EntityIdCallBack(int timeMin, int timeMax, int valueMin, int valueMax) {
-            this.timeMin = timeMin;
-            this.timeMax = timeMax;
-            this.valueMin = valueMin;
-            this.valueMax = valueMax;
-        }
-
-        private boolean overlap(int t1min, int t1max, int t2min, int t2max){
-            return (t1min<=t2max && t2min<=t1max);
-        }
-
-        public void onCall(int time, Slice value) {
-            int val = value.getInt(0);
-            if(first){
-                first=false;
-            }else{
-                if(lastTime>=time){
-                    log.trace("time not inc: last("+lastTime+") cur("+time+")");
-//                    throw new RuntimeException("time not inc: last("+lastTime+") cur("+time+")");
-                }
-                if(overlap(lastTime, time, timeMin, timeMax) &&
-                        (valueMin <= val && val <= valueMax)){
-                    throw new StopLoopException();
-                }
-            }
-            lastTime = time;
-        }
+        public EntityIdCallBack(long entityId) {this.entityId = entityId; }
+        public void onCall(int time, Slice value) {}
         public void setValueType(String valueType) {}
         public void onCallBatch(Slice batchValue) {}
-        public Object onReturn() {return null;}
+        public Object onReturn() {return null; }
         public CallBackType getType() {return null;}
     };
 

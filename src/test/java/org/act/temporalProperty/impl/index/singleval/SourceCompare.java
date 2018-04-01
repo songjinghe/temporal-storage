@@ -3,6 +3,7 @@ package org.act.temporalProperty.impl.index.singleval;
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.Table;
 import org.act.temporalProperty.impl.InternalKey;
+import org.act.temporalProperty.index.PropertyValueInterval;
 import org.act.temporalProperty.index.rtree.IndexEntry;
 import org.act.temporalProperty.util.Slice;
 import org.apache.commons.lang3.SystemUtils;
@@ -56,15 +57,6 @@ public class SourceCompare {
         this.entryList = new ArrayList<IndexEntry>();
     }
 
-    public List<IndexEntry> queryBySource(int timeMin, int timeMax, int valueMin, int valueMax) {
-
-        int ret1 = importFiles();
-        if(ret1 < 0)
-            return null;
-
-        return filterEntry(timeMin, timeMax, valueMin, valueMax);
-    }
-
     // According to the (startTime, endTime; inputFileCount) to filter files in dataDir
     /* Read (startTime, endTime, [propertyId]; entityId, propertyValue) into a array (iterator); List<List<entry>()> --- each file one list;
      *  use propertyValue to filter; HashMap<travelTime, EntryList>
@@ -87,7 +79,16 @@ public class SourceCompare {
         return 0;
     }
 
-    private List<IndexEntry> filterEntry(int startTime, int endTime, int valueMin, int valueMax){
+    public List<IndexEntry> queryBySource(int timeMin, int timeMax, List<Integer> proIds, int[][] pValueIntervals) {
+
+        int ret1 = importFiles();
+        if(ret1 < 0)
+            return null;
+
+        return filterEntry(timeMin, timeMax, proIds, pValueIntervals);
+    }
+
+    private List<IndexEntry> filterEntry(int startTime, int endTime, List<Integer> proIds, int[][] pValueIntervals){
 
         int fileCount = Math.min(totalFileList.size(), inputFileCount);
 
@@ -105,24 +106,103 @@ public class SourceCompare {
                     String chainId = fields[2];
                     Long entityId = getEntityId(gridId, chainId);
 
-                    int travelTime = Integer.valueOf(fields[6]);
+                    int travelTime = Integer.valueOf(fields[6]); //pId = 1
+                    int fullStatus = Integer.valueOf(fields[7]); //pId = 2
+                    int vehicleCount = Integer.valueOf(fields[8]); //pId = 3
+                    int segmentCount = Integer.valueOf(fields[9]); //pId = 4
 
-                   // if((travelTime >= valueMin) && (travelTime <= valueMax)) {
+                    Slice[] values = new Slice[4];
+                    values[0] = new Slice(ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(travelTime).array());
+                    values[1] = new Slice(ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(fullStatus).array());
+                    values[2] = new Slice(ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(vehicleCount).array());
+                    values[3] = new Slice(ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(segmentCount).array());
 
-                        //int eTime = getEndTime(i + 1, endTime);
-                        Slice value = new Slice(ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(travelTime).array());
-
-                        entryList.add(new IndexEntry(entityId, sTime, NOW_TIME, new Slice[]{value}));
-
-                   // }
-
+                    entryList.add(new IndexEntry(entityId, sTime, NOW_TIME, values));
                 }
             } catch (IOException e) {
                 System.out.println("FileReader: NullIOException.");
             }
         }
 
-        return mergeEntryList(startTime, endTime, valueMin, valueMax);
+        return mergeEntryList(startTime, endTime, proIds, pValueIntervals);
+    }
+
+    private List<IndexEntry> mergeEntryList(int startTime, int endTime, List<Integer> proIds, int[][] pValueIntervals) {
+/*
+        List<IndexEntry> mergeList = new ArrayList<>();
+
+        entryList.sort(Comparator.comparing(IndexEntry::getEntityId));
+
+        List<IndexEntry> entityIdList = new ArrayList<>();
+        for (int i = 0; i < entryList.size(); i++) {
+
+            IndexEntry entry = entryList.get(i);
+            entityIdList.add(entry);
+
+            if ((i + 1 == entryList.size()) || !entryList.get(i + 1).getEntityId().equals(entry.getEntityId())) {
+
+                entityIdList.sort(Comparator.comparing(IndexEntry::getStart));
+
+                for(int j = 0; j < entityIdList.size(); ) {
+
+                    IndexEntry entity = entityIdList.get(j);
+                    Long entityId = entity.getEntityId();
+                    int sTime = entity.getStart();
+                    Slice value = entity.getValue(0);
+                    int eTime = 0;
+                    int travelTime = value.getInt(0);
+
+                    while(j < entityIdList.size()) {
+
+                        if(j + 1 == entityIdList.size()) {
+                            //eTime = entity.getEnd();
+                            eTime = endTime;
+
+                            if((sTime <= endTime) && (eTime >= startTime)) {
+                                for(int k = 0; k < proIds.size(); k++) {
+                                    int proId = proIds.get(k);
+
+                                }
+                            }
+
+                            if((travelTime >= valueMin) && (travelTime <= valueMax) &&
+                                    ) {
+                                entity = new IndexEntry(entityId, sTime, eTime, new Slice[]{value});
+                                mergeList.add(entity);
+                            }
+
+                            j++;
+                            break;
+
+                        } else if(!entityIdList.get(j).getValue(0).equals(entityIdList.get(j + 1).getValue(0))){
+                            eTime = entityIdList.get(j + 1).getStart() - 1;
+
+                            if((travelTime >= valueMin) && (travelTime <= valueMax) &&
+                                    (sTime <= endTime) && (eTime >= startTime)) {
+                                entity = new IndexEntry(entityId, sTime, eTime, new Slice[]{value});
+                                mergeList.add(entity);
+                            }
+
+                            j++;
+                            break;
+                        }
+
+                        j++;
+                    }
+                }
+
+                entityIdList.clear();
+            }
+        }
+
+        entityIdList.clear();
+        entityIdList = null;
+
+        // entryList.clear();
+        // entryList = null;
+
+        return mergeList; */
+        return null;
     }
 
     public List<IndexEntry> mergeIndexResult(List<IndexEntry> indexResult) {
@@ -173,75 +253,7 @@ public class SourceCompare {
         return mergeList;
     }
 
-    private List<IndexEntry> mergeEntryList(int startTime, int endTime, int valueMin, int valueMax) {
 
-        List<IndexEntry> mergeList = new ArrayList<>();
-
-        entryList.sort(Comparator.comparing(IndexEntry::getEntityId));
-
-        List<IndexEntry> entityIdList = new ArrayList<>();
-        for (int i = 0; i < entryList.size(); i++) {
-
-            IndexEntry entry = entryList.get(i);
-            entityIdList.add(entry);
-
-            if ((i + 1 == entryList.size()) || !entryList.get(i + 1).getEntityId().equals(entry.getEntityId())) {
-
-                entityIdList.sort(Comparator.comparing(IndexEntry::getStart));
-
-                for(int j = 0; j < entityIdList.size(); ) {
-
-                    IndexEntry entity = entityIdList.get(j);
-                    Long entityId = entity.getEntityId();
-                    int sTime = entity.getStart();
-                    Slice value = entity.getValue(0);
-                    int eTime = 0;
-                    int travelTime = value.getInt(0);
-
-                    while(j < entityIdList.size()) {
-
-                        if(j + 1 == entityIdList.size()) {
-                            //eTime = entity.getEnd();
-                            eTime = endTime;
-
-                            if((travelTime >= valueMin) && (travelTime <= valueMax) &&
-                                    (sTime <= endTime) && (eTime >= startTime)) {
-                                entity = new IndexEntry(entityId, sTime, eTime, new Slice[]{value});
-                                mergeList.add(entity);
-                            }
-
-                            j++;
-                            break;
-
-                        } else if(!entityIdList.get(j).getValue(0).equals(entityIdList.get(j + 1).getValue(0))){
-                            eTime = entityIdList.get(j + 1).getStart() - 1;
-
-                            if((travelTime >= valueMin) && (travelTime <= valueMax) &&
-                                    (sTime <= endTime) && (eTime >= startTime)) {
-                                entity = new IndexEntry(entityId, sTime, eTime, new Slice[]{value});
-                                mergeList.add(entity);
-                            }
-
-                            j++;
-                            break;
-                        }
-
-                        j++;
-                    }
-                }
-
-                entityIdList.clear();
-            }
-        }
-
-        entityIdList.clear();
-        entityIdList = null;
-
-       // entryList.clear();
-       // entryList = null;
-
-        return mergeList;
-    }
 
     public List<Table<IndexEntry, String, String>> listDiffer(Set<Long> entities, List<IndexEntry> rangequeries){
 

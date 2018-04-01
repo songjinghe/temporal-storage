@@ -72,8 +72,8 @@ public class CorrectnessTest {
 
     private void compare(int startTime, int endTime, int valMin, int valMax){
 
-        List<IndexEntry> rangeResult = sourceEntry.queryBySource(startTime, endTime, valMin, valMax);
-        rangeResult.sort(cmp);
+    //    List<IndexEntry> rangeResult = sourceEntry.queryBySource(startTime, endTime, valMin, valMax);
+    //    rangeResult.sort(cmp);
 
         List<IndexEntry> indexResult = queryByIndex(startTime, endTime, valMin, valMax);//27000
         indexResult.sort(cmp);
@@ -84,9 +84,9 @@ public class CorrectnessTest {
 //        rangeResult.sort(cmp);
 //        log.info("range query complete");
 
-        log.info("size: range({}) vs index({})", rangeResult.size(), indexResult.size());
+   //     log.info("size: range({}) vs index({})", rangeResult.size(), indexResult.size());
 //
-        sameEntities(rangeResult, indexResult);
+    //    sameEntities(rangeResult, indexResult);
 
 //        for(int i=0; i<rangeResult.size() && i<indexResult.size(); i++){
 //            IndexEntry rangeE = rangeResult.get(i);
