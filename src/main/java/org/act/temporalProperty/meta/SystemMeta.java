@@ -31,7 +31,7 @@ public class SystemMeta {
     public SinglePropertyStore getStore(int propertyId){
         SinglePropertyStore store = propertyStores.get(propertyId);
         if(store==null){
-            throw new TPSRuntimeException("no such property id: "+propertyId+". should create first!");
+            throw new TPSRuntimeException("no such property id: {}. should create first!", propertyId);
         }
         return store;
     }

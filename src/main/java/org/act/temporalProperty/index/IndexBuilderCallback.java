@@ -27,8 +27,8 @@ public class IndexBuilderCallback {
         data.add(new TimePointEntry(propertyId, entityId, startTime, value));
     }
 
-    public PeekingIterator<IndexEntry> getIterator(int endTime){
-        return new IndexPoint2IntervalIterator(proIdList, data, endTime, op);
+    public PeekingIterator<IndexEntry> getIterator(int startTime, int endTime){
+        return new IndexPoint2IntervalIterator(proIdList, data, startTime, endTime, op);
     }
 
 

@@ -74,6 +74,7 @@ public class CorrectnessTest {
 
         List<IndexEntry> rangeResult = sourceEntry.queryBySource(startTime, endTime, valMin, valMax);
         rangeResult.sort(cmp);
+        log.info("range query complete");
 
         List<IndexEntry> indexResult = queryByIndex(startTime, endTime, valMin, valMax);//27000
         indexResult.sort(cmp);
