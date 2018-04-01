@@ -285,7 +285,7 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
             for(Integer pid : proIds){
                 merged.add(meta.getStore(pid).buildIndexIterator(start, end));
             }
-            return new PropertyFilterIterator(proIds, new TwoLevelMergeIterator( getMemTableIter(start, end), merged));
+            return new PropertyFilterIterator(proIds, TwoLevelMergeIterator.toDisk( getMemTableIter(start, end), merged));
         }
     }
 

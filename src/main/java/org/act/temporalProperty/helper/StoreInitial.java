@@ -90,7 +90,7 @@ public class StoreInitial {
                     try {
                         table = new FileChannelTable(tempFileName, channel, TableComparator.instance(), false);
                     } catch (IllegalArgumentException e) {
-                        throw new TPSRuntimeException(tempFileName + " file size larger than " + Integer.MAX_VALUE + " bytes. Should not happen.", e);
+                        throw new TPSRuntimeException(tempFileName+" file size larger than Integer.MAX_VALUE bytes. Should not happen.", e);
                     }
 
                     TableIterator iterator = table.iterator();

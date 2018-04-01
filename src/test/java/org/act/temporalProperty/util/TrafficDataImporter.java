@@ -101,9 +101,9 @@ public class TrafficDataImporter {
         long roadId = getId(gridId, chainId);
 //        log.debug("eid({}), time({}), travelTime({})", roadId, time, travelTime);
         setIntProperty(store, time, roadId, 1, travelTime);
-//        setIntProperty(store, time, roadId, 2, fullStatus);
-//        setIntProperty(store, time, roadId, 3, vehicleCount);
-//        setIntProperty(store, time, roadId, 4, segmentCount);
+        setIntProperty(store, time, roadId, 2, fullStatus);
+        setIntProperty(store, time, roadId, 3, vehicleCount);
+        setIntProperty(store, time, roadId, 4, segmentCount);
     }
 
     private long getId(String gridId, String chainId) {
