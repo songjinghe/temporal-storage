@@ -3,10 +3,12 @@ package org.act.temporalProperty.impl.index.multival;
 import org.act.temporalProperty.TemporalPropertyStore;
 import org.act.temporalProperty.impl.RangeQueryCallBack;
 import org.act.temporalProperty.impl.index.singleval.CorrectnessTest;
+import org.act.temporalProperty.impl.index.singleval.SourceCompare;
 import org.act.temporalProperty.index.IndexQueryRegion;
 import org.act.temporalProperty.index.IndexValueType;
 import org.act.temporalProperty.index.PropertyValueInterval;
 import org.act.temporalProperty.index.rtree.IndexEntry;
+import org.act.temporalProperty.util.DataFileImporter;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.StoreBuilder;
 import org.act.temporalProperty.util.TrafficDataImporter;
@@ -21,6 +23,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.io.File;
 
 /**
  * Created by song on 2018-01-22.
@@ -28,34 +31,28 @@ import java.util.List;
 public class BuildAndQueryTest {
     private static Logger log = LoggerFactory.getLogger(BuildAndQueryTest.class);
 
-    List<Integer> proIds = new ArrayList<>(); // the list of the proIds which will be indexed and queried
-
-    private static String dataPath(){
-        if(SystemUtils.IS_OS_WINDOWS){
-            return "C:\\Users\\Administrator\\Desktop\\TGraph-source\\20101104.tar\\20101104";
-        }else{
-            return "/home/song/tmp/road data/20101104";
-        }
-    }
-    private static String dbDir(){
-        if(SystemUtils.IS_OS_WINDOWS){
-            return "temporal.property.test";
-        }else{
-            return "/tmp/temporal.property.test";
-        }
-    }
-
-
-    //private static String dataPath = "/home/song/tmp/road data";
-    //private static String dbDir = "/tmp/temporal.property.test";
+    private static DataFileImporter dataFileImporter;
     private static TemporalPropertyStore store;
     private static StoreBuilder stBuilder;
     private static TrafficDataImporter importer;
+    private static SourceCompare sourceEntry;
+
+    private static String dbDir;
+    private static String dataPath;
+    private static List<File> dataFileList;
+
+    List<Integer> proIds = new ArrayList<>(); // the list of the proIds which will be indexed and queried
 
     @BeforeClass
     public static void initDB() throws Throwable {
-        stBuilder = new StoreBuilder(dbDir(), true);
-        importer = new TrafficDataImporter(stBuilder.store(), dataPath(), 100);
+        dataFileImporter = new DataFileImporter();
+        dbDir = dataFileImporter.getDbDir();
+        dataPath = dataFileImporter.getDataPath();
+        dataFileList = dataFileImporter.getDataFileList();
+
+        stBuilder = new StoreBuilder(dbDir, true);
+        importer = new TrafficDataImporter(stBuilder.store(), dataFileList, 1000);
+        sourceEntry = new SourceCompare(dataPath, dataFileList, 1000);
         log.info("time: {} - {}", importer.getMinTime(), importer.getMaxTime());
         store = stBuilder.store();
     }
@@ -84,16 +81,20 @@ public class BuildAndQueryTest {
         pValueIntervals[1][1] = 200;
         //pId = 3, valueMin = 0, valueMax = 200
         pValueIntervals[2][0] = 0;
-        pValueIntervals[2][1] = 200;
+        pValueIntervals[2][1] = 300;
         //pId = 4, valueMin = 0, valueMax = 200
         pValueIntervals[3][0] = 0;
         pValueIntervals[3][1] = 200;
 
+        List<IndexEntry> rangeResult = sourceEntry.queryBySource(18300, 27000, proIds, pValueIntervals);
+        rangeResult.sort(Comparator.comparing(IndexEntry::getEntityId));
+        log.info("range result count {}", rangeResult.size());
+
         List<IndexEntry> indexResult = queryByIndex(18300, 27000, pValueIntervals);
+        indexResult.sort(Comparator.comparing(IndexEntry::getEntityId));
         log.info("index result count {}", indexResult.size());
 
-        List<IndexEntry> rangeResult = queryByRange(18300, 27000, pValueIntervals);
-        log.info("range result count {}", rangeResult.size());
+
 
         store.shutDown();
     }

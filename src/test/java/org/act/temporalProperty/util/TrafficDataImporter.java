@@ -17,17 +17,17 @@ import static org.act.temporalProperty.util.StoreBuilder.setIntProperty;
  * Created by song on 2018-01-23.
  */
 public class TrafficDataImporter {
-    private static Logger log = LoggerFactory.getLogger(StoreBuilder.class);
+    private static Logger log = LoggerFactory.getLogger(TrafficDataImporter.class);
 
-    private final File dataPath;
+    private List<File> dataFileList;
     private final Map<String, Long> roadIdMap = new HashMap<>();
     private int minTime;
     private int maxTime;
     private TemporalPropertyStore store;
 
-    public TrafficDataImporter(TemporalPropertyStore store, String dataPath, int inputFileCount) throws IOException {
+    public TrafficDataImporter(TemporalPropertyStore store, List<File> dataFileList, int inputFileCount) throws IOException {
         this.store = store;
-        this.dataPath = new File(dataPath);
+        this.dataFileList = dataFileList;
         store.createProperty(1, ValueContentType.INT);
         store.createProperty(2, ValueContentType.INT);
         store.createProperty(3, ValueContentType.INT);
@@ -48,9 +48,7 @@ public class TrafficDataImporter {
     }
 
     private void inputData(int inputFileCount) throws IOException {
-        List<File> dataFileList = new ArrayList<>();
-        getFileRecursive(dataPath, dataFileList, 5);
-        dataFileList.sort((Comparator.comparing(File::getName)));
+
         for (int i = 0; i < dataFileList.size() && i<inputFileCount; i++) {
             File file = dataFileList.get(i);
             int time = timeStr2int(file.getName().substring(9, 21)) - 1288800000;

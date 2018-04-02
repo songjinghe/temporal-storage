@@ -7,6 +7,7 @@ import org.act.temporalProperty.index.IndexQueryRegion;
 import org.act.temporalProperty.index.IndexValueType;
 import org.act.temporalProperty.index.PropertyValueInterval;
 import org.act.temporalProperty.index.rtree.IndexEntry;
+import org.act.temporalProperty.util.DataFileImporter;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.StoreBuilder;
 import org.act.temporalProperty.util.TrafficDataImporter;
@@ -17,6 +18,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.util.*;
 
 /**
@@ -25,41 +27,38 @@ import java.util.*;
 public class CorrectnessTest {
     private static Logger log = LoggerFactory.getLogger(CorrectnessTest.class);
 
-    private static String dataPath(){
-         if(SystemUtils.IS_OS_WINDOWS){
-             return "C:\\Users\\Administrator\\Desktop\\TGraph-source\\20101104.tar\\20101104";
-         }else{
-             return "/home/song/tmp/road data/20101104";
-         }
-    }
-    private static String dbDir(){
-        if(SystemUtils.IS_OS_WINDOWS){
-            return "temporal.property.test";
-        }else{
-            return "/tmp/temporal.property.test";
-        }
-    }
-
+    private static DataFileImporter dataFileImporter;
     private TemporalPropertyStore store;
     private StoreBuilder stBuilder;
     private TrafficDataImporter importer;
     private SourceCompare sourceEntry;
 
+    private static String dbDir;
+    private static String dataPath;
+    private static List<File> dataFileList;
+
+    List<Integer> proIds = new ArrayList<>(); // the list of the proIds which will be indexed and queried
+
     @Before
     public void initDB() throws Throwable {
-        stBuilder = new StoreBuilder(dbDir(), true);
-        importer = new TrafficDataImporter(stBuilder.store(), dataPath(), 1000);
-        sourceEntry = new SourceCompare(dataPath(), 1000); //fileCount = 10; no entry in timeRange, but query results can be found in Index and Range? --- endTime (<=endTime --> < endTime?)
+
+        dataFileImporter = new DataFileImporter();
+        dbDir = dataFileImporter.getDbDir();
+        dataPath = dataFileImporter.getDataPath();
+        dataFileList = dataFileImporter.getDataFileList();
+
+        stBuilder = new StoreBuilder(dbDir, true);
+        importer = new TrafficDataImporter(stBuilder.store(), dataFileList, 1000);
+        sourceEntry = new SourceCompare(dataPath, dataFileList, 1000);
         log.info("time: {} - {}", importer.getMinTime(), importer.getMaxTime());
         store = stBuilder.store();
+
         buildIndex();
     }
 
     private void buildIndex(){
-        List<Integer> proIds = new ArrayList<>();
+
         proIds.add(1);
-//        store.createValueIndex(1288803660, 1288824660, proIds, types);
-//        store.createValueIndex(1288800300, 1288802460, proIds, types);
         store.createValueIndex(1560, 27360, proIds);
         log.info("create index done");
     }
@@ -72,8 +71,16 @@ public class CorrectnessTest {
 
     private void compare(int startTime, int endTime, int valMin, int valMax){
 
-    //    List<IndexEntry> rangeResult = sourceEntry.queryBySource(startTime, endTime, valMin, valMax);
-    //    rangeResult.sort(cmp);
+        proIds.add(1);
+
+        int proNum = proIds.size();
+        int[][] pValueIntervals = new int[proNum][2];
+        //pId = 1, valueMin = 0, valueMax = 200
+        pValueIntervals[0][0] = valMin;
+        pValueIntervals[0][1] = valMax;
+
+        List<IndexEntry> rangeResult = sourceEntry.queryBySource(startTime, endTime, proIds, pValueIntervals);
+        rangeResult.sort(cmp);
 
         List<IndexEntry> indexResult = queryByIndex(startTime, endTime, valMin, valMax);//27000
         indexResult.sort(cmp);

@@ -8,7 +8,10 @@ import com.google.gson.JsonObject;
 import org.act.temporalProperty.exception.TPSNHException;
 import org.act.temporalProperty.impl.index.singleval.SourceCompare;
 import org.act.temporalProperty.index.rtree.*;
+import org.act.temporalProperty.util.DataFileImporter;
 import org.act.temporalProperty.util.Slice;
+import org.act.temporalProperty.util.StoreBuilder;
+import org.act.temporalProperty.util.TrafficDataImporter;
 import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -28,13 +31,28 @@ import java.util.List;
 public class RTreeTest {
     private static Logger log = LoggerFactory.getLogger(RTreeTest.class);
 
+    private static DataFileImporter dataFileImporter;
+    private SourceCompare sourceEntry;
+
+    private static String dbDir;
+    private static String dataPath;
+    private static List<File> dataFileList;
+
+    List<Integer> proIds = new ArrayList<>(); // the list of the proIds which will be indexed and queried
+
     RTree tree;
     SourceCompare sourceCompare;
 
     @Before
     public void buildRTree(){
-        sourceCompare = new SourceCompare("/home/song/tmp/road data/20101104", 100);
-//        List<IndexEntry> tmp = sourceCompare.queryBySource(300, 320, 200, 300);
+
+        dataFileImporter = new DataFileImporter();
+        dbDir = dataFileImporter.getDbDir();
+        dataPath = dataFileImporter.getDataPath();
+        dataFileList = dataFileImporter.getDataFileList();
+        sourceEntry = new SourceCompare(dataPath, dataFileList, 100);
+
+        //List<IndexEntry> tmp = sourceCompare.queryBySource(300, 320, 200, 300);
         List<IndexEntry> tmp = querySource(30, 3200, 100, 300);
         log.info("{}", tmp.size());
 //        log.info("{}", tmp);
@@ -44,7 +62,8 @@ public class RTreeTest {
     }
 
     private List<IndexEntry> querySource(int timeMin, int timeMax, int valMin, int valMax) {
-        List<IndexEntry> result = sourceCompare.queryBySource(timeMin, timeMax, valMin, valMax);
+      //  List<IndexEntry> result = sourceCompare.queryBySource(timeMin, timeMax, valMin, valMax);
+        List<IndexEntry> result = new ArrayList<>();
         for(int i=0; i<result.size(); i++){
             IndexEntry entry = result.get(i);
             int start,end;
