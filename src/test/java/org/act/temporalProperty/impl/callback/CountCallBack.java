@@ -1,16 +1,16 @@
 package org.act.temporalProperty.impl.callback;
 
-import org.act.temporalProperty.impl.RangeQueryCallBack;
+import org.act.temporalProperty.query.range.AbstractRangeQuery;
 import org.act.temporalProperty.util.Slice;
 
-public class CountCallBack extends RangeQueryCallBack
+public class CountCallBack extends AbstractRangeQuery
 {
 
     int Number = 0;
     String valueType;
     
     @Override
-    public void onCall(int time, Slice value)
+    public void onNewValue(int time, Slice value)
     {
         Number++;
     }

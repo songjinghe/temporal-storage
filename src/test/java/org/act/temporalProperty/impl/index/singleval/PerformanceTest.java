@@ -1,7 +1,7 @@
 package org.act.temporalProperty.impl.index.singleval;
 
 import org.act.temporalProperty.TemporalPropertyStore;
-import org.act.temporalProperty.impl.RangeQueryCallBack;
+import org.act.temporalProperty.query.range.AbstractRangeQuery;
 import org.act.temporalProperty.index.IndexQueryRegion;
 import org.act.temporalProperty.index.IndexTableIterator;
 import org.act.temporalProperty.index.IndexValueType;
@@ -142,7 +142,7 @@ public class PerformanceTest {
                         private boolean first = true;
                         private int lastTime = -1;
                         private Slice lastVal;
-                        public void onCall(int time, Slice value) {
+                        public void onNewValue(int time, Slice value) {
                             if (first) {
                                 first = false;
                             } else if (overlap(lastTime, time-1, timeMin, timeMax)) {
@@ -179,7 +179,7 @@ public class PerformanceTest {
                 private boolean first = true;
                 private int lastTime = -1;
                 private Slice lastVal;
-                public void onCall(int time, Slice value0) {
+                public void onNewValue(int time, Slice value0) {
                     if (first) {
                         first = false;
                         if(time>timeMin) throw new StopLoopException("start time("+time+") later than timeMin");
@@ -210,10 +210,10 @@ public class PerformanceTest {
 
     private static boolean overlap(int t1min, int t1max, int t2min, int t2max){return (t1min<=t2max && t2min<=t1max);}
 
-    private class CustomCallBack extends RangeQueryCallBack {
+    private class CustomCallBack extends AbstractRangeQuery {
         private long entityId;
         public CustomCallBack(long entityId){this.entityId=entityId;}
-        public void onCall(int time, Slice value) {}
+        public void onNewValue(int time, Slice value) {}
         public void setValueType(String valueType) {}
         public void onCallBatch(Slice batchValue) {}
         public Object onReturn() {return null;}

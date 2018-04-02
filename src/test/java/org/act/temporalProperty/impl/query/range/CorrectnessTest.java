@@ -1,7 +1,7 @@
 package org.act.temporalProperty.impl.query.range;
 
 import org.act.temporalProperty.TemporalPropertyStore;
-import org.act.temporalProperty.impl.RangeQueryCallBack;
+import org.act.temporalProperty.query.range.AbstractRangeQuery;
 import org.act.temporalProperty.meta.ValueContentType;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.StoreBuilder;
@@ -38,7 +38,7 @@ public class CorrectnessTest {
         Slice val = store.getPointValue(1,0, sep*2-10);
         log.debug("point query result {}", val.getInt(0));
         log.debug("if you see next line, then means no bug.");
-        Object result = store.getRangeValue(1, 0, sep*2-10, sep*2, new RangeQueryCallBack(){
+        Object result = store.getRangeValue(1, 0, sep*2-10, sep*2, new AbstractRangeQuery(){
 
             @Override
             public void setValueType(String valueType) {
@@ -46,7 +46,7 @@ public class CorrectnessTest {
             }
 
             @Override
-            public void onCall(int time, Slice value) {
+            public void onNewValue(int time, Slice value) {
                 log.debug("if you see this line, then means no bug. val={}", value.getInt(0));
             }
 
