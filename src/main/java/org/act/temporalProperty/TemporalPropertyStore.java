@@ -5,6 +5,7 @@ import org.act.temporalProperty.index.IndexQueryRegion;
 import org.act.temporalProperty.index.IndexValueType;
 import org.act.temporalProperty.index.rtree.IndexEntry;
 import org.act.temporalProperty.meta.ValueContentType;
+import org.act.temporalProperty.query.range.InternalEntryRangeQueryCallBack;
 import org.act.temporalProperty.util.Slice;
 
 import java.util.List;
@@ -40,7 +41,7 @@ public interface TemporalPropertyStore
 	 * @param callback 时间段查询所采用的聚集类型
 	 * @return @{Slice} 查询的结果
 	 */
-    Object getRangeValue( long id, int proId, int startTime, int endTime, RangeQueryCallBack callback );
+    Object getRangeValue( long id, int proId, int startTime, int endTime, InternalEntryRangeQueryCallBack callback );
 
 	/**
 	 * 创建某个动态属性

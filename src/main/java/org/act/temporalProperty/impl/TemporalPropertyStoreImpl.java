@@ -14,6 +14,7 @@ import org.act.temporalProperty.meta.PropertyMetaData;
 import org.act.temporalProperty.meta.SystemMeta;
 import org.act.temporalProperty.meta.SystemMetaController;
 import org.act.temporalProperty.meta.ValueContentType;
+import org.act.temporalProperty.query.range.InternalEntryRangeQueryCallBack;
 import org.act.temporalProperty.table.TwoLevelMergeIterator;
 import org.act.temporalProperty.table.MergeProcess;
 import org.act.temporalProperty.table.TableBuilder;
@@ -105,7 +106,7 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
     }
 
     @Override
-    public Object getRangeValue( long id, int proId, int startTime, int endTime, RangeQueryCallBack callback ) {
+    public Object getRangeValue( long id, int proId, int startTime, int endTime, InternalEntryRangeQueryCallBack callback ) {
         meta.lockShared();
         try{
             Slice idSlice = toSlice(proId, id);
@@ -120,8 +121,8 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
             while(mergedIterator.hasNext()){
                 InternalEntry entry = mergedIterator.next();
                 InternalKey key = entry.getKey();
-                if( key.getStartTime() <= endTime && key.getValueType() == ValueType.VALUE){
-                    callback.onCall(key.getStartTime(), entry.getValue());
+                if( key.getStartTime() <= endTime){
+                    callback.onNewEntry(entry);
                 }else break;
             }
             return callback.onReturn();
