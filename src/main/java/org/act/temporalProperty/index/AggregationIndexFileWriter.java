@@ -1,0 +1,57 @@
+package org.act.temporalProperty.index;
+
+import org.act.temporalProperty.helper.PairViewFilterByNextIterator;
+import org.act.temporalProperty.impl.*;
+import org.act.temporalProperty.table.TableBuilder;
+import org.act.temporalProperty.table.TableComparator;
+import org.act.temporalProperty.util.Slice;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.channels.FileChannel;
+import java.util.*;
+
+/**
+ * Created by song on 2018-04-05.
+ */
+public class AggregationIndexFileWriter {
+
+    private final Iterator<AggregationIndexEntry> data;
+    private final File file;
+
+    public AggregationIndexFileWriter(List<AggregationIndexEntry> data, File file) {
+        this.data = data.iterator();
+        this.file = file;
+    }
+
+    public long write() throws IOException {
+        try(FileOutputStream targetStream = new FileOutputStream(file)) {
+            FileChannel targetChannel = targetStream.getChannel();
+            TableBuilder builder = new TableBuilder(new Options(), targetChannel, TableComparator.forAggrIndex());
+            // merge same AggregationIndexKey, sum up their duration.
+            AggregationIndexEntry lastEntry = null;
+            int duration = 0;
+            while (data.hasNext()) {
+                AggregationIndexEntry entry = data.next();
+                if(lastEntry==null){
+                    duration = entry.getDuration();
+                }else if(entry.getKey().equals(lastEntry.getKey())) {
+                    duration += entry.getDuration();
+                } else{ // key not equal, so we add lastKey.
+                    Slice dur = new Slice(4);
+                    dur.setInt(0, duration);
+                    builder.add(lastEntry.getKey().encode(), dur);
+                }
+                lastEntry = entry;
+            }
+            if(lastEntry!=null) {
+                Slice dur = new Slice(4);
+                dur.setInt(0, duration);
+                builder.add(lastEntry.getKey().encode(), dur);
+            }
+            targetChannel.force(true);
+            return targetChannel.size();
+        }
+    }
+}

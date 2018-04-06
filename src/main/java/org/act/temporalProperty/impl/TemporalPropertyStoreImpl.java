@@ -14,6 +14,8 @@ import org.act.temporalProperty.meta.PropertyMetaData;
 import org.act.temporalProperty.meta.SystemMeta;
 import org.act.temporalProperty.meta.SystemMetaController;
 import org.act.temporalProperty.meta.ValueContentType;
+import org.act.temporalProperty.query.aggr.ValueGroupingMap;
+import org.act.temporalProperty.query.aggr.IndexAggregationQuery;
 import org.act.temporalProperty.query.range.InternalEntryRangeQueryCallBack;
 import org.act.temporalProperty.table.TwoLevelMergeIterator;
 import org.act.temporalProperty.table.MergeProcess;
@@ -25,10 +27,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 /**
  * TemporalPropertyStore的实现类
@@ -55,7 +54,7 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
         this.init();
         this.cache = new TableCache( 25, TableComparator.instance(), false);
         this.meta.initStore(dbDir, cache);
-        this.index = new IndexStore(new File(dbDir, "index"), this, meta.getIndexes());
+        this.index = new IndexStore(new File(dbDir, "index"), this, meta.getIndexes(), meta.indexNextId());
         this.mergeProcess = new MergeProcess(dbDir.getAbsolutePath(), meta, index);
         this.mergeProcess.start();
     }
@@ -207,12 +206,43 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
 
     @Override
     public boolean deleteEntityProperty(Slice id) {
-        //TODO
+        //TODO deleteEntityProperty
         return false;
     }
 
     @Override
-    public void createValueIndex(int start, int end, List<Integer> proIds) {
+    public long createAggrIndex(int propertyId, int start, int end, ValueGroupingMap valueGrouping, int every, int timeUnit){
+        meta.lockShared();
+        try{
+            return index.createAggrIndex(propertyId, start, end, valueGrouping, every, timeUnit);
+        } catch (IOException e) {
+            e.printStackTrace();
+            throw new TPSRuntimeException("error when create index.", e);
+        } finally {
+            meta.unLockShared();
+        }
+    }
+
+    @Override
+    public Object aggregate(long entityId, int proId, int startTime, int endTime, InternalEntryRangeQueryCallBack callback) {
+        return getRangeValue(entityId, proId, startTime, endTime, callback);
+    }
+
+    @Override
+    public Object aggrWithIndex(long entityId, int proId, int startTime, int endTime, long indexId, IndexAggregationQuery query) {
+        meta.lockShared();
+        try{
+            return index.aggrIndexQuery(entityId, proId, startTime, endTime, indexId);
+        } catch (IOException e) {
+            e.printStackTrace();
+            throw new TPSRuntimeException("error when aggr with index.", e);
+        } finally{
+            meta.unLockShared();
+        }
+    }
+
+    @Override
+    public long createValueIndex(int start, int end, List<Integer> proIds) {
         List<IndexValueType> types = new ArrayList<>();
         for(Integer pid : proIds){
             PropertyMetaData pMeta = meta.getProperties().get(pid);
@@ -222,22 +252,36 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
                 throw new TPSRuntimeException("storage not contains property id "+pid);
             }
         }
-        createValueIndex(start, end, proIds, types);
+        return createValueIndex(start, end, proIds, types);
     }
 
-    private void createValueIndex(int start, int end, List<Integer> proIds, List<IndexValueType> types){
+    private long createValueIndex(int start, int end, List<Integer> proIds, List<IndexValueType> types){
         if(proIds.isEmpty()) throw new RuntimeException("should have at least one proId");
         meta.lockShared();
         try {
-            index.createValueIndex(start, end, proIds, types);
+            return index.createValueIndex(start, end, proIds, types);
         } catch (IOException e) {
             e.printStackTrace();
+            return 0;
         } finally {
             meta.unLockShared();
         }
     }
 
-
+    private TreeMap<Integer, Integer> mergeAggrQueryResult(Map<Integer, Integer> v1, Map<Integer, Integer> v2){
+        TreeMap<Integer, Integer> result = new TreeMap<>();
+        Set<Integer> keySet = v1.keySet();
+        keySet.addAll(v2.keySet());
+        for(Integer valGroupId : keySet){
+            int duration = 0;
+            Integer duration1 = v1.get(valGroupId);
+            if(duration1!=null) duration+=duration1;
+            Integer duration2 = v2.get(valGroupId);
+            if(duration2!=null) duration+=duration2;
+            result.put(valGroupId, duration);
+        }
+        return result;
+    }
 
     private IndexEntryOperator extractOperator(IndexQueryRegion regions) {
         List<IndexValueType> types = new ArrayList<>();

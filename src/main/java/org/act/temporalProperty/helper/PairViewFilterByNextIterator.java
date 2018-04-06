@@ -23,6 +23,8 @@ public abstract class PairViewFilterByNextIterator<T> extends AbstractIterator<T
         while(first !=null && second !=null){
             if(shouldReturnFirst(first, second)){
                 return shift2next();
+            }else{
+                shift2next();
             }
         }
         if(first !=null){ // next==null
@@ -48,8 +50,6 @@ public abstract class PairViewFilterByNextIterator<T> extends AbstractIterator<T
         return tmp;
     }
 
-    protected boolean shouldReturnFirst(T cur, T next) {
-        throw new UnsupportedOperationException("method `shouldReturnFirst` should be override!");
-    }
+    protected abstract boolean shouldReturnFirst(T cur, T next);
 
 }

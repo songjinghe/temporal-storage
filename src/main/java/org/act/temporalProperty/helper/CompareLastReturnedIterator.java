@@ -8,11 +8,11 @@ import java.util.Iterator;
 /**
  * Created by song on 2018-03-28.
  */
-public abstract class PairViewFilterByPreIterator<T> extends AbstractIterator<T> {
+public abstract class CompareLastReturnedIterator<T> extends AbstractIterator<T> {
     private final PeekingIterator<T> in;
     private T lastReturned;
 
-    public PairViewFilterByPreIterator(PeekingIterator<T> in){
+    public CompareLastReturnedIterator(PeekingIterator<T> in){
         this.in = in;
         lastReturned = null;
     }
@@ -30,8 +30,6 @@ public abstract class PairViewFilterByPreIterator<T> extends AbstractIterator<T>
         }
     }
 
-    protected boolean shouldReturnSecond(T pre, T cur) {
-        throw new UnsupportedOperationException("method `shouldReturnSecond` should be override!");
-    }
+    protected abstract boolean shouldReturnSecond(T lastReturned, T cur);
 
 }

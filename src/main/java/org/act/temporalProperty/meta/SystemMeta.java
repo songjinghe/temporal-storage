@@ -20,6 +20,7 @@ public class SystemMeta {
 
     private final Map<Integer, PropertyMetaData> properties = new HashMap<>();
     private final Set<IndexMetaData> indexes = new HashSet<>();
+    private long indexNextId;
     private final Map<Integer, SinglePropertyStore> propertyStores = new HashMap<>();
     private TableCache cache;
     private File dbDir;
@@ -94,5 +95,13 @@ public class SystemMeta {
                 ", indexes=" + indexes +
                 ", dbDir=" + dbDir +
                 '}';
+    }
+
+    public long indexNextId() {
+        return this.indexNextId;
+    }
+
+    public void setIndexNextId(long indexNextId) {
+        this.indexNextId = indexNextId;
     }
 }

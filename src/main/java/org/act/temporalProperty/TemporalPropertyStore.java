@@ -1,10 +1,10 @@
 package org.act.temporalProperty;
 
-import org.act.temporalProperty.impl.RangeQueryCallBack;
 import org.act.temporalProperty.index.IndexQueryRegion;
-import org.act.temporalProperty.index.IndexValueType;
 import org.act.temporalProperty.index.rtree.IndexEntry;
 import org.act.temporalProperty.meta.ValueContentType;
+import org.act.temporalProperty.query.aggr.IndexAggregationQuery;
+import org.act.temporalProperty.query.aggr.ValueGroupingMap;
 import org.act.temporalProperty.query.range.InternalEntryRangeQueryCallBack;
 import org.act.temporalProperty.util.Slice;
 
@@ -72,13 +72,19 @@ public interface TemporalPropertyStore
 	 */
 	boolean deleteEntityProperty(Slice id);
 
+    long createAggrIndex(int propertyId, int start, int end, ValueGroupingMap valueGrouping, int every, int timeUnit);
+
+    Object aggregate(long entityId, int proId, int startTime, int endTime, InternalEntryRangeQueryCallBack callback);
+
+	Object aggrWithIndex(long entityId, int proId, int startTime, int endTime, long indexId, IndexAggregationQuery query);
+
 	/**
 	 * 创建一个值索引
 	 * @param start  索引开始时间
 	 * @param end    索引结束时间
 	 * @param proIds 索引的属性id列表
 	 */
-	void createValueIndex(int start, int end, List<Integer> proIds);
+	long createValueIndex(int start, int end, List<Integer> proIds);
 
 	/**
 	 * get entity id which satisfy query condition
