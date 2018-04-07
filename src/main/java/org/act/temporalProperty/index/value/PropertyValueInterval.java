@@ -1,5 +1,6 @@
-package org.act.temporalProperty.index;
+package org.act.temporalProperty.index.value;
 
+import org.act.temporalProperty.index.IndexValueType;
 import org.act.temporalProperty.util.Slice;
 
 /**

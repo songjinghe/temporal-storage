@@ -1,6 +1,6 @@
 package org.act.temporalProperty.query.aggr;
 
-import org.act.temporalProperty.index.TimeIntervalEntry;
+import org.act.temporalProperty.index.aggregation.TimeIntervalEntry;
 
 import java.util.Collection;
 import java.util.Map;

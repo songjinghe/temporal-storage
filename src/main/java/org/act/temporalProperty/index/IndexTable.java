@@ -1,11 +1,13 @@
 package org.act.temporalProperty.index;
 
 import org.act.temporalProperty.impl.SeekingIterator;
-import org.act.temporalProperty.index.rtree.IndexEntry;
-import org.act.temporalProperty.index.rtree.IndexEntryOperator;
+import org.act.temporalProperty.index.value.IndexQueryRegion;
+import org.act.temporalProperty.index.value.IndexTableIterator;
+import org.act.temporalProperty.index.value.PropertyValueInterval;
+import org.act.temporalProperty.index.value.rtree.IndexEntry;
+import org.act.temporalProperty.index.value.rtree.IndexEntryOperator;
 import org.act.temporalProperty.table.MMapTable;
 import org.act.temporalProperty.table.TableComparator;
-import org.act.temporalProperty.table.TableIterator;
 import org.act.temporalProperty.util.Slice;
 
 import java.io.IOException;

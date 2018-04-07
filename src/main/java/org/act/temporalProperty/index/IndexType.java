@@ -6,7 +6,8 @@ import com.google.common.base.Preconditions;
  * Created by song on 2018-01-18.
  */
 public enum IndexType {
-    TIME_AGGR(0), SINGLE_VALUE(1), MULTI_VALUE(2);
+    SINGLE_VALUE(0), MULTI_VALUE(1),
+    AGGR_DURATION(2), AGGR_MIN(3), AGGR_MAX(4), AGGR_MIN_MAX(5);
 
     int id;
     IndexType(int id){
@@ -16,11 +17,14 @@ public enum IndexType {
     public int getId(){return id;}
 
     public static IndexType decode(int i){
-        Preconditions.checkArgument(i==0 || i==1 || i==2);
+        Preconditions.checkArgument(0<=i && i<=5);
         switch (i){
-            case 0: return TIME_AGGR;
-            case 1: return SINGLE_VALUE;
-            default:return MULTI_VALUE;
+            case 0: return SINGLE_VALUE;
+            case 1: return MULTI_VALUE;
+            case 2: return AGGR_DURATION;
+            case 3: return AGGR_MIN;
+            case 4: return AGGR_MAX;
+            default:return AGGR_MIN_MAX;
         }
     }
 }

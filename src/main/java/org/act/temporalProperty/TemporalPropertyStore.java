@@ -1,7 +1,8 @@
 package org.act.temporalProperty;
 
-import org.act.temporalProperty.index.IndexQueryRegion;
-import org.act.temporalProperty.index.rtree.IndexEntry;
+import org.act.temporalProperty.index.value.IndexQueryRegion;
+import org.act.temporalProperty.index.IndexType;
+import org.act.temporalProperty.index.value.rtree.IndexEntry;
 import org.act.temporalProperty.meta.ValueContentType;
 import org.act.temporalProperty.query.aggr.IndexAggregationQuery;
 import org.act.temporalProperty.query.aggr.ValueGroupingMap;
@@ -72,11 +73,13 @@ public interface TemporalPropertyStore
 	 */
 	boolean deleteEntityProperty(Slice id);
 
-    long createAggrIndex(int propertyId, int start, int end, ValueGroupingMap valueGrouping, int every, int timeUnit);
+    long createAggrDurationIndex(int propertyId, int start, int end, ValueGroupingMap valueGrouping, int every, int timeUnit);
 
-    Object aggregate(long entityId, int proId, int startTime, int endTime, InternalEntryRangeQueryCallBack callback);
+	long createAggrMinMaxIndex(int propertyId, int start, int end, int every, int timeUnit, IndexType type);
 
-	Object aggrWithIndex(long entityId, int proId, int startTime, int endTime, long indexId, IndexAggregationQuery query);
+	Object aggregate(long entityId, int proId, int startTime, int endTime, InternalEntryRangeQueryCallBack callback);
+
+	Object aggrWithIndex(long indexId, long entityId, int proId, int startTime, int endTime, IndexAggregationQuery query);
 
 	/**
 	 * 创建一个值索引

@@ -2,10 +2,9 @@ package org.act.temporalProperty.impl.index.singleval;
 
 import org.act.temporalProperty.TemporalPropertyStore;
 import org.act.temporalProperty.impl.RangeQueryCallBack;
-import org.act.temporalProperty.index.IndexQueryRegion;
+import org.act.temporalProperty.index.value.IndexQueryRegion;
 import org.act.temporalProperty.index.IndexValueType;
-import org.act.temporalProperty.index.PropertyValueInterval;
-import org.act.temporalProperty.meta.ValueContentType;
+import org.act.temporalProperty.index.value.PropertyValueInterval;
 import org.act.temporalProperty.util.DataFileImporter;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.StoreBuilder;

@@ -1,4 +1,4 @@
-package org.act.temporalProperty.index;
+package org.act.temporalProperty.index.aggregation;
 
 import org.act.temporalProperty.util.Slice;
 

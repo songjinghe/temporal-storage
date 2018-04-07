@@ -1,8 +1,8 @@
-package org.act.temporalProperty.index;
+package org.act.temporalProperty.index.value;
 
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.PeekingIterator;
-import org.act.temporalProperty.index.rtree.*;
+import org.act.temporalProperty.index.value.rtree.*;
 
 import java.io.IOException;
 import java.nio.ByteOrder;

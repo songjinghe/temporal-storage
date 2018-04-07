@@ -2,10 +2,10 @@ package org.act.temporalProperty.impl.index.singleval;
 
 import com.google.common.collect.Lists;
 import org.act.temporalProperty.TemporalPropertyStore;
-import org.act.temporalProperty.index.IndexQueryRegion;
+import org.act.temporalProperty.index.value.IndexQueryRegion;
 import org.act.temporalProperty.index.IndexValueType;
-import org.act.temporalProperty.index.PropertyValueInterval;
-import org.act.temporalProperty.index.rtree.IndexEntry;
+import org.act.temporalProperty.index.value.PropertyValueInterval;
+import org.act.temporalProperty.index.value.rtree.IndexEntry;
 import org.act.temporalProperty.meta.ValueContentType;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.StoreBuilder;

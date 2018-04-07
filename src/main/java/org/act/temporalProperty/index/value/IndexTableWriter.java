@@ -1,6 +1,6 @@
-package org.act.temporalProperty.index;
+package org.act.temporalProperty.index.value;
 
-import org.act.temporalProperty.index.rtree.*;
+import org.act.temporalProperty.index.value.rtree.*;
 import org.act.temporalProperty.util.DynamicSliceOutput;
 
 import java.io.IOException;

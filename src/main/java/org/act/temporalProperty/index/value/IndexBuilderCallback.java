@@ -1,8 +1,8 @@
-package org.act.temporalProperty.index;
+package org.act.temporalProperty.index.value;
 
 import com.google.common.collect.PeekingIterator;
-import org.act.temporalProperty.index.rtree.IndexEntry;
-import org.act.temporalProperty.index.rtree.IndexEntryOperator;
+import org.act.temporalProperty.index.value.rtree.IndexEntry;
+import org.act.temporalProperty.index.value.rtree.IndexEntryOperator;
 import org.act.temporalProperty.util.Slice;
 
 import java.util.*;

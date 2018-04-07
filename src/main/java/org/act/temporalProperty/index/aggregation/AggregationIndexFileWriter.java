@@ -1,6 +1,5 @@
-package org.act.temporalProperty.index;
+package org.act.temporalProperty.index.aggregation;
 
-import org.act.temporalProperty.helper.PairViewFilterByNextIterator;
 import org.act.temporalProperty.impl.*;
 import org.act.temporalProperty.table.TableBuilder;
 import org.act.temporalProperty.table.TableComparator;

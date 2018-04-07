@@ -2,18 +2,13 @@ package org.act.temporalProperty.impl.index.singleval;
 
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.Table;
-import org.act.temporalProperty.impl.InternalKey;
-import org.act.temporalProperty.index.PropertyValueInterval;
-import org.act.temporalProperty.index.rtree.IndexEntry;
+import org.act.temporalProperty.index.value.rtree.IndexEntry;
 import org.act.temporalProperty.util.Slice;
-import org.act.temporalProperty.util.TrafficDataImporter;
 import org.apache.commons.lang3.SystemUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.*;
 /*
 * edit by yf

@@ -1,4 +1,4 @@
-package org.act.temporalProperty.index.rtree;
+package org.act.temporalProperty.index.value.rtree;
 
 import com.google.common.base.Preconditions;
 import org.act.temporalProperty.exception.TPSNHException;

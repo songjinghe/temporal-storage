@@ -2,7 +2,7 @@ package org.act.temporalProperty.meta;
 
 import org.act.temporalProperty.exception.TPSRuntimeException;
 import org.act.temporalProperty.impl.*;
-import org.act.temporalProperty.index.IndexMetaData;
+import org.act.temporalProperty.index.value.IndexMetaData;
 
 import java.io.File;
 import java.io.IOException;

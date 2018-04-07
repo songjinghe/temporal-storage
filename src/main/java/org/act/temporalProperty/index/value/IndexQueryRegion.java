@@ -1,10 +1,8 @@
-package org.act.temporalProperty.index;
+package org.act.temporalProperty.index.value;
 
-import org.act.temporalProperty.index.rtree.RTreeRange;
-import org.act.temporalProperty.util.Slice;
+import org.act.temporalProperty.index.value.rtree.RTreeRange;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 /**

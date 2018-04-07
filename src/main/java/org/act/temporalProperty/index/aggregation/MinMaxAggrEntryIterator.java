@@ -1,21 +1,24 @@
-package org.act.temporalProperty.index;
+package org.act.temporalProperty.index.aggregation;
 
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.PeekingIterator;
 import org.act.temporalProperty.exception.TPSNHException;
+import org.act.temporalProperty.index.EntityTimeIntervalEntry;
 import org.act.temporalProperty.query.aggr.AggregationIndexKey;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.TimeIntervalUtil;
-import org.apache.commons.lang3.time.DateUtils;
+import org.apache.commons.lang3.tuple.Triple;
 
-import java.util.*;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
 
 /**
  * Created by song on 2018-04-06.
  */
-class Interval2AggrEntryIterator extends AbstractIterator<AggregationIndexEntry> implements PeekingIterator<AggregationIndexEntry> {
+public class MinMaxAggrEntryIterator extends AbstractIterator<Triple<Long,Integer,Slice>> implements PeekingIterator<Triple<Long,Integer,Slice>> {
     private final Iterator<EntityTimeIntervalEntry> tpIter;
-    private final TreeMap<Slice, Integer> valueGrouping;
     private final TreeMap<Integer, Integer> intervalStarts;
     private final int intervalBegin;
     private final int intervalFinish;
@@ -28,9 +31,8 @@ class Interval2AggrEntryIterator extends AbstractIterator<AggregationIndexEntry>
      * @param iterator should only contains one property.
      * @param intervalStarts interval start time point TreeSet
      */
-    public Interval2AggrEntryIterator(Iterator<EntityTimeIntervalEntry> iterator, TreeMap<Slice, Integer> valueGrouping, TreeMap<Integer, Integer> intervalStarts) {
+    public MinMaxAggrEntryIterator(Iterator<EntityTimeIntervalEntry> iterator, TreeMap<Integer, Integer> intervalStarts) {
         this.tpIter = iterator;
-        this.valueGrouping = valueGrouping;
         this.intervalStarts = intervalStarts;
         if(intervalStarts.size()<2) throw new TPSNHException("time interval too less!");
         this.intervalBegin = intervalStarts.firstKey();
@@ -38,7 +40,7 @@ class Interval2AggrEntryIterator extends AbstractIterator<AggregationIndexEntry>
         if(intervalBegin>intervalFinish) throw new TPSNHException("time interval begin > finish!");
     }
 
-    protected AggregationIndexEntry computeNext() {
+    protected Triple<Long,Integer,Slice> computeNext() {
         if(lastEntry!=null){
             return computeTimeGroup(this.eStart, this.eEnd, lastEntry);
         }else {
@@ -57,34 +59,18 @@ class Interval2AggrEntryIterator extends AbstractIterator<AggregationIndexEntry>
         }
     }
 
-    private AggregationIndexEntry computeTimeGroup(int eStart, int eEnd, EntityTimeIntervalEntry entry) {
-        int duration;
+    private Triple<Long,Integer,Slice> computeTimeGroup(int eStart, int eEnd, EntityTimeIntervalEntry entry) {
         int timeGroupId = intervalStarts.floorEntry(eStart).getValue();
         // if eStart and eEnd both in the same time range.
         if(Objects.equals(intervalStarts.floorKey(eStart), intervalStarts.floorKey(eEnd))){
-            duration = eEnd - eStart + 1;
             lastEntry = null;
-            return outputEntry(entry, timeGroupId, duration);
+            return Triple.of(entry.entityId(), timeGroupId, entry.value());
         }else{
-            duration = intervalStarts.higherKey(eStart) - eStart; //no need +1.
             this.eStart = intervalStarts.higherKey(eStart);
             this.eEnd = eEnd;
             lastEntry = entry;
-            return outputEntry(entry, timeGroupId, duration);
+            return Triple.of(entry.entityId(), timeGroupId, entry.value());
         }
     }
-
-    private AggregationIndexEntry outputEntry(EntityTimeIntervalEntry entry, int timeGroupId, int duration) {
-        Slice val = entry.value();
-        Map.Entry<Slice, Integer> valGroup = valueGrouping.floorEntry(val);
-        AggregationIndexKey key;
-        if(valGroup!=null){
-            key = new AggregationIndexKey(entry.entityId(), timeGroupId, valGroup.getValue());
-        }else{
-            key = new AggregationIndexKey(entry.entityId(), timeGroupId, -1);
-        }
-        return new AggregationIndexEntry(key, duration);
-    }
-
 
 }

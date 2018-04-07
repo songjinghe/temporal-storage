@@ -1,7 +1,6 @@
-package org.act.temporalProperty.index.rtree;
+package org.act.temporalProperty.index.value.rtree;
 
 import org.act.temporalProperty.exception.TPSNHException;
-import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.SliceInput;
 import org.act.temporalProperty.util.SliceOutput;
 

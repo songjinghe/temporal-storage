@@ -1,9 +1,6 @@
 package org.act.temporalProperty.query.aggr;
 
-import com.google.common.base.*;
-import com.google.common.base.Objects;
-import org.act.temporalProperty.index.TimeIntervalEntry;
-import org.act.temporalProperty.meta.ValueContentType;
+import org.act.temporalProperty.index.aggregation.TimeIntervalEntry;
 
 import java.util.*;
 

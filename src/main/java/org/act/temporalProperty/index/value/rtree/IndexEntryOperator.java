@@ -1,9 +1,10 @@
-package org.act.temporalProperty.index.rtree;
+package org.act.temporalProperty.index.value.rtree;
 
 import com.google.common.base.Preconditions;
 import org.act.temporalProperty.index.*;
+import org.act.temporalProperty.index.value.IndexQueryRegion;
+import org.act.temporalProperty.index.value.PropertyValueInterval;
 import org.act.temporalProperty.util.Slice;
-import org.act.temporalProperty.util.SliceInput;
 
 import java.util.List;
 

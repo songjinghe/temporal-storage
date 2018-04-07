@@ -4,7 +4,7 @@ import org.act.temporalProperty.exception.TPSNHException;
 import org.act.temporalProperty.impl.LogReader;
 import org.act.temporalProperty.impl.LogWriter;
 import org.act.temporalProperty.impl.Logs;
-import org.act.temporalProperty.index.IndexMetaData;
+import org.act.temporalProperty.index.value.IndexMetaData;
 import org.act.temporalProperty.util.DynamicSliceOutput;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.SliceInput;

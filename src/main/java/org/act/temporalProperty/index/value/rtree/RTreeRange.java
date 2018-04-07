@@ -1,11 +1,10 @@
-package org.act.temporalProperty.index.rtree;
+package org.act.temporalProperty.index.value.rtree;
 
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.SliceInput;
 import org.act.temporalProperty.util.SliceOutput;
 
 import java.nio.ByteBuffer;
-import java.nio.MappedByteBuffer;
 import java.util.List;
 
 public class RTreeRange

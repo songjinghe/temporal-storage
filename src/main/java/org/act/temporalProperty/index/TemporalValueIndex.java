@@ -2,6 +2,9 @@ package org.act.temporalProperty.index;
 
 import com.google.common.collect.Multimap;
 import org.act.temporalProperty.impl.TableCache;
+import org.act.temporalProperty.index.value.IndexMetaData;
+import org.act.temporalProperty.index.value.IndexQueryRegion;
+import org.act.temporalProperty.index.value.PropertyValueInterval;
 
 import java.util.*;
 

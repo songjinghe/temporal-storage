@@ -1,12 +1,10 @@
-package org.act.temporalProperty.index.rtree;
+package org.act.temporalProperty.index.value.rtree;
 
 import org.act.temporalProperty.util.DynamicSliceOutput;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.SliceInput;
 
 import java.nio.ByteBuffer;
-import java.nio.MappedByteBuffer;
-import java.util.List;
 
 /**
  * Created by song on 2018-01-19.

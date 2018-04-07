@@ -1,4 +1,4 @@
-package org.act.temporalProperty.index.rtree;
+package org.act.temporalProperty.index.value.rtree;
 
 import org.act.temporalProperty.util.SliceOutput;
 

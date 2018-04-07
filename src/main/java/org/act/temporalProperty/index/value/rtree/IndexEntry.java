@@ -1,4 +1,4 @@
-package org.act.temporalProperty.index.rtree;
+package org.act.temporalProperty.index.value.rtree;
 
 
 import com.google.common.base.Objects;
@@ -8,8 +8,6 @@ import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.SliceInput;
 import org.act.temporalProperty.util.SliceOutput;
 import org.act.temporalProperty.util.VariableLengthQuantity;
-
-import java.util.Arrays;
 
 /**
  * Created by song on 2018-01-21.

@@ -8,8 +8,11 @@ import org.act.temporalProperty.helper.StoreInitial;
 import org.act.temporalProperty.helper.EPEntryIterator;
 import org.act.temporalProperty.helper.EPMergeIterator;
 import org.act.temporalProperty.index.*;
-import org.act.temporalProperty.index.rtree.IndexEntry;
-import org.act.temporalProperty.index.rtree.IndexEntryOperator;
+import org.act.temporalProperty.index.value.IndexMetaData;
+import org.act.temporalProperty.index.value.IndexQueryRegion;
+import org.act.temporalProperty.index.value.PropertyValueInterval;
+import org.act.temporalProperty.index.value.rtree.IndexEntry;
+import org.act.temporalProperty.index.value.rtree.IndexEntryOperator;
 import org.act.temporalProperty.meta.PropertyMetaData;
 import org.act.temporalProperty.meta.SystemMeta;
 import org.act.temporalProperty.meta.SystemMetaController;
@@ -211,10 +214,25 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
     }
 
     @Override
-    public long createAggrIndex(int propertyId, int start, int end, ValueGroupingMap valueGrouping, int every, int timeUnit){
+    public long createAggrDurationIndex(int propertyId, int start, int end, ValueGroupingMap valueGrouping, int every, int timeUnit){
         meta.lockShared();
         try{
-            return index.createAggrIndex(propertyId, start, end, valueGrouping, every, timeUnit);
+            PropertyMetaData pMeta = meta.getProperties().get(propertyId);
+            return index.createAggrIndex(pMeta, start, end, valueGrouping, every, timeUnit);
+        } catch (IOException e) {
+            e.printStackTrace();
+            throw new TPSRuntimeException("error when create index.", e);
+        } finally {
+            meta.unLockShared();
+        }
+    }
+
+    @Override
+    public long createAggrMinMaxIndex(int propertyId, int start, int end, int every, int timeUnit, IndexType type){
+        meta.lockShared();
+        try{
+            PropertyMetaData pMeta = meta.getProperties().get(propertyId);
+            return index.createAggrMinMaxIndex(pMeta, start, end, every, timeUnit, type);
         } catch (IOException e) {
             e.printStackTrace();
             throw new TPSRuntimeException("error when create index.", e);
@@ -229,10 +247,10 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
     }
 
     @Override
-    public Object aggrWithIndex(long entityId, int proId, int startTime, int endTime, long indexId, IndexAggregationQuery query) {
+    public Object aggrWithIndex(long indexId, long entityId, int proId, int startTime, int endTime, IndexAggregationQuery query) {
         meta.lockShared();
         try{
-            return index.aggrIndexQuery(entityId, proId, startTime, endTime, indexId);
+            return index.aggrIndexQuery(entityId, proId, startTime, endTime, indexId, query);
         } catch (IOException e) {
             e.printStackTrace();
             throw new TPSRuntimeException("error when aggr with index.", e);
