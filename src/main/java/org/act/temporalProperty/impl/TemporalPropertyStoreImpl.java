@@ -197,7 +197,7 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
                 Set<Integer> pids = new HashSet<>(iMeta.getPropertyIdList());
                 if(pids.contains(propertyId)) indexSet.remove(iMeta);
             }
-            index.deleteProperty(propertyId);
+            index.deleteIndex(propertyId);
             return true;
         } catch (IOException e) {
             e.printStackTrace();
@@ -250,7 +250,7 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
     public Object aggrWithIndex(long indexId, long entityId, int proId, int startTime, int endTime, IndexAggregationQuery query) {
         meta.lockShared();
         try{
-            return index.aggrIndexQuery(entityId, proId, startTime, endTime, indexId, query);
+            return index.queryAggrIndex(entityId, proId, startTime, endTime, indexId, query);
         } catch (IOException e) {
             e.printStackTrace();
             throw new TPSRuntimeException("error when aggr with index.", e);
@@ -322,7 +322,7 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
     @Override
     public List<IndexEntry> getEntries(IndexQueryRegion condition) {
         try {
-            return index.valueIndexQuery(condition);
+            return index.queryValueIndex(condition);
         } catch (IOException e) {
             e.printStackTrace();
             throw new RuntimeException(e);

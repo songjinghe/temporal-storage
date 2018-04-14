@@ -11,7 +11,7 @@ import org.act.temporalProperty.impl.ValueType;
 /**
  * Created by song on 2018-04-06.
  */
-class SimplePoint2IntervalIterator extends AbstractIterator<EntityTimeIntervalEntry> implements PeekingIterator<EntityTimeIntervalEntry> {
+public class SimplePoint2IntervalIterator extends AbstractIterator<EntityTimeIntervalEntry> implements PeekingIterator<EntityTimeIntervalEntry> {
     private final OnePropertyChecker tpIter;
     private final int endTime;
     private InternalEntry lastEntry = null;
@@ -20,7 +20,7 @@ class SimplePoint2IntervalIterator extends AbstractIterator<EntityTimeIntervalEn
      * @param tpIter  should only contains one property.
      * @param endTime
      */
-    SimplePoint2IntervalIterator(SearchableIterator tpIter, int endTime) {
+    public SimplePoint2IntervalIterator(SearchableIterator tpIter, int endTime) {
         this.tpIter = new OnePropertyChecker(tpIter);
         this.endTime = endTime;
         if (tpIter.hasNext()) {

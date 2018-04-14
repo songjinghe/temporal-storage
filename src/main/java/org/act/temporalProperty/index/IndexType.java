@@ -16,6 +16,10 @@ public enum IndexType {
 
     public int getId(){return id;}
 
+    public boolean isValueIndex(){
+        return id<2;
+    }
+
     public static IndexType decode(int i){
         Preconditions.checkArgument(0<=i && i<=5);
         switch (i){
