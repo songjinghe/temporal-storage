@@ -25,6 +25,9 @@ public class TrafficDataImporter {
     private int maxTime;
     private TemporalPropertyStore store;
 
+    private long writeTime = 0;
+    private long writeCount = 0;
+
     public TrafficDataImporter(TemporalPropertyStore store, List<File> dataFileList, int inputFileCount) throws IOException {
         this.store = store;
         this.dataFileList = dataFileList;
@@ -47,23 +50,29 @@ public class TrafficDataImporter {
         return maxTime;
     }
 
+    public long getWriteTime() { return writeTime; }
+
+    public long getWriteCount() { return writeCount; }
+
     private void inputData(int inputFileCount) throws IOException {
 
-        for (int i = 0; i < dataFileList.size() && i<inputFileCount; i++) {
+        for (int i = 0; i < dataFileList.size() && i < inputFileCount; i++) {
             File file = dataFileList.get(i);
             int time = timeStr2int(file.getName().substring(9, 21)) - 1288800000;
             if(minTime>time) minTime = time;
             if(maxTime<time) maxTime = time;
             try(BufferedReader br = new BufferedReader(new FileReader(file))) {
-                String line;
-                for (int lineCount = 0; (line = br.readLine()) != null; lineCount++) {
-                    if (lineCount == 0) continue;
+                String line = br.readLine();
+                while ((line = br.readLine()) != null) {
+
                     input(time, line);
+                    writeCount++;
                 }
+                br.close();
             }
-            if(i%10==0) log.info("input {} files, current {}, time {}", i, file.getName(), time);
+           // if(i%10==0) log.info("input {} files, current {}, time {}", i, file.getName(), time);
         }
-        log.info("input files done, {} roads", this.roadIdMap.size());
+      //  log.info("input files done, {} roads", this.roadIdMap.size());
     }
 
     private static void getFileRecursive(File dir, List<File> fileList, int level){
@@ -86,6 +95,7 @@ public class TrafficDataImporter {
     private void input(int time, String line) {
         String[] fields = line.split(",");
 //        int index = Integer.valueOf(fields[0]);
+
         String gridId = fields[1];
         String chainId = fields[2];
 //        int ignore = Integer.valueOf(fields[3]);
@@ -96,13 +106,19 @@ public class TrafficDataImporter {
         int vehicleCount = Integer.valueOf(fields[8]);
         int segmentCount = Integer.valueOf(fields[9]);
 
+        long startTime = System.currentTimeMillis();
+
         long roadId = getId(gridId, chainId);
 //        log.debug("eid({}), time({}), travelTime({})", roadId, time, travelTime);
         setIntProperty(store, time, roadId, 1, travelTime);
         setIntProperty(store, time, roadId, 2, fullStatus);
         setIntProperty(store, time, roadId, 3, vehicleCount);
         setIntProperty(store, time, roadId, 4, segmentCount);
+
+        long endTime = System.currentTimeMillis();
+        writeTime += endTime - startTime;
     }
+
 
     private long getId(String gridId, String chainId) {
         String strKey = gridId+":"+chainId;
