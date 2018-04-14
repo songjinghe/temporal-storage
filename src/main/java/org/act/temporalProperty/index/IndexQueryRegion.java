@@ -35,6 +35,4 @@ public class IndexQueryRegion {
     public List<PropertyValueInterval> getPropertyValueIntervals() {
         return pValues;
     }
-
-
 }
