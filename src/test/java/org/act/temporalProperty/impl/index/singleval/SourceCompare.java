@@ -335,6 +335,8 @@ public class SourceCompare {
 
             }
 
+            br.close();
+
         } catch (IOException e) {
             System.out.println("SourceCompare -- queryByFileName");
         }
