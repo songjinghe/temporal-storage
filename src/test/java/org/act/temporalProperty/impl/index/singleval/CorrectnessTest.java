@@ -315,7 +315,7 @@ public class CorrectnessTest {
     };
 
     @After
-    public void closeDB(){
+    public void closeDB() throws Throwable {
         if(store!=null) store.shutDown();
     }
 
