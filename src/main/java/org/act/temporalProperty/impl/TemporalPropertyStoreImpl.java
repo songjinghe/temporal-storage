@@ -74,7 +74,9 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
     /**
      * 退出系统时调用，主要作用是将内存中的数据写入磁盘。
      */
-    public void shutDown() throws IOException {
+    public void shutDown() throws IOException, InterruptedException {
+        this.mergeProcess.interrupt();
+        this.mergeProcess.join();
         this.flushMemTable2Disk();
         this.flushMetaInfo2Disk();
         this.lockFile.close();
