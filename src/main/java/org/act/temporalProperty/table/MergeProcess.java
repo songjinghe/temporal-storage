@@ -63,19 +63,29 @@ public class MergeProcess extends Thread
         return myName;
     }
 
-    public void shutdown(){
+    public void shutdown() throws InterruptedException {
         this.shouldGo = false;
+        this.join();
     }
 
     @Override
     public void run(){
         Thread.currentThread().setName(getMyName());
         try{
-            while(!Thread.interrupted() && shouldGo) {
-                if (memTable!=null && !memTable.isEmpty()) {
-                    startMergeProcess(memTable);
+            while(!Thread.interrupted()) {
+                if(shouldGo) {
+                    if (memTable != null && !memTable.isEmpty()) {
+                        startMergeProcess(memTable);
+                    } else {
+                        Thread.sleep(100);
+                    }
                 }else{
-                    Thread.sleep(100);
+                    if (memTable != null && !memTable.isEmpty()) {
+                        startMergeProcess(memTable);
+                        return;
+                    } else {
+                        return;
+                    }
                 }
             }
         } catch (InterruptedException e) {

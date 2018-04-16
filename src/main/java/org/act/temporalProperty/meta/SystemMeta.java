@@ -95,4 +95,8 @@ public class SystemMeta {
                 ", dbDir=" + dbDir +
                 '}';
     }
+
+    public ReentrantReadWriteLock getLock() {
+        return lock;
+    }
 }

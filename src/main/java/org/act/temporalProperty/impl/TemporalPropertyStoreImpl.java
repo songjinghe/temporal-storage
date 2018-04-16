@@ -76,7 +76,8 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
      */
     public void shutDown() throws IOException, InterruptedException {
         this.mergeProcess.shutdown();
-        this.mergeProcess.join();
+        this.mergeProcess.getId();
+        this.meta.getLock().writeLock();
         this.flushMemTable2Disk();
         this.flushMetaInfo2Disk();
         this.lockFile.close();
