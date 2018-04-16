@@ -22,6 +22,7 @@ import org.act.temporalProperty.util.Slice;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
@@ -44,7 +45,7 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
     private IndexStore index;
 
     private boolean forbiddenWrite=false;
-
+    private FileReader lockFile; // keeps opened while system is running to prevent delete of the storage dir;
 
     /**
      * @param dbDir 存储动态属性数据的目录地址
@@ -65,18 +66,18 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
     private void init() throws Throwable
     {
         StoreInitial starter = new StoreInitial(dbDir);
+        lockFile = starter.init();
         this.meta = starter.getMetaInfo();
         this.memTable = starter.getMemTable();
-
     }
 
     /**
      * 退出系统时调用，主要作用是将内存中的数据写入磁盘。
      */
-    public void shutDown()
-    {
+    public void shutDown() throws IOException {
         this.flushMemTable2Disk();
         this.flushMetaInfo2Disk();
+        this.lockFile.close();
     }
 
 

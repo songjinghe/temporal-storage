@@ -13,6 +13,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
+import java.nio.file.Files;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -34,7 +35,8 @@ public class IndexStore {
     private Map<Integer, TreeMap<Integer, IndexMetaData>> aggr = new HashMap<>(); // proId, time
 
     public IndexStore(File indexDir, TemporalPropertyStoreImpl store, Set<IndexMetaData> indexes) throws IOException {
-        if(!indexDir.exists() && !indexDir.mkdir()) throw new IOException("unable to create index dir");
+        Files.createDirectories(indexDir.toPath());
+//        if(!indexDir.exists() && !indexDir.mkdir()) throw new IOException("unable to create index dir");
         this.indexDir = indexDir;
         this.tpStore = store;
         for(IndexMetaData meta : indexes){
