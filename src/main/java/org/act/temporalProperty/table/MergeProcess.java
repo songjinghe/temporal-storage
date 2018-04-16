@@ -27,6 +27,7 @@ public class MergeProcess extends Thread
     private final SystemMeta systemMeta;
     private final String storeDir;
     private volatile MemTable memTable = null;
+    private volatile boolean shouldGo = true;
     private static Logger log = LoggerFactory.getLogger( MergeProcess.class );
     private final IndexStore index;
 
@@ -62,11 +63,15 @@ public class MergeProcess extends Thread
         return myName;
     }
 
+    public void shutdown(){
+        this.shouldGo = false;
+    }
+
     @Override
     public void run(){
         Thread.currentThread().setName(getMyName());
         try{
-            while(!Thread.interrupted()) {
+            while(!Thread.interrupted() && shouldGo) {
                 if (memTable!=null && !memTable.isEmpty()) {
                     startMergeProcess(memTable);
                 }else{
