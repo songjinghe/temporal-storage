@@ -58,6 +58,7 @@ public class PerformanceTest {
         endTime = System.currentTimeMillis();
 
         return (endTime - startTime);
+        
     }
 
 

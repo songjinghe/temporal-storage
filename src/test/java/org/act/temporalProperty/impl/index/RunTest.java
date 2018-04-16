@@ -57,6 +57,7 @@ public class RunTest {
         }
 
         outSrc.close();
+
         outDes.close();
     }
 
