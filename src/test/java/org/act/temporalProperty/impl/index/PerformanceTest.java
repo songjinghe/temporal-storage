@@ -73,5 +73,7 @@ public class PerformanceTest {
         //flushTime = getFlushMemtableTime(); //flush operation may influence the performance of write (flush the DRAM-cache)
 
         log.info("inputFileCount = {}, writeCount = {}, writeTime = {}", fileCount, writeCount, writeTime);
+
+        store.shutDown();
     }
 }

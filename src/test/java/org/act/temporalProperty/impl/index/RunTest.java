@@ -25,11 +25,13 @@ public class RunTest {
         List<File> dataDir = getDataFiles();
 
         //dataDir.size()
-        for (int fileCount = 3; fileCount <= 5; fileCount++) {
+        for (int fileCount = 1; fileCount <= dataDir.size(); fileCount++) {
 
             long writeCount = 0;
             long writeTime = 0;
-            for (int num = 0; num < 3; num++) {
+            long minTime = 0;
+            long maxTime = 0;
+            for (int num = 0; num < 10; num++) {
 
                 PerformanceTest writeTest = new PerformanceTest(fileCount);
                 writeTest.writeTest();
@@ -37,10 +39,20 @@ public class RunTest {
                 long writeTimeTmp = writeTest.getWriteTime();
                 outSrc.println(fileCount + "   " + writeCount + "  " + writeTimeTmp);
 
+                if((writeTimeTmp < minTime)|| (minTime == 0)) {
+                    minTime = writeTimeTmp;
+                }
+
+                if(writeTimeTmp > maxTime) {
+                    maxTime = writeTimeTmp;
+                }
+
                 writeTime += writeTimeTmp;
             }
 
-            writeTime /= 3;
+            writeTime -= minTime;
+            writeTime -= maxTime;
+            writeTime /= 8;
             outDes.println(fileCount + "    " + writeCount + "  " + writeTime);
         }
 
