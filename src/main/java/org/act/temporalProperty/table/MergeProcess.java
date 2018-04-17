@@ -27,6 +27,7 @@ public class MergeProcess extends Thread
     private final SystemMeta systemMeta;
     private final String storeDir;
     private volatile MemTable memTable = null;
+    private volatile boolean shouldGo = true;
     private static Logger log = LoggerFactory.getLogger( MergeProcess.class );
     private final IndexStore index;
 
@@ -45,15 +46,46 @@ public class MergeProcess extends Thread
         this.memTable = memTable;
     }
 
+    private String getMyName(){
+        StringBuilder sb = new StringBuilder("TPS");
+        if(storeDir.endsWith("temporal.node.properties")){
+            sb.append("-Node");
+        }else if(storeDir.endsWith("temporal.rel.properties")){
+            sb.append("-Rel");
+        }
+        String myName = sb.toString();
+        Set<Thread> allThreads = Thread.getAllStackTraces().keySet();
+        for(Thread t : allThreads){
+            if(t.getName().equals(myName)){
+                return myName+"("+storeDir+")";
+            }
+        }
+        return myName;
+    }
+
+    public void shutdown() throws InterruptedException {
+        this.shouldGo = false;
+        this.join();
+    }
+
     @Override
     public void run(){
-        Thread.currentThread().setName("TemporalPropStore-"+(storeDir.endsWith("temporal.node.properties")?"Node":"Rel"));
+        Thread.currentThread().setName(getMyName());
         try{
             while(!Thread.interrupted()) {
-                if (memTable!=null && !memTable.isEmpty()) {
-                    startMergeProcess(memTable);
+                if(shouldGo) {
+                    if (memTable != null && !memTable.isEmpty()) {
+                        startMergeProcess(memTable);
+                    } else {
+                        Thread.sleep(100);
+                    }
                 }else{
-                    Thread.sleep(100);
+                    if (memTable != null && !memTable.isEmpty()) {
+                        startMergeProcess(memTable);
+                        return;
+                    } else {
+                        return;
+                    }
                 }
             }
         } catch (InterruptedException e) {
@@ -156,6 +188,7 @@ public class MergeProcess extends Thread
             boolean success;
 
             File targetFile = new File( propStoreDir, targetFileName );
+//            Files.deleteIfExists(targetFile.toPath());
             if( targetFile.exists() ) {
                 success = targetFile.delete();
                 if (!success) {

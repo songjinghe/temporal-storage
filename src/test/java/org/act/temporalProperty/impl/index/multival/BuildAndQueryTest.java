@@ -159,7 +159,7 @@ public class BuildAndQueryTest {
     }
 
     @After
-    public void closeDB(){
+    public void closeDB() throws Throwable {
         if(store!=null) store.shutDown();
     }
 

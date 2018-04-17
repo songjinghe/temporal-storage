@@ -28,9 +28,14 @@ import org.act.temporalProperty.util.Slice;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
-import java.util.*;
+import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * TemporalPropertyStore的实现类
@@ -47,7 +52,7 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
     private IndexStore index;
 
     private boolean forbiddenWrite=false;
-
+    private FileReader lockFile; // keeps opened while system is running to prevent delete of the storage dir;
 
     /**
      * @param dbDir 存储动态属性数据的目录地址
@@ -68,18 +73,21 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
     private void init() throws Throwable
     {
         StoreInitial starter = new StoreInitial(dbDir);
+        lockFile = starter.init();
         this.meta = starter.getMetaInfo();
         this.memTable = starter.getMemTable();
-
     }
 
     /**
      * 退出系统时调用，主要作用是将内存中的数据写入磁盘。
      */
-    public void shutDown()
-    {
+    public void shutDown() throws IOException, InterruptedException {
+        this.meta.lockShutDown();
+        this.mergeProcess.shutdown();
         this.flushMemTable2Disk();
         this.flushMetaInfo2Disk();
+        this.lockFile.close();
+        Files.delete(new File(dbDir, Filename.lockFileName()).toPath());
     }
 
 
@@ -372,9 +380,10 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
     @Override
     public void flushMemTable2Disk(){
         try{
+            buffer2disk();
             File tempFile = new File( this.dbDir + "/" + Filename.tempFileName( 0 ));
             if( !tempFile.exists() )
-                tempFile.createNewFile();
+                Files.createFile(tempFile.toPath());
             FileOutputStream outputStream = new FileOutputStream( tempFile );
             FileChannel channel = outputStream.getChannel();
             TableBuilder builer = new TableBuilder( new Options(), channel, TableComparator.instance() );
@@ -399,6 +408,17 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
         } catch (IOException e) {
             e.printStackTrace();
             throw new TPSRuntimeException("meta flush to disk failed", e);
+        }
+    }
+
+    private void buffer2disk() throws IOException {
+        for(PropertyMetaData p : this.meta.getProperties().values()){
+            for(FileBuffer buffer : p.getUnstableBuffers().values()){
+                buffer.force();
+            }
+            for(FileBuffer buffer : p.getStableBuffers().values()){
+                buffer.force();
+            }
         }
     }
 

@@ -34,6 +34,17 @@ public class StoreInitial {
         this.rootDir = rootDir;
     }
 
+    public FileReader init() throws IOException {
+        if(!rootDir.exists()) Files.createDirectory(rootDir.toPath());
+        File runLockFile = new File(rootDir, Filename.lockFileName());
+        if(runLockFile.exists()){
+            throw new IOException("is.running.lock exist, may be another storage instance running on "+rootDir.getAbsolutePath()+"?");
+        }else{
+            Files.createFile(runLockFile.toPath());
+            return new FileReader(runLockFile);
+        }
+    }
+
     private SystemMeta findAndLoadMeta(File rootDir) throws TPSMetaLoadFailedException {
         if(rootDir!=null && rootDir.isDirectory()) {
             String[] files = rootDir.list();
@@ -58,7 +69,8 @@ public class StoreInitial {
                 }else if(metaFile==null && metaTmpFile!=null){
                     return SystemMetaController.decode(metaTmpFile.getMeta());
                 }else{//metaFile==null && metaTmpFile==null
-                    throw new TPSMetaLoadFailedException("has meta file but both read failed");
+                    //throw new TPSMetaLoadFailedException("has meta file but both read failed");
+                    return null;
                 }
             }else{
                 throw new TPSMetaLoadFailedException("failed to list dir: "+rootDir.getAbsolutePath());
