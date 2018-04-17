@@ -268,8 +268,8 @@ public class SinglePropertyStore
 
     private File buffer2file(String filePath, String bufferFileName, FileBuffer buffer) throws IOException {
         File tempFile = new File(this.proDir, Filename.tempFileName(6));
-        if (tempFile.exists() && !tempFile.delete()) throw new IOException("can not delete tmp file!");
-        if(!tempFile.createNewFile()) throw new IOException("can not create tmp file!");
+        Files.deleteIfExists(tempFile.toPath());
+        Files.createFile(tempFile.toPath());
 
         FileOutputStream stream = new FileOutputStream(tempFile);
         FileChannel channel = stream.getChannel();

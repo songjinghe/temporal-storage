@@ -25,6 +25,7 @@ import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -75,12 +76,12 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
      * 退出系统时调用，主要作用是将内存中的数据写入磁盘。
      */
     public void shutDown() throws IOException, InterruptedException {
+        this.meta.lockShutDown();
         this.mergeProcess.shutdown();
-        this.mergeProcess.getId();
-        this.meta.getLock().writeLock();
         this.flushMemTable2Disk();
         this.flushMetaInfo2Disk();
         this.lockFile.close();
+        Files.delete(new File(dbDir, Filename.lockFileName()).toPath());
     }
 
 
@@ -313,9 +314,10 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
     @Override
     public void flushMemTable2Disk(){
         try{
+            buffer2disk();
             File tempFile = new File( this.dbDir + "/" + Filename.tempFileName( 0 ));
             if( !tempFile.exists() )
-                tempFile.createNewFile();
+                Files.createFile(tempFile.toPath());
             FileOutputStream outputStream = new FileOutputStream( tempFile );
             FileChannel channel = outputStream.getChannel();
             TableBuilder builer = new TableBuilder( new Options(), channel, TableComparator.instance() );
@@ -340,6 +342,17 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
         } catch (IOException e) {
             e.printStackTrace();
             throw new TPSRuntimeException("meta flush to disk failed", e);
+        }
+    }
+
+    private void buffer2disk() throws IOException {
+        for(PropertyMetaData p : this.meta.getProperties().values()){
+            for(FileBuffer buffer : p.getUnstableBuffers().values()){
+                buffer.force();
+            }
+            for(FileBuffer buffer : p.getStableBuffers().values()){
+                buffer.force();
+            }
         }
     }
 

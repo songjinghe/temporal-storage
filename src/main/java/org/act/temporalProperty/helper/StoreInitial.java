@@ -35,12 +35,12 @@ public class StoreInitial {
     }
 
     public FileReader init() throws IOException {
-        if(!rootDir.exists() && !rootDir.mkdir()) throw new IOException("create storage dir failed!");
-        File runLockFile = new File(rootDir, "is.running.lock");
+        if(!rootDir.exists()) Files.createDirectory(rootDir.toPath());
+        File runLockFile = new File(rootDir, Filename.lockFileName());
         if(runLockFile.exists()){
             throw new IOException("is.running.lock exist, may be another storage instance running on "+rootDir.getAbsolutePath()+"?");
         }else{
-            if(!runLockFile.createNewFile()) throw new IOException("can not create lock file!");
+            Files.createFile(runLockFile.toPath());
             return new FileReader(runLockFile);
         }
     }

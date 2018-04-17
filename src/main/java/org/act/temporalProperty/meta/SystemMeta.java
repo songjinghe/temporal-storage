@@ -99,4 +99,8 @@ public class SystemMeta {
     public ReentrantReadWriteLock getLock() {
         return lock;
     }
+
+    public void lockShutDown() {
+//        this.lock.shutDown();
+    }
 }
