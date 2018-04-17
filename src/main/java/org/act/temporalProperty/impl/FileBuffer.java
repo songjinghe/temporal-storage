@@ -3,6 +3,7 @@ package org.act.temporalProperty.impl;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 
 import org.act.temporalProperty.impl.MemTable.MemTableIterator;
 import org.act.temporalProperty.table.TableComparator;
@@ -24,6 +25,7 @@ public class FileBuffer implements Closeable
      */
     private UnSortedTable discTable;
     
+    private String fName;
     /**
      * 实例化方法
      * @param unSortedTableFile 在磁盘中起备份作用的文件的绝对名称
@@ -31,9 +33,10 @@ public class FileBuffer implements Closeable
      */
     public FileBuffer(File unSortedTableFile ) throws IOException
     {
+        this.fName = unSortedTableFile.getAbsolutePath();
         this.memTable = new MemTable( TableComparator.instance() );
         if( !unSortedTableFile.exists() ){
-            unSortedTableFile.createNewFile();
+            Files.createFile(unSortedTableFile.toPath());
             this.discTable = new UnSortedTable(unSortedTableFile);
         }else{
             this.discTable = new UnSortedTable(unSortedTableFile);
@@ -51,6 +54,11 @@ public class FileBuffer implements Closeable
     {
         discTable.add( key, value );
         this.memTable.add( key, value );
+    }
+
+    public void force() throws IOException
+    {
+        discTable.addCheckPoint();
     }
     
     /**
@@ -74,5 +82,10 @@ public class FileBuffer implements Closeable
 
     public long size(){
         return this.memTable.approximateMemUsage();
+    }
+
+    @Override
+    public String toString() {
+        return "FileBuffer{"+fName+","+size()+"}";
     }
 }
