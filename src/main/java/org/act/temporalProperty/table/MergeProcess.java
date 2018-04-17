@@ -237,7 +237,7 @@ public class MergeProcess extends Thread
                 for (Long fileNumber : mergeParticipants) {
 //                    log.debug("merge {}", fileNumber);
                     File mergeSource = new File(propStoreDir, Filename.unStableFileName(fileNumber));
-                    Table table = cache.newTable(mergeSource.getAbsolutePath());
+                    Table table = cache.getTable(mergeSource.getAbsolutePath());
                     SearchableIterator mergeIterator;
                     FileBuffer filebuffer = pMeta.getUnstableBuffers(fileNumber);
                     if (null != filebuffer) {

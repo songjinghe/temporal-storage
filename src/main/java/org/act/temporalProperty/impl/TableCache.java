@@ -60,12 +60,7 @@ public class TableCache
         return new PackInternalKeyIterator(getTable(filePath).iterator());
     }
 
-    public Table newTable( String filePath )
-    {
-        return getTable( filePath );
-    }
-
-    private Table getTable(String filePath)
+    public Table getTable(String filePath)
     {
         Table table;
         try {

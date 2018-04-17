@@ -1,7 +1,5 @@
 package org.act.temporalProperty.index;
 
-import com.google.common.collect.Lists;
-import org.act.temporalProperty.exception.TPSRuntimeException;
 import org.act.temporalProperty.impl.*;
 import org.act.temporalProperty.index.aggregation.*;
 import org.act.temporalProperty.index.value.*;
@@ -9,16 +7,12 @@ import org.act.temporalProperty.index.value.rtree.IndexEntry;
 import org.act.temporalProperty.meta.PropertyMetaData;
 import org.act.temporalProperty.query.aggr.IndexAggregationQuery;
 import org.act.temporalProperty.query.aggr.ValueGroupingMap;
-import org.act.temporalProperty.util.SliceInput;
 import org.act.temporalProperty.util.SliceOutput;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
-import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicLong;
-
-import static org.act.temporalProperty.index.IndexType.*;
 
 /**
  * Created by song on 2018-03-19.
@@ -77,23 +71,23 @@ public class IndexStore {
 //    }
 
     public long createValueIndex(int start, int end, List<Integer> proIds, List<IndexValueType> types) throws IOException {
-        return value.createValueIndex(start, end, proIds, types);
+        return value.create(start, end, proIds, types);
     }
 
-    public long createAggrIndex(PropertyMetaData pMeta, int start, int end, ValueGroupingMap valueGrouping, int every, int timeUnit) throws IOException {
-        return aggr.createAggrIndex(pMeta, start, end, valueGrouping, every, timeUnit);
+    public long createAggrDurationIndex(PropertyMetaData pMeta, int start, int end, ValueGroupingMap valueGrouping, int every, int timeUnit) throws IOException {
+        return aggr.createDuration(pMeta, start, end, valueGrouping, every, timeUnit);
     }
 
     public long createAggrMinMaxIndex(PropertyMetaData pMeta, int start, int end, int every, int timeUnit, IndexType type) throws IOException {
-        return aggr.createAggrMinMaxIndex(pMeta, start, end, every, timeUnit, type);
+        return aggr.createMinMax(pMeta, start, end, every, timeUnit, type);
     }
 
     public List<IndexEntry> queryValueIndex(IndexQueryRegion condition) throws IOException {
-        return value.valueIndexQuery(condition);
+        return value.query(condition);
     }
 
-    public Object queryAggrIndex(long entityId, int proId, int start, int end, long indexId, IndexAggregationQuery query) throws IOException {
-        return aggr.aggrIndexQuery(entityId, proId, start, end, indexId, query);
+    public Object queryAggrIndex(long entityId, PropertyMetaData meta, int start, int end, long indexId, IndexAggregationQuery query) throws IOException {
+        return aggr.query(entityId, meta, start, end, indexId, query);
     }
 
     public void deleteIndex(int propertyId) {

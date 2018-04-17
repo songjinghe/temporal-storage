@@ -10,9 +10,7 @@ import org.act.temporalProperty.helper.EPMergeIterator;
 import org.act.temporalProperty.index.*;
 import org.act.temporalProperty.index.value.IndexMetaData;
 import org.act.temporalProperty.index.value.IndexQueryRegion;
-import org.act.temporalProperty.index.value.PropertyValueInterval;
 import org.act.temporalProperty.index.value.rtree.IndexEntry;
-import org.act.temporalProperty.index.value.rtree.IndexEntryOperator;
 import org.act.temporalProperty.meta.PropertyMetaData;
 import org.act.temporalProperty.meta.SystemMeta;
 import org.act.temporalProperty.meta.SystemMetaController;
@@ -231,7 +229,7 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
         meta.lock.lockExclusive();
         try{
             PropertyMetaData pMeta = meta.getProperties().get(propertyId);
-            return index.createAggrIndex(pMeta, start, end, valueGrouping, every, timeUnit);
+            return index.createAggrDurationIndex(pMeta, start, end, valueGrouping, every, timeUnit);
         } catch (IOException e) {
             e.printStackTrace();
             throw new TPSRuntimeException("error when create index.", e);
@@ -263,7 +261,8 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
     public Object aggrWithIndex(long indexId, long entityId, int proId, int startTime, int endTime, IndexAggregationQuery query) {
         meta.lock.lockShared();
         try{
-            return index.queryAggrIndex(entityId, proId, startTime, endTime, indexId, query);
+            PropertyMetaData pMeta = meta.getProperties().get(proId);
+            return index.queryAggrIndex(entityId, pMeta, startTime, endTime, indexId, query);
         } catch (IOException e) {
             e.printStackTrace();
             throw new TPSRuntimeException("error when aggr with index.", e);

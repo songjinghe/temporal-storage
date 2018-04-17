@@ -41,7 +41,7 @@ public class ValueIndexManager {
         this.nextId = nextId;
     }
 
-    public long createValueIndex(int start, int end, List<Integer> proIds, List<IndexValueType> types) throws IOException {
+    public long create(int start, int end, List<Integer> proIds, List<IndexValueType> types) throws IOException {
         long fileId = nextId.getAndIncrement();
         long fileSize = createValIndex(start, end, proIds, types, fileId);
         if (proIds.size() == 1) {
@@ -89,7 +89,7 @@ public class ValueIndexManager {
         multiVal.get(meta.getTimeStart()).add(meta);
     }
 
-    public List<IndexEntry> valueIndexQuery(IndexQueryRegion condition) throws IOException {
+    public List<IndexEntry> query(IndexQueryRegion condition) throws IOException {
         IndexMetaData meta = valIndexCoverRegion(condition);
         Iterator<IndexEntry> iter = this.getQueryIterator(condition, meta);
         List<IndexEntry> result = new ArrayList<>();

@@ -11,6 +11,8 @@ import java.util.Map;
 public interface IndexAggregationQuery extends InternalEntryRangeQueryCallBack {
 
     interface MinMax extends IndexAggregationQuery{
+        int MIN=0;
+        int MAX=1;
         Object onResult(Map<Integer, Slice> valueGroupMap);
     }
 

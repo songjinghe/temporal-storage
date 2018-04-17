@@ -25,7 +25,7 @@ public abstract class AbstractTimeIntervalAggrQuery<K,V> implements TimeInterval
     private int lastTime = -1;
     private Slice lastVal;
 
-    AbstractTimeIntervalAggrQuery(int endTime) {
+    protected AbstractTimeIntervalAggrQuery(int endTime) {
         this.endTime = endTime;
     }
 
@@ -59,8 +59,10 @@ public abstract class AbstractTimeIntervalAggrQuery<K,V> implements TimeInterval
     private void onEntry(int start, int end, Slice value){
         TimeIntervalEntry entry = new TimeIntervalEntry(start, end, value);
         K groupId = computeGroupId(entry);
-        groupListMap.computeIfAbsent(groupId, k -> new ArrayList<>());
-        groupListMap.get(groupId).add(entry);
+        if(groupId!=null) {
+            groupListMap.computeIfAbsent(groupId, k -> new ArrayList<>());
+            groupListMap.get(groupId).add(entry);
+        }
     }
 
     protected int asInt(Slice value){

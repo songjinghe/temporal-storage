@@ -73,12 +73,50 @@ public interface TemporalPropertyStore
 	 */
 	boolean deleteEntityProperty(Slice id);
 
-    long createAggrDurationIndex(int propertyId, int start, int end, ValueGroupingMap valueGrouping, int every, int timeUnit);
-
-	long createAggrMinMaxIndex(int propertyId, int start, int end, int every, int timeUnit, IndexType type);
-
+	/**
+	 * Aggregation查询是getRangeValue的一种alias而已.
+	 */
 	Object aggregate(long entityId, int proId, int startTime, int endTime, InternalEntryRangeQueryCallBack callback);
 
+	/**
+	 * 创建Aggregation索引(可加速[在某段时间上对Value分组后统计各组时长]的查询操作).
+	 * see {@link org.act.temporalProperty.index.aggregation.AggregationIndexMeta#calcInterval(int, int, int, int)} for more detail.
+	 * 这个调用等索引建立完成才返回.
+	 * @param propertyId    要索引的属性ID
+	 * @param start         索引起始时间
+	 * @param end           索引结束时间
+	 * @param valueGrouping grouping values
+	 * @param every         see {@link org.act.temporalProperty.index.aggregation.AggregationIndexMeta#calcInterval(int, int, int, int)} for more detail.
+	 * @param timeUnit      can be Calendar.SECOND|HOUR|DAY|WEEK|SEMI_MONTH|MONTH|YEAR, see {@link org.act.temporalProperty.index.aggregation.AggregationIndexMeta#calcInterval(int, int, int, int)} for more detail.
+	 * @return index ID
+	 */
+    long createAggrDurationIndex(int propertyId, int start, int end, ValueGroupingMap valueGrouping, int every, int timeUnit);
+
+	/**
+	 * 创建Aggregation索引(可加速[在某段时间上查找Value最大或最小值]的查询操作).
+	 * @param propertyId 要索引的属性ID
+	 * @param start      索引起始时间
+	 * @param end        索引结束时间
+	 * @param every      see {@link org.act.temporalProperty.index.aggregation.AggregationIndexMeta#calcInterval(int, int, int, int)} for more detail.
+	 * @param timeUnit   can be Calendar.SECOND|HOUR|DAY|WEEK|SEMI_MONTH|MONTH|YEAR, see {@link org.act.temporalProperty.index.aggregation.AggregationIndexMeta#calcInterval(int, int, int, int)} for more detail.
+	 * @param type       索引类型: 只索引最大值; 只索引最小值; 同时索引最大及最小值.
+	 * @return index ID
+	 */
+	long createAggrMinMaxIndex(int propertyId, int start, int end, int every, int timeUnit, IndexType type);
+
+
+	/**
+	 * 使用Aggregation索引进行查询(加速)
+	 * 注意这里不再需要指定是最大|最小|分组统计时长的查询, 因为查询类型已经包含在索引中了.
+	 * 一旦索引的时间无法完全覆盖[startTime, endTime], 则会使用和创建索引相同的配置(如valueGroup)进行range查询
+	 * @param indexId   要使用的索引的ID
+	 * @param entityId  查询的entityID
+	 * @param proId     要查询的属性id
+	 * @param startTime 开始时间
+	 * @param endTime   结束时间
+	 * @param query     用于处理查询结果的CallBack
+	 * @return CallBack定义的返回
+	 */
 	Object aggrWithIndex(long indexId, long entityId, int proId, int startTime, int endTime, IndexAggregationQuery query);
 
 	/**

@@ -278,7 +278,7 @@ public class SinglePropertyStore
         FileOutputStream stream = new FileOutputStream(tempFile);
         FileChannel channel = stream.getChannel();
         TableBuilder builder = new TableBuilder(new Options(), channel, TableComparator.instance());
-        Table table = this.cache.newTable(filePath);
+        Table table = this.cache.getTable(filePath);
         SearchableIterator iterator = TwoLevelMergeIterator.merge(buffer.iterator(), table.iterator());
         while (iterator.hasNext()) {
             InternalEntry entry = iterator.next();
