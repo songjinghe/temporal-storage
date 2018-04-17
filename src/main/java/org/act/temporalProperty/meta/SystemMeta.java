@@ -1,6 +1,7 @@
 package org.act.temporalProperty.meta;
 
 import org.act.temporalProperty.exception.TPSRuntimeException;
+import org.act.temporalProperty.helper.StoreLock;
 import org.act.temporalProperty.impl.*;
 import org.act.temporalProperty.index.value.IndexMetaData;
 
@@ -14,9 +15,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * Created by song on 2018-01-17.
  */
 public class SystemMeta {
-    private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock( false );
-    public final Condition waitWriteCondition = lock.writeLock().newCondition();
-    public final Condition writeDiskComplete = lock.writeLock().newCondition();
+    public final StoreLock lock = new StoreLock();
 
     private final Map<Integer, PropertyMetaData> properties = new HashMap<>();
     private final Set<IndexMetaData> indexes = new HashSet<>();
@@ -57,22 +56,6 @@ public class SystemMeta {
 
     public void addProperty(PropertyMetaData pMeta) {
         properties.put(pMeta.getPropertyId(), pMeta);
-    }
-
-    public void lockShared(){
-        lock.readLock().lock();
-    }
-
-    public void unLockShared(){
-        lock.readLock().unlock();
-    }
-
-    public void lockExclusive(){
-        lock.writeLock().lock();
-    }
-
-    public void unLockExclusive(){
-        lock.writeLock().unlock();
     }
 
     public void force(File dir) throws IOException {

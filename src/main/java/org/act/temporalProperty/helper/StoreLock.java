@@ -1,5 +1,8 @@
 package org.act.temporalProperty.helper;
 
+import org.act.temporalProperty.exception.StoreShutdownException;
+import org.act.temporalProperty.exception.TPSRuntimeException;
+
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -16,29 +19,29 @@ public class StoreLock{
         this.systemDown = true;
     }
 
-    public void lockExclusive() throws InterruptedException {
+    public void lockExclusive(){
         lock.writeLock().lock();
         if(systemDown){
-            throw new InterruptedException("System already shutdown!");
+            throw new StoreShutdownException();
         }// else return;
     }
 
-    public void unlockExclusive() throws InterruptedException {
+    public void unlockExclusive(){
         lock.writeLock().unlock();
     }
 
-    public void mergeLockExclusive() throws InterruptedException {
+    public void mergeLockExclusive(){
         lock.writeLock().lock();
     }
 
-    public void mergeUnlockExclusive() throws InterruptedException {
+    public void mergeUnlockExclusive(){
         lock.writeLock().unlock();
     }
 
-    public void lockShared() throws InterruptedException {
+    public void lockShared(){
         lock.readLock().lock();
         if(systemDown){
-            throw new InterruptedException("System already shutdown!");
+            throw new StoreShutdownException();
         }
     }
 
@@ -49,7 +52,7 @@ public class StoreLock{
     public void waitSubmitMemTable() throws InterruptedException {
         memTableSubmitted.await();
         if(systemDown){
-            throw new InterruptedException("System already shutdown!");
+            throw new StoreShutdownException();
         }
     }
 

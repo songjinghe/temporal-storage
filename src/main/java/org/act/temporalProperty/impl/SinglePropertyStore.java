@@ -47,18 +47,20 @@ public class SinglePropertyStore
     }
 
     private void loadBuffers() throws IOException {
-        for(FileMetaData meta : propertyMeta.getUnStableFiles().values()){
-            File bufferFile = new File(this.proDir, Filename.unbufferFileName(meta.getNumber()));
+        for(FileBuffer buffer : propertyMeta.getUnstableBuffers().values()){
+            File bufferFile = new File(this.proDir, Filename.unbufferFileName(buffer.getNumber()));
             if (bufferFile.exists()) {
-                FileBuffer buffer = new FileBuffer(bufferFile);
-                propertyMeta.addUnstableBuffer(meta.getNumber(), buffer);
+                buffer.init(bufferFile);
+            }else{
+                throw new IOException("buffer file not found: "+bufferFile.getAbsolutePath());
             }
         }
-        for(FileMetaData meta : propertyMeta.getStableFiles().values()){
-            File bufferFile = new File(this.proDir, Filename.stbufferFileName(meta.getNumber()));
+        for(FileBuffer buffer : propertyMeta.getStableBuffers().values()){
+            File bufferFile = new File(this.proDir, Filename.stbufferFileName(buffer.getNumber()));
             if (bufferFile.exists()) {
-                FileBuffer buffer = new FileBuffer(bufferFile);
-                propertyMeta.addStableBuffer(meta.getNumber(), buffer);
+                buffer.init(bufferFile);
+            }else{
+                throw new IOException("buffer file not found: "+bufferFile.getAbsolutePath());
             }
         }
     }
@@ -225,7 +227,8 @@ public class SinglePropertyStore
 
         FileBuffer buffer = propertyMeta.getUnstableBuffers( meta.getNumber() );
         if( null == buffer ) {
-            buffer = new FileBuffer(new File(this.proDir, Filename.unbufferFileName(meta.getNumber())));
+            String fileName = Filename.unbufferFileName(meta.getNumber());
+            buffer = new FileBuffer(new File(this.proDir, fileName), meta.getNumber());
             propertyMeta.addUnstableBuffer(meta.getNumber(), buffer);
         }
         buffer.add( key.encode(), value );
@@ -240,7 +243,8 @@ public class SinglePropertyStore
 
         FileBuffer buffer = propertyMeta.getStableBuffers( meta.getNumber() );
         if( null == buffer ) {
-            buffer = new FileBuffer(new File(this.proDir, Filename.stbufferFileName(meta.getNumber())));
+            String fileName = Filename.stbufferFileName(meta.getNumber());
+            buffer = new FileBuffer(new File(this.proDir, fileName), meta.getNumber());
             propertyMeta.addStableBuffer(meta.getNumber(), buffer);
         }
         buffer.add( key.encode(), value );

@@ -82,7 +82,7 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
      * 退出系统时调用，主要作用是将内存中的数据写入磁盘。
      */
     public void shutDown() throws IOException, InterruptedException {
-        this.meta.lockShutDown();
+        this.meta.lock.shutdown();
         this.mergeProcess.shutdown();
         this.flushMemTable2Disk();
         this.flushMetaInfo2Disk();
@@ -95,7 +95,7 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
     public Slice getPointValue(long entityId, int proId, int time ) {
         Slice idSlice = toSlice(proId, entityId);
         InternalKey searchKey = new InternalKey( idSlice, time );
-        this.meta.lockShared();
+        this.meta.lock.lockShared();
         try {
             Slice result = memTable.get(searchKey.encode());
             if (result != null && result.length() > 0) {
@@ -111,13 +111,13 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
                 return meta.getStore(proId).getPointValue(idSlice, time);
             }
         }finally {
-            this.meta.unLockShared();
+            this.meta.lock.unlockShared();
         }
     }
 
     @Override
     public Object getRangeValue( long id, int proId, int startTime, int endTime, InternalEntryRangeQueryCallBack callback ) {
-        meta.lockShared();
+        meta.lock.lockShared();
         try{
             Slice idSlice = toSlice(proId, id);
 
@@ -137,32 +137,37 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
             }
             return callback.onReturn();
         }finally{
-            meta.unLockShared();
+            meta.lock.unlockShared();
         }
     }
 
     @Override
     public boolean createProperty(int propertyId, ValueContentType type) {
-        SinglePropertyStore prop = meta.proStores().get(propertyId);
-        if(prop==null){
-            try {
-                PropertyMetaData pMeta = new PropertyMetaData(propertyId, type);
-                meta.addStore(propertyId, new SinglePropertyStore(pMeta, dbDir,cache));
-                meta.addProperty(pMeta);
-                return true;
-            } catch (Throwable ignore) {
-                return false;
+        meta.lock.lockExclusive();
+        try {
+            SinglePropertyStore prop = meta.proStores().get(propertyId);
+            if (prop == null) {
+                try {
+                    PropertyMetaData pMeta = new PropertyMetaData(propertyId, type);
+                    meta.addStore(propertyId, new SinglePropertyStore(pMeta, dbDir, cache));
+                    meta.addProperty(pMeta);
+                    return true;
+                } catch (Throwable ignore) {
+                    return false;
+                }
+            } else {
+                PropertyMetaData pMeta = meta.getProperties().get(propertyId);
+                if (pMeta != null && pMeta.getType() == type) {
+                    // already exist, maybe in recovery. so just delete all property then create again.
+                    deleteProperty(propertyId);
+                    createProperty(propertyId, type);
+                    return true;
+                } else {
+                    throw new TPSRuntimeException("create temporal property failed, exist property with same id but diff type!");
+                }
             }
-        }else{
-            PropertyMetaData pMeta = meta.getProperties().get(propertyId);
-            if(pMeta!=null && pMeta.getType()==type){
-                // already exist, maybe in recovery. so just delete all property then create again.
-                deleteProperty(propertyId);
-                createProperty(propertyId, type);
-                return true;
-            }else{
-                throw new TPSRuntimeException("create temporal property failed, exist property with same id but diff type!");
-            }
+        }finally {
+            meta.lock.unlockExclusive();
         }
     }
 
@@ -173,30 +178,30 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
             throw new TPSNHException("no such property id: "+internalKey.getPropertyId()+". should create first!");
         }
 
-        meta.lockExclusive();
+        meta.lock.lockExclusive();
         try{
-            if(forbiddenWrite) meta.waitWriteCondition.await();
+            if(forbiddenWrite) meta.lock.waitSubmitMemTable();
             this.memTable.add(key, new Slice(value));
             if( this.memTable.approximateMemUsage() >= 4*1024*1024 ){
                 forbiddenWrite = true;
+                this.mergeProcess.add( this.memTable ); // may await at current line.
                 this.stableMemTable = this.memTable;
-                this.mergeProcess.add( this.stableMemTable ); // may await at current line.
                 this.memTable = new MemTable( TableComparator.instance() );
                 forbiddenWrite = false;
             }
-            meta.waitWriteCondition.signal();
+            meta.lock.memTableSubmitted();
         } catch (InterruptedException e) {
             e.printStackTrace();
             return false;
         } finally {
-            meta.unLockExclusive();
+            meta.lock.unlockExclusive();
         }
         return true;
     }
 
     @Override
     public boolean deleteProperty(int propertyId) {
-        meta.lockExclusive();
+        meta.lock.lockExclusive();
         try{
             meta.getProperties().remove(propertyId);
             meta.getStore(propertyId).destroy();
@@ -211,7 +216,7 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
             e.printStackTrace();
             return false;
         } finally {
-            meta.unLockExclusive();
+            meta.lock.unlockExclusive();
         }
     }
 
@@ -223,7 +228,7 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
 
     @Override
     public long createAggrDurationIndex(int propertyId, int start, int end, ValueGroupingMap valueGrouping, int every, int timeUnit){
-        meta.lockShared();
+        meta.lock.lockExclusive();
         try{
             PropertyMetaData pMeta = meta.getProperties().get(propertyId);
             return index.createAggrIndex(pMeta, start, end, valueGrouping, every, timeUnit);
@@ -231,13 +236,13 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
             e.printStackTrace();
             throw new TPSRuntimeException("error when create index.", e);
         } finally {
-            meta.unLockShared();
+            meta.lock.unlockExclusive();
         }
     }
 
     @Override
     public long createAggrMinMaxIndex(int propertyId, int start, int end, int every, int timeUnit, IndexType type){
-        meta.lockShared();
+        meta.lock.lockExclusive();
         try{
             PropertyMetaData pMeta = meta.getProperties().get(propertyId);
             return index.createAggrMinMaxIndex(pMeta, start, end, every, timeUnit, type);
@@ -245,7 +250,7 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
             e.printStackTrace();
             throw new TPSRuntimeException("error when create index.", e);
         } finally {
-            meta.unLockShared();
+            meta.lock.unlockExclusive();
         }
     }
 
@@ -256,66 +261,71 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
 
     @Override
     public Object aggrWithIndex(long indexId, long entityId, int proId, int startTime, int endTime, IndexAggregationQuery query) {
-        meta.lockShared();
+        meta.lock.lockShared();
         try{
             return index.queryAggrIndex(entityId, proId, startTime, endTime, indexId, query);
         } catch (IOException e) {
             e.printStackTrace();
             throw new TPSRuntimeException("error when aggr with index.", e);
         } finally{
-            meta.unLockShared();
+            meta.lock.unlockShared();
         }
     }
 
     @Override
     public long createValueIndex(int start, int end, List<Integer> proIds) {
-        List<IndexValueType> types = new ArrayList<>();
-        for(Integer pid : proIds){
-            PropertyMetaData pMeta = meta.getProperties().get(pid);
-            if(pMeta!=null) {
-                types.add(IndexValueType.convertFrom(pMeta.getType()));
-            }else{
-                throw new TPSRuntimeException("storage not contains property id "+pid);
+        meta.lock.lockExclusive();
+        try {
+            List<IndexValueType> types = new ArrayList<>();
+            for (Integer pid : proIds) {
+                PropertyMetaData pMeta = meta.getProperties().get(pid);
+                if (pMeta != null) {
+                    types.add(IndexValueType.convertFrom(pMeta.getType()));
+                } else {
+                    throw new TPSRuntimeException("storage not contains property id " + pid);
+                }
             }
+            return createValueIndex(start, end, proIds, types);
+        }finally {
+            meta.lock.unlockExclusive();
         }
-        return createValueIndex(start, end, proIds, types);
     }
 
     private long createValueIndex(int start, int end, List<Integer> proIds, List<IndexValueType> types){
         if(proIds.isEmpty()) throw new RuntimeException("should have at least one proId");
-        meta.lockShared();
+        meta.lock.lockExclusive();
         try {
             return index.createValueIndex(start, end, proIds, types);
         } catch (IOException e) {
             e.printStackTrace();
             return 0;
         } finally {
-            meta.unLockShared();
+            meta.lock.unlockExclusive();
         }
     }
 
-    private TreeMap<Integer, Integer> mergeAggrQueryResult(Map<Integer, Integer> v1, Map<Integer, Integer> v2){
-        TreeMap<Integer, Integer> result = new TreeMap<>();
-        Set<Integer> keySet = v1.keySet();
-        keySet.addAll(v2.keySet());
-        for(Integer valGroupId : keySet){
-            int duration = 0;
-            Integer duration1 = v1.get(valGroupId);
-            if(duration1!=null) duration+=duration1;
-            Integer duration2 = v2.get(valGroupId);
-            if(duration2!=null) duration+=duration2;
-            result.put(valGroupId, duration);
-        }
-        return result;
-    }
+//    private TreeMap<Integer, Integer> mergeAggrQueryResult(Map<Integer, Integer> v1, Map<Integer, Integer> v2){
+//        TreeMap<Integer, Integer> result = new TreeMap<>();
+//        Set<Integer> keySet = v1.keySet();
+//        keySet.addAll(v2.keySet());
+//        for(Integer valGroupId : keySet){
+//            int duration = 0;
+//            Integer duration1 = v1.get(valGroupId);
+//            if(duration1!=null) duration+=duration1;
+//            Integer duration2 = v2.get(valGroupId);
+//            if(duration2!=null) duration+=duration2;
+//            result.put(valGroupId, duration);
+//        }
+//        return result;
+//    }
 
-    private IndexEntryOperator extractOperator(IndexQueryRegion regions) {
-        List<IndexValueType> types = new ArrayList<>();
-        for(PropertyValueInterval p : regions.getPropertyValueIntervals()){
-            types.add(p.getType());
-        }
-        return new IndexEntryOperator(types, 4096);
-    }
+//    private IndexEntryOperator extractOperator(IndexQueryRegion regions) {
+//        List<IndexValueType> types = new ArrayList<>();
+//        for(PropertyValueInterval p : regions.getPropertyValueIntervals()){
+//            types.add(p.getType());
+//        }
+//        return new IndexEntryOperator(types, 4096);
+//    }
 
     @Override
     public List<Long> getEntities(IndexQueryRegion condition) {

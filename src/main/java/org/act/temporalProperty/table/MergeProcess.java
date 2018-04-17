@@ -41,7 +41,7 @@ public class MergeProcess extends Thread
     // the caller should get write lock first.
     public void add(MemTable memTable) throws InterruptedException{
         while(this.memTable!=null){
-            systemMeta.writeDiskComplete.await();
+            systemMeta.lock.waitMergeDone();
         }
         this.memTable = memTable;
     }
@@ -127,14 +127,14 @@ public class MergeProcess extends Thread
             }
         }
 
-        systemMeta.lockExclusive();
+        systemMeta.lock.lockExclusive();
         try {
             for (MergeTask task : taskList) task.updateMetaInfo();
             systemMeta.force(new File(storeDir));
             memTable = null;
-            systemMeta.writeDiskComplete.signalAll();
+            systemMeta.lock.mergeDone();
         }finally {
-            systemMeta.unLockExclusive();
+            systemMeta.lock.unlockExclusive();
         }
 
         for(MergeTask task : taskList){

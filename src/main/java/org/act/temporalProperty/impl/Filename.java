@@ -35,7 +35,7 @@ public final class Filename
         INFO_LOG  // Either the current one, or an old one
     }
 
-    public static String stbufferFileName( long number )
+    public static String stbufferFileName( long number)
     {
         return makeFileName( number, "st", "buffer" );
     }
