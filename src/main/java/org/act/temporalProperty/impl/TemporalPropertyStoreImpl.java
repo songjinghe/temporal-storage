@@ -82,6 +82,7 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
     public void shutDown() throws IOException, InterruptedException {
         this.meta.lock.shutdown();
         this.mergeProcess.shutdown();
+        this.cache.close();
         this.flushMemTable2Disk();
         this.flushMetaInfo2Disk();
         this.lockFile.close();
@@ -423,10 +424,10 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
     private void buffer2disk() throws IOException {
         for(PropertyMetaData p : this.meta.getProperties().values()){
             for(FileBuffer buffer : p.getUnstableBuffers().values()){
-                buffer.force();
+                buffer.close();
             }
             for(FileBuffer buffer : p.getStableBuffers().values()){
-                buffer.force();
+                buffer.close();
             }
         }
     }

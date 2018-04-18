@@ -73,7 +73,6 @@ public class FileBuffer implements Closeable
     @Override
     public void close() throws IOException
     {
-//        System.out.println("");
         this.memTable = null;
         this.discTable.close();
     }
