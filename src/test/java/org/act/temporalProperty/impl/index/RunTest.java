@@ -31,7 +31,7 @@ public class RunTest {
             long writeTime = 0;
             long minTime = 0;
             long maxTime = 0;
-            for (int num = 0; num < 1; num++) {
+            for (int num = 0; num < 10; num++) {
 
                 PerformanceTest writeTest = new PerformanceTest(fileCount);
                 writeTest.writeTest();
