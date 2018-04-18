@@ -51,25 +51,8 @@ public class ValueGroupingMap {
         return this.valueType;
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        ValueGroupingMap that = (ValueGroupingMap) o;
-        return com.google.common.base.Objects.equal(groupMap, that.groupMap);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hashCode(groupMap);
-    }
-
     public TreeMap<Slice, Integer> map() {
-        TreeMap<Slice, Integer> result = new TreeMap<>(getComparator());
-        for(Entry<Slice, Integer> entry : groupMap.entrySet()) {
-            result.put(entry.getKey(), entry.getValue());
-        }
-        return result;
+        return groupMap;
     }
 
 //    private Slice toSlice(Slice key) {
@@ -119,19 +102,21 @@ public class ValueGroupingMap {
         return s;
     }
 
-    private Comparator<Slice> getComparator() {
-        return getComparator(this.valueType);
-    }
+    public static Comparator<Slice> INT_CMP = Comparator.comparingInt(o -> o.getInt(0));
+    public static Comparator<Slice> LONG_CMP = Comparator.comparingLong(o -> o.getLong(0));;
+    public static Comparator<Slice> FLOAT_CMP = Comparator.comparingDouble(o -> o.getFloat(0));
+    public static Comparator<Slice> DOUBLE_CMP = FLOAT_CMP;
+    public static Comparator<Slice> STR_CMP = Comparator.naturalOrder();
 
     public static Comparator<Slice> getComparator(ValueContentType valueType) {
         switch(valueType){
-            case INT: return Comparator.comparingInt(o -> o.getInt(0));
-            case LONG: return Comparator.comparingLong(o -> o.getLong(0));
+            case INT: return INT_CMP;
+            case LONG: return LONG_CMP;
             case FLOAT:
             case DOUBLE:
-                return Comparator.comparingDouble(o -> o.getFloat(0));
+                return FLOAT_CMP;
             case STRING:
-                return Comparator.naturalOrder();
+                return STR_CMP;
             default:
                 throw new TPSNHException("invalid value type");
         }

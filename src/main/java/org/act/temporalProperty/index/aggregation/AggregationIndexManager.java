@@ -74,15 +74,9 @@ public class AggregationIndexManager {
 
 
 
-    private Integer time2groupId(TreeMap<Integer, Integer> map, int time){
-        Entry<Integer, Integer> entry = map.floorEntry(time);
-        return entry==null ? null : entry.getValue();
-    }
-
     private List<Integer> pidList(PropertyMetaData meta){
         return Lists.newArrayList(meta.getPropertyId());
     }
-
 
     private Pair<Integer, Integer> overlappedGroups(AggregationIndexMeta meta, int start, int end){
         Entry<Integer, Integer> iStart = meta.getTimeGroupMap().ceilingEntry(start);
@@ -130,7 +124,10 @@ public class AggregationIndexManager {
             AggregationIndexFileWriter w = new AggregationIndexFileWriter(data, indexFile);
             long fileSize = w.write();
             //创建新的索引文件元信息
-            AggregationIndexMeta meta = new AggregationIndexMeta(indexId, AGGR_DURATION, pMeta.getPropertyId(), timeGroup.firstKey(), timeGroup.lastKey() - 1, fileSize, every, timeUnit, valueGrouping.map());
+            AggregationIndexMeta meta = new AggregationIndexMeta(
+                    indexId, AGGR_DURATION, pMeta.getPropertyId(), pMeta.getType(),
+                    timeGroup.firstKey(), timeGroup.lastKey() - 1,
+                    fileSize, every, timeUnit, valueGrouping.map());
             // 添加元信息到meta
             addMeta(meta);
 
@@ -160,7 +157,7 @@ public class AggregationIndexManager {
                     result = mergeAggrResult(result, rangeQueryResult);
                 }
             }
-            return query.onResult(result);
+            return query.onResult(result, timeGroups==null?0:(timeGroups.getRight()-timeGroups.getLeft()+1));
         }
 
         private TreeMap<Integer, Integer> queryIndex(long entityId, AggregationIndexMeta meta, int startTimeGroup, int endTimeGroup) throws IOException {
@@ -237,7 +234,9 @@ public class AggregationIndexManager {
             MinMaxAggrIndexWriter w = new MinMaxAggrIndexWriter(data, indexFile, ValueGroupingMap.getComparator(pMeta.getType()), type);
             long fileSize = w.write();
             // 添加元信息到meta
-            addMeta(new AggregationIndexMeta(indexId, type, pMeta.getPropertyId(), timeGroup.firstKey(), timeGroup.lastKey()-1, fileSize, every, timeUnit, new TreeMap<>()));
+            addMeta(new AggregationIndexMeta(
+                    indexId, type, pMeta.getPropertyId(), pMeta.getType(),
+                    timeGroup.firstKey(), timeGroup.lastKey()-1, fileSize, every, timeUnit, new TreeMap<>()));
 
             // 返回索引ID
             return indexId;
@@ -246,12 +245,14 @@ public class AggregationIndexManager {
 
         public Object query(long entityId, AggregationIndexMeta meta, int start, int end, MinMax query) throws IOException {
             TreeMap<Integer, Slice> result = new TreeMap<>();
-            Comparator<? super Slice> cp = meta.getValGroupMap().comparator();
+            Comparator<? super Slice> cp = ValueGroupingMap.getComparator(meta.getValueType());
+            boolean shouldAddMin = (meta.getType()==AGGR_MIN || meta.getType()==AGGR_MIN_MAX);
+            boolean shouldAddMax = (meta.getType()==AGGR_MAX || meta.getType()==AGGR_MIN_MAX);
             // 找出可以用索引加速的时间区间
             Pair<Integer, Integer> timeGroups = overlappedGroups(meta, start, end);
             if(timeGroups!=null){
                 // 如果可以加速, 则使用索引得到这段时间的结果
-                result = queryIndex(entityId, meta, cp, timeGroups.getLeft(), timeGroups.getLeft());
+                result = queryIndex(entityId, meta, cp, timeGroups.getLeft(), timeGroups.getLeft(), shouldAddMin, shouldAddMax);
             }
             // 找出不用索引加速的时间区间(列表)
             List<Pair<Integer, Integer>> unCoveredList = unCoveredTime(meta, start, end);
@@ -263,31 +264,39 @@ public class AggregationIndexManager {
                     // 进行range查询并返回结果
                     TreeMap<Integer, Slice> rangeQueryResult = (TreeMap<Integer, Slice>) tpStore.aggregate(entityId, proId, start, end, packedQuery);
                     // 合并结果
-                    result = mergeAggrResult(result, rangeQueryResult, cp);
+                    result = mergeAggrResult(result, rangeQueryResult, cp, shouldAddMin, shouldAddMax);
                 }
             }
-            return query.onResult(result);
+            return query.onResult(result, timeGroups==null?0:(timeGroups.getRight()-timeGroups.getLeft()+1));
         }
 
-        private TreeMap<Integer, Slice> mergeAggrResult(TreeMap<Integer, Slice> map1, TreeMap<Integer, Slice> map2, Comparator<? super Slice> cp) {
-
-            return null;
+        private TreeMap<Integer, Slice> mergeAggrResult(TreeMap<Integer, Slice> map1, TreeMap<Integer, Slice> map2, Comparator<? super Slice> cp, boolean shouldAddMin, boolean shouldAddMax) {
+            if(shouldAddMin){
+                Slice min1 = map1.get(MinMax.MIN);
+                Slice min2 = map2.get(MinMax.MIN);
+                if(cp.compare(min2, min1)<0) map1.put(MinMax.MIN, min2);
+            }
+            if(shouldAddMax){
+                Slice max1 = map1.get(MinMax.MAX);
+                Slice max2 = map2.get(MinMax.MAX);
+                if(cp.compare(max2, max1)>0) map1.put(MinMax.MAX, max2);
+            }
+            return map1;
         }
 
-        private TreeMap<Integer, Slice> queryIndex(long entityId, AggregationIndexMeta meta, Comparator<? super Slice> cp, int startTimeGroup, int endTimeGroup) throws IOException {
+        private TreeMap<Integer, Slice> queryIndex(
+                long entityId, AggregationIndexMeta meta, Comparator<? super Slice> cp, int startTimeGroup, int endTimeGroup, boolean shouldAddMin, boolean shouldAddMax) throws IOException {
             TreeMap<Integer, Slice> result = new TreeMap<>();
             String filePath = new File(indexDir, Filename.aggrIndexFileName(meta.getId())).getAbsolutePath();
             SeekingIterator<Slice, Slice> iterator = cache.getTable(filePath).aggrIterator(filePath);
 
-            iterator.seek(new AggregationIndexKey(entityId, startTimeGroup, 0).encode());
+            iterator.seek(new AggregationIndexKey(entityId, startTimeGroup, MinMax.MIN).encode());
             while(iterator.hasNext()){
                 Entry<Slice, Slice> entry = iterator.next();
                 AggregationIndexKey key = new AggregationIndexKey(entry.getKey());
                 if(key.getEntityId()==entityId && key.getTimeGroupId()>=startTimeGroup){
                     if(key.getTimeGroupId()<=endTimeGroup) {
                         Slice val = entry.getValue();
-                        boolean shouldAddMin = (meta.getType()==AGGR_MIN || meta.getType()==AGGR_MIN_MAX);
-                        boolean shouldAddMax = (meta.getType()==AGGR_MAX || meta.getType()==AGGR_MIN_MAX);
                         if(shouldAddMin) result.merge(MinMax.MIN, val, (oldVal, newVal) -> (cp.compare(newVal, oldVal)<0) ? newVal : oldVal);
                         if(shouldAddMax) result.merge(MinMax.MAX, val, (oldVal, newVal) -> (cp.compare(newVal, oldVal)>0) ? newVal : oldVal);
                     }else{
@@ -300,10 +309,24 @@ public class AggregationIndexManager {
 
 
         private AbstractTimeIntervalAggrQuery packQuery(AggregationIndexMeta meta, Comparator<? super Slice> cp, int end) {
-            return new AbstractTimeIntervalAggrQuery<Integer, Slice>(end) {
 
+            return new AbstractTimeIntervalAggrQuery<Integer, Slice>(end) {
+                Slice min=null,max=null;
                 @Override
                 public Integer computeGroupId(TimeIntervalEntry entry) {
+                    Slice val = entry.value();
+                    if(min==null){
+                        min = val;
+                    }else if(cp.compare(val, min)<0){
+                        min = val;
+                        return null;
+                    }//else do nothing.
+                    if(max==null){
+                        max = val;
+                    }else if(cp.compare(val, max)>0){
+                        max = val;
+                        return null;
+                    }//else do nothing.
                     return null;
                 }
 
@@ -312,7 +335,10 @@ public class AggregationIndexManager {
                     return null;
                 }
 
-                public Object onResult(Map result) {
+                public Object onResult(Map<Integer, Slice> result) {
+                    result = new TreeMap<>();
+                    result.put(MinMax.MAX, max);
+                    result.put(MinMax.MIN, min);
                     return result;
                 }
             };

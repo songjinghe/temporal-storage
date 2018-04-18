@@ -47,7 +47,7 @@ public class CorrectnessTest {
     }
 
     private Object queryAggr(TemporalPropertyStore store, int proId, int entityId, int start, int end, int interval) {
-        return store.aggregate(entityId, proId, start, end, new DurationStatisticAggregationQuery<Integer>() {
+        return store.aggregate(entityId, proId, start, end, new DurationStatisticAggregationQuery<Integer>(end) {
             @Override
             public Integer computeGroupId(TimeIntervalEntry entry) {
                 return asInt(entry.value());

@@ -1,10 +1,12 @@
 package org.act.temporalProperty.impl.index.singleval;
 
 import org.act.temporalProperty.TemporalPropertyStore;
-import org.act.temporalProperty.impl.RangeQueryCallBack;
-import org.act.temporalProperty.index.value.IndexQueryRegion;
+import org.act.temporalProperty.impl.InternalEntry;
 import org.act.temporalProperty.index.IndexValueType;
+import org.act.temporalProperty.index.value.IndexQueryRegion;
 import org.act.temporalProperty.index.value.PropertyValueInterval;
+import org.act.temporalProperty.meta.ValueContentType;
+import org.act.temporalProperty.query.range.InternalEntryRangeQueryCallBack;
 import org.act.temporalProperty.util.DataFileImporter;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.StoreBuilder;
@@ -17,7 +19,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Created by song on 2018-01-22.
@@ -115,20 +118,18 @@ public class BuildAndQueryTest {
 
 
     private static void testRangeQuery(TemporalPropertyStore store) {
-        store.getRangeValue(2, 1, 1560, 27000, new RangeQueryCallBack() {
-            public void setValueType(String valueType) {}
-            public void onCall(int time, Slice value) {
-                log.info("{} {}", time, value.getInt(0));
+        store.getRangeValue(2, 1, 1560, 27000, new InternalEntryRangeQueryCallBack() {
+            public void setValueType(ValueContentType valueType) {}
+            public void onNewEntry(InternalEntry entry) {
+                log.info("{} {}", entry.getKey().getStartTime(), entry.getValue().getInt(0));
             }
-            public void onCallBatch(Slice batchValue){}
-            public Object onReturn(){return null;}
-            public CallBackType getType(){return null;}
+            public Object onReturn() {return null;}
         });
     }
 
 
 
-    private class EntityIdCallBack extends RangeQueryCallBack {
+    private class EntityIdCallBack implements InternalEntryRangeQueryCallBack {
         private int timeMin, timeMax, valueMin, valueMax, lastTime = -1;
         private boolean first = true;
 
@@ -143,7 +144,9 @@ public class BuildAndQueryTest {
             return (t1min<=t2max && t2min<=t1max);
         }
 
-        public void onCall(int time, Slice value) {
+        public void onNewEntry(InternalEntry entry) {
+            int time = entry.getKey().getStartTime();
+            Slice value = entry.getValue();
             int val = value.getInt(0);
             if(first){
                 first=false;
@@ -159,10 +162,8 @@ public class BuildAndQueryTest {
             }
             lastTime = time;
         }
-        public void setValueType(String valueType) {}
-        public void onCallBatch(Slice batchValue) {}
+        public void setValueType(ValueContentType valueType) {}
         public Object onReturn() {return null;}
-        public CallBackType getType() {return null;}
     };
 
     private class StopLoopException extends RuntimeException {

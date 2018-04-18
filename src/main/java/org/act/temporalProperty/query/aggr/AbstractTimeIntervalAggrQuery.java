@@ -4,6 +4,7 @@ import com.google.common.base.Preconditions;
 import org.act.temporalProperty.impl.InternalEntry;
 import org.act.temporalProperty.impl.InternalKey;
 import org.act.temporalProperty.index.aggregation.TimeIntervalEntry;
+import org.act.temporalProperty.meta.ValueContentType;
 import org.act.temporalProperty.query.range.InternalEntryRangeQueryCallBack;
 import org.act.temporalProperty.util.Slice;
 
@@ -30,7 +31,7 @@ public abstract class AbstractTimeIntervalAggrQuery<K,V> implements TimeInterval
     }
 
     @Override
-    public void setValueType(String valueType) {
+    public void setValueType(ValueContentType valueType) {
         // do nothing
     }
 
@@ -51,7 +52,8 @@ public abstract class AbstractTimeIntervalAggrQuery<K,V> implements TimeInterval
             onEntry(lastTime, endTime, lastVal);
         }
         for(Entry<K, List<TimeIntervalEntry>> entry : groupListMap.entrySet()){
-            groupValMap.put(entry.getKey(), aggregate(entry.getKey(), entry.getValue()));
+            V aggrValue = aggregate(entry.getKey(), entry.getValue());
+            if(aggrValue!=null) groupValMap.put(entry.getKey(), aggrValue);
         }
         return onResult(groupValMap);
     }

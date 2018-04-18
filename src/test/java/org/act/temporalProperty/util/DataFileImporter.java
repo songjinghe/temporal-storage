@@ -39,7 +39,8 @@ public class DataFileImporter {
 
     private void setDataPath() {
         if(SystemUtils.IS_OS_WINDOWS){
-            this.dataPath = "C:\\Users\\Administrator\\Desktop\\TGraph-source\\20101104.tar\\20101104";
+//            this.dataPath = "C:\\Users\\Administrator\\Desktop\\TGraph-source\\20101104.tar\\20101104";
+            dataPath = "D:\\songjh\\projects\\TGraph\\test-traffic-data\\20101105";
         }else{
             this.dataPath = "/home/song/tmp/road data/20101104";
         }

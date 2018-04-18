@@ -7,7 +7,7 @@ public enum ValueContentType {
     INT(1), LONG(2), FLOAT(3), DOUBLE(4), STRING(5);
     private final int id;
     ValueContentType(int id){this.id=id;}
-    int getId(){return id;}
+    public int getId(){return id;}
 
     public static ValueContentType decode(int i) {
         switch (i){

@@ -1,6 +1,7 @@
 package org.act.temporalProperty.index.value;
 
 import org.act.temporalProperty.index.IndexType;
+import org.act.temporalProperty.index.aggregation.AggregationIndexMeta;
 import org.act.temporalProperty.util.DynamicSliceOutput;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.SliceInput;
@@ -73,6 +74,7 @@ public class IndexMetaData {
 
     public void encode(SliceOutput out){
         out.writeInt(this.getType().getId());
+        out.writeLong(this.getId());
         out.writeInt(this.getTimeStart());
         out.writeInt(this.getTimeEnd());
         out.writeLong(this.getFileSize());
@@ -83,8 +85,8 @@ public class IndexMetaData {
     }
 
     public IndexMetaData(SliceInput in){
-        this.fileId = in.readInt();
         this.type = IndexType.decode(in.readInt());
+        this.fileId = in.readInt();
         this.timeStart = in.readInt();
         this.timeEnd = in.readInt();
         this.fileSize = in.readLong();
@@ -96,7 +98,12 @@ public class IndexMetaData {
         this.propertyIdList = pidList;
     }
 
-    public IndexMetaData(Slice in){
-        this(in.input());
+    public static IndexMetaData decode(Slice in){
+        IndexType type = IndexType.decode(in.getInt(0));
+        if(type==IndexType.SINGLE_VALUE || type==IndexType.MULTI_VALUE){
+            return new IndexMetaData(in.input());
+        }else{
+            return AggregationIndexMeta.decode(in);
+        }
     }
 }

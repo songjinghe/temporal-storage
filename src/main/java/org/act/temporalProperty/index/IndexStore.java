@@ -87,7 +87,7 @@ public class IndexStore {
     }
 
     public Object queryAggrIndex(long entityId, PropertyMetaData meta, int start, int end, long indexId, IndexAggregationQuery query) throws IOException {
-        return aggr.query(entityId, meta, start, end, indexId, query);
+        return aggr.query(entityId, meta.getPropertyId(), start, end, indexId, query);
     }
 
     public void deleteIndex(int propertyId) {

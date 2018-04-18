@@ -7,6 +7,7 @@ import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.ExecutionException;
 
+import com.google.common.cache.RemovalListener;
 import org.act.temporalProperty.table.FileChannelTable;
 import org.act.temporalProperty.table.MMapTable;
 import org.act.temporalProperty.table.Table;
@@ -33,15 +34,10 @@ public class TableCache
     {
         cache = CacheBuilder.newBuilder()
                 .maximumSize(tableCacheSize)
-//                .removalListener(new RemovalListener<Long, TableAndFile>()
-//                {
-//                    @Override
-//                    public void onRemoval(RemovalNotification<Long, TableAndFile> notification)
-//                    {
-//                        Table table = notification.getValue().getTable();
-//                        finalizer.addCleanup(table, table.closer());
-//                    }
-//                })
+                .removalListener((RemovalListener<String, TableAndFile>) notification -> {
+                    Table table = notification.getValue().getTable();
+                    finalizer.addCleanup(table, table.closer());
+                })
                 .build(new CacheLoader<String, TableAndFile>(){
                     @Override
                     public TableAndFile load(String filePath) throws IOException{

@@ -1,8 +1,10 @@
 package org.act.temporalProperty.impl.query.range;
 
 import org.act.temporalProperty.TemporalPropertyStore;
-import org.act.temporalProperty.impl.RangeQueryCallBack;
+import org.act.temporalProperty.impl.InternalEntry;
 import org.act.temporalProperty.impl.index.singleval.SourceCompare;
+import org.act.temporalProperty.meta.ValueContentType;
+import org.act.temporalProperty.query.range.InternalEntryRangeQueryCallBack;
 import org.act.temporalProperty.util.DataFileImporter;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.StoreBuilder;
@@ -15,9 +17,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 /**
  * Created by song on 2018-01-23.
@@ -64,14 +64,12 @@ public class RangeQueryTest {
         });
     }
 
-    private class CustomCallBack extends RangeQueryCallBack {
+    private class CustomCallBack implements InternalEntryRangeQueryCallBack {
         private long entityId;
         public CustomCallBack(long entityId){this.entityId=entityId;}
-        public void onCall(int time, Slice value) {}
-        public void setValueType(String valueType) {}
-        public void onCallBatch(Slice batchValue) {}
+        public void setValueType(ValueContentType valueType) {}
+        public void onNewEntry(InternalEntry entry) {}
         public Object onReturn() {return null;}
-        public CallBackType getType() {return null;}
     }
 
     private class StopLoopException extends RuntimeException {

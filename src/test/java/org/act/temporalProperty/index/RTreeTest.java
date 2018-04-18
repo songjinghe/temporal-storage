@@ -7,6 +7,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import org.act.temporalProperty.exception.TPSNHException;
 import org.act.temporalProperty.impl.index.singleval.SourceCompare;
+import org.act.temporalProperty.index.value.rtree.*;
 import org.act.temporalProperty.util.DataFileImporter;
 import org.act.temporalProperty.util.Slice;
 import org.junit.Before;

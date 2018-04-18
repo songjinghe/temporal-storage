@@ -31,7 +31,7 @@ public class RunTest {
             long writeTime = 0;
             long minTime = 0;
             long maxTime = 0;
-            for (int num = 0; num < 10; num++) {
+            for (int num = 0; num < 1; num++) {
 
                 PerformanceTest writeTest = new PerformanceTest(fileCount);
                 writeTest.writeTest();
@@ -63,7 +63,8 @@ public class RunTest {
     private List<File> getDataFiles() {
         String dataPath;
         if(SystemUtils.IS_OS_WINDOWS){
-            dataPath = "C:\\Users\\Administrator\\Desktop\\TGraph-source\\20101104.tar\\20101104";
+//            dataPath = "C:\\Users\\Administrator\\Desktop\\TGraph-source\\20101104.tar\\20101104";
+            dataPath = "D:\\songjh\\projects\\TGraph\\test-traffic-data\\20101105";
         }else{
             dataPath = "/home/song/tmp/road data/20101104";
         }

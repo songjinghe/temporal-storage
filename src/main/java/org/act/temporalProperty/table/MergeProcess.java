@@ -127,14 +127,14 @@ public class MergeProcess extends Thread
             }
         }
 
-        systemMeta.lock.lockExclusive();
+        systemMeta.lock.mergeLockExclusive();
         try {
             for (MergeTask task : taskList) task.updateMetaInfo();
             systemMeta.force(new File(storeDir));
             memTable = null;
             systemMeta.lock.mergeDone();
         }finally {
-            systemMeta.lock.unlockExclusive();
+            systemMeta.lock.mergeUnlockExclusive();
         }
 
         for(MergeTask task : taskList){

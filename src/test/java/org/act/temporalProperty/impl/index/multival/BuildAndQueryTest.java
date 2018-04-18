@@ -1,12 +1,14 @@
 package org.act.temporalProperty.impl.index.multival;
 
 import org.act.temporalProperty.TemporalPropertyStore;
-import org.act.temporalProperty.impl.RangeQueryCallBack;
+import org.act.temporalProperty.impl.InternalEntry;
 import org.act.temporalProperty.impl.index.singleval.SourceCompare;
-import org.act.temporalProperty.index.value.IndexQueryRegion;
 import org.act.temporalProperty.index.IndexValueType;
+import org.act.temporalProperty.index.value.IndexQueryRegion;
 import org.act.temporalProperty.index.value.PropertyValueInterval;
 import org.act.temporalProperty.index.value.rtree.IndexEntry;
+import org.act.temporalProperty.meta.ValueContentType;
+import org.act.temporalProperty.query.range.InternalEntryRangeQueryCallBack;
 import org.act.temporalProperty.util.DataFileImporter;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.StoreBuilder;
@@ -18,10 +20,10 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.io.File;
 
 /**
  * Created by song on 2018-01-22.
@@ -166,14 +168,12 @@ public class BuildAndQueryTest {
 
 
     private static void testRangeQuery(TemporalPropertyStore store) {
-        store.getRangeValue(2, 1, 1560, 27000, new RangeQueryCallBack() {
-            public void setValueType(String valueType) {}
-            public void onCall(int time, Slice value) {
-                log.info("{} {}", time, value.getInt(0));
+        store.getRangeValue(2, 1, 1560, 27000, new InternalEntryRangeQueryCallBack() {
+            public void setValueType(ValueContentType valueType) {}
+            public void onNewEntry(InternalEntry entry) {
+                log.info("{} {}", entry.getKey().getStartTime(), entry.getValue().getInt(0));
             }
-            public void onCallBatch(Slice batchValue){}
-            public Object onReturn(){return null;}
-            public CallBackType getType(){return null;}
+            public Object onReturn() {return null;}
         });
     }
 
@@ -181,16 +181,13 @@ public class BuildAndQueryTest {
         return (t1min<=t2max && t2min<=t1max);
     }
 
-    private class EntityIdCallBack extends RangeQueryCallBack {
+    private class EntityIdCallBack implements InternalEntryRangeQueryCallBack {
         private long entityId;
-
-        public EntityIdCallBack(long entityId) {this.entityId = entityId; }
-        public void onCall(int time, Slice value) {}
-        public void setValueType(String valueType) {}
-        public void onCallBatch(Slice batchValue) {}
-        public Object onReturn() {return null; }
-        public CallBackType getType() {return null;}
-    };
+        public EntityIdCallBack(long entityId){this.entityId=entityId;}
+        public void setValueType(ValueContentType valueType) {}
+        public void onNewEntry(InternalEntry entry) {}
+        public Object onReturn() {return null;}
+    }
 
     private class StopLoopException extends RuntimeException {
     }

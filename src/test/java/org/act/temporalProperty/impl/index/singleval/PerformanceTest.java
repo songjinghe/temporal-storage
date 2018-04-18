@@ -1,12 +1,14 @@
 package org.act.temporalProperty.impl.index.singleval;
 
 import org.act.temporalProperty.TemporalPropertyStore;
-import org.act.temporalProperty.query.range.AbstractRangeQuery;
+import org.act.temporalProperty.impl.InternalEntry;
+import org.act.temporalProperty.index.IndexValueType;
 import org.act.temporalProperty.index.value.IndexQueryRegion;
 import org.act.temporalProperty.index.value.IndexTableIterator;
-import org.act.temporalProperty.index.IndexValueType;
 import org.act.temporalProperty.index.value.PropertyValueInterval;
 import org.act.temporalProperty.index.value.rtree.IndexEntry;
+import org.act.temporalProperty.meta.ValueContentType;
+import org.act.temporalProperty.query.range.InternalEntryRangeQueryCallBack;
 import org.act.temporalProperty.util.DataFileImporter;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.StoreBuilder;
@@ -18,7 +20,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 
 /**
  * Created by song on 2018-01-28.
@@ -210,14 +215,12 @@ public class PerformanceTest {
 
     private static boolean overlap(int t1min, int t1max, int t2min, int t2max){return (t1min<=t2max && t2min<=t1max);}
 
-    private class CustomCallBack extends AbstractRangeQuery {
+    private class CustomCallBack implements InternalEntryRangeQueryCallBack {
         private long entityId;
         public CustomCallBack(long entityId){this.entityId=entityId;}
-        public void onNewValue(int time, Slice value) {}
-        public void setValueType(String valueType) {}
-        public void onCallBatch(Slice batchValue) {}
+        public void setValueType(ValueContentType valueType) {}
+        public void onNewEntry(InternalEntry entry) {}
         public Object onReturn() {return null;}
-        public CallBackType getType() {return null;}
     }
 
     private class StopLoopException extends RuntimeException {

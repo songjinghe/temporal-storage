@@ -3,6 +3,9 @@ package org.act.temporalProperty.index.aggregation;
 import com.google.common.collect.Lists;
 import org.act.temporalProperty.index.value.IndexMetaData;
 import org.act.temporalProperty.index.IndexType;
+import org.act.temporalProperty.meta.PropertyMetaData;
+import org.act.temporalProperty.meta.ValueContentType;
+import org.act.temporalProperty.query.aggr.ValueGroupingMap;
 import org.act.temporalProperty.util.DynamicSliceOutput;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.SliceInput;
@@ -22,14 +25,16 @@ public class AggregationIndexMeta extends IndexMetaData {
     private final TreeMap<Slice, Integer> vGroupMap;
     private final int tEvery;
     private final int timeUnit;
+    private final ValueContentType valueType;
     private TreeMap<Integer, Integer> tGroupMap;
 
-    public AggregationIndexMeta(long fileId, IndexType type, int pid, int start, int end, long fileSize,
+    public AggregationIndexMeta(long fileId, IndexType type, int pid, ValueContentType vType,  int start, int end, long fileSize,
                                 int tEvery, int timeUnit, TreeMap<Slice, Integer> valueGroup) {
         super(fileId, type, Lists.newArrayList(pid), start, end, fileSize);
         this.vGroupMap = valueGroup;
         this.tEvery = tEvery;
         this.timeUnit = timeUnit;
+        this.valueType = vType;
     }
 
     public TreeMap<Slice, Integer> getValGroupMap() {
@@ -41,6 +46,18 @@ public class AggregationIndexMeta extends IndexMetaData {
             tGroupMap = calcInterval(getTimeStart(), getTimeEnd(), tEvery, timeUnit);
         }
         return tGroupMap;
+    }
+
+    public int getTEvery() {
+        return tEvery;
+    }
+
+    public int getTimeUnit() {
+        return timeUnit;
+    }
+
+    public ValueContentType getValueType() {
+        return valueType;
     }
 
     @Override
@@ -66,6 +83,7 @@ public class AggregationIndexMeta extends IndexMetaData {
         super.encode(out);
         out.writeInt(tEvery);
         out.writeInt(timeUnit);
+        out.writeInt(valueType.getId());
         out.writeInt(vGroupMap.size());
         for(Map.Entry<Slice, Integer> entry : vGroupMap.entrySet()){
             out.writeInt(entry.getKey().length());
@@ -75,8 +93,8 @@ public class AggregationIndexMeta extends IndexMetaData {
     }
 
     public static AggregationIndexMeta decode(SliceInput in){
-        int fileId = in.readInt();
         IndexType type = IndexType.decode(in.readInt());
+        int fileId = in.readInt();
         int timeStart = in.readInt();
         int timeEnd = in.readInt();
         long fileSize = in.readLong();
@@ -87,7 +105,8 @@ public class AggregationIndexMeta extends IndexMetaData {
         }
         int tEvery = in.readInt();
         int timeUnit = in.readInt();
-        TreeMap<Slice, Integer> valGroupMap = new TreeMap<>();
+        ValueContentType vType = ValueContentType.decode(in.readInt());
+        TreeMap<Slice, Integer> valGroupMap = new TreeMap<>(ValueGroupingMap.getComparator(vType));
         count = in.readInt();
         for(int i=0; i<count; i++){
             int len = in.readInt();
@@ -95,7 +114,7 @@ public class AggregationIndexMeta extends IndexMetaData {
             int groupId = in.readInt();
             valGroupMap.put(key, groupId);
         }
-        return new AggregationIndexMeta(fileId, type, pidList.get(0), timeStart, timeEnd, fileSize, tEvery, timeUnit, valGroupMap);
+        return new AggregationIndexMeta(fileId, type, pidList.get(0), vType, timeStart, timeEnd, fileSize, tEvery, timeUnit, valGroupMap);
     }
 
     public static AggregationIndexMeta decode(Slice in){
