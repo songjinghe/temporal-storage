@@ -1,9 +1,13 @@
 package org.act.temporalProperty;
 
-import org.act.temporalProperty.index.value.IndexQueryRegion;
+import org.act.temporalProperty.impl.MemTable;
 import org.act.temporalProperty.index.IndexType;
+import org.act.temporalProperty.index.value.IndexMetaData;
+import org.act.temporalProperty.index.value.IndexQueryRegion;
 import org.act.temporalProperty.index.value.rtree.IndexEntry;
 import org.act.temporalProperty.meta.ValueContentType;
+import org.act.temporalProperty.query.TimeIntervalKey;
+import org.act.temporalProperty.query.aggr.AggregationIndexQueryResult;
 import org.act.temporalProperty.query.aggr.IndexAggregationQuery;
 import org.act.temporalProperty.query.aggr.ValueGroupingMap;
 import org.act.temporalProperty.query.range.InternalEntryRangeQueryCallBack;
@@ -12,7 +16,7 @@ import org.act.temporalProperty.util.Slice;
 import java.util.List;
 
 /**
- * 动态属性存储系统，对外提供其功能的接口
+ * 时态属性存储系统，对外提供其功能的接口
  *
  */
 public interface TemporalPropertyStore
@@ -25,18 +29,18 @@ public interface TemporalPropertyStore
 
 	int Version = 1;
 	/**
-	 * 对某个动态属性进行时间点查询，返回查询的 结果
-	 * @param entityId 动态属性所属的点/边的id
-	 * @param proId 动态属性id
+	 * 对某个时态属性进行时间点查询，返回查询的 结果
+	 * @param entityId 时态属性所属的点/边的id
+	 * @param proId 时态属性id
 	 * @param time 需要查询的时间
 	 * @return @{Slice} 查询的结果
 	 */
     Slice getPointValue( long entityId, int proId, int time );
     
     /**
-	 * 对某个动态属性进行时间段查询，返回查询的 结果
-	 * @param id 动态属性所属的点/边的id
-	 * @param proId 动态属性id
+	 * 对某个时态属性进行时间段查询，返回查询的 结果
+	 * @param id 时态属性所属的点/边的id
+	 * @param proId 时态属性id
 	 * @param startTime 需要查询的时间的起始时间
 	 * @param endTime 需要查询的时间的结束时间
 	 * @param callback 时间段查询所采用的聚集类型
@@ -44,31 +48,34 @@ public interface TemporalPropertyStore
 	 */
     Object getRangeValue( long id, int proId, int startTime, int endTime, InternalEntryRangeQueryCallBack callback );
 
+    // query together with cache data
+	Object getRangeValue( long entityId, int proId, int start, int end, InternalEntryRangeQueryCallBack callBack, MemTable cache );
+
 	/**
-	 * 创建某个动态属性
-	 * @param propertyId 动态属性的id
+	 * 创建某个时态属性
+	 * @param propertyId 时态属性的id
 	 * @return 是否创建成功，如果有相同ID但类型不同的属性则返回false
 	 */
 	boolean createProperty(int propertyId, ValueContentType type);
 
     /**
-     * 写入某个动态属性的值
-     * @param id 动态属性所属的点/边的id+动态属性id+相应值有效的起始时间
+     * 写入某个时态属性的值，值的起始时间和结束时间都是inclusive
+     * @param key 由InternalKey(时态属性所属的点/边的id+时态属性id+相应值有效的起始时间)+endTime组成
      * @param value 值
      * @return 是否写入成功
      */
-    boolean setProperty( Slice id, byte[] value );
+    boolean setProperty(TimeIntervalKey key, Slice value );
     
     /**
-     * 删除某个动态属性
-     * @param propertyId 动态属性的id
+     * 删除某个时态属性
+     * @param propertyId 时态属性的id
      * @return 是否删除成功
      */
     boolean deleteProperty(int propertyId);
 
 	/**
-	 * 删除某个动态属性中某个eid的所有数据
-	 * @param id 动态属性的id + entity id
+	 * 删除某个时态属性中某个eid的所有数据
+	 * @param id 时态属性的id + entity id
 	 * @return 是否删除成功
 	 */
 	boolean deleteEntityProperty(Slice id);
@@ -114,11 +121,12 @@ public interface TemporalPropertyStore
 	 * @param proId     要查询的属性id
 	 * @param startTime 开始时间
 	 * @param endTime   结束时间
-	 * @param query     用于处理查询结果的CallBack
 	 * @return CallBack定义的返回
 	 */
-	Object aggrWithIndex(long indexId, long entityId, int proId, int startTime, int endTime, IndexAggregationQuery query);
+	AggregationIndexQueryResult aggrWithIndex(long indexId, long entityId, int proId, int startTime, int endTime);
 
+	// query together with cache data
+	AggregationIndexQueryResult aggrWithIndex(long indexId, long entityId, int proId, int startTime, int endTime, MemTable cache);
 	/**
 	 * 创建一个值索引
 	 * @param start  索引开始时间
@@ -141,9 +149,12 @@ public interface TemporalPropertyStore
 	 */
 	List<IndexEntry> getEntries(IndexQueryRegion condition);
 
+	List<IndexMetaData> listIndex();
+
 	void flushMemTable2Disk();
 
     void flushMetaInfo2Disk();
 
     void shutDown() throws Throwable;
+
 }

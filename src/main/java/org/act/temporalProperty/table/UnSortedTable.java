@@ -1,7 +1,6 @@
 package org.act.temporalProperty.table;
 
 import java.io.*;
-import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.*;
 
@@ -9,9 +8,6 @@ import org.act.temporalProperty.impl.*;
 import org.act.temporalProperty.util.DynamicSliceOutput;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.SliceInput;
-import org.act.temporalProperty.util.Slices;
-
-import static org.act.temporalProperty.util.SizeOf.SIZE_OF_INT;
 
 /**
  * Buffer的备份文件。文件中的写入都是在末尾进行append。文件内数据没有顺序
@@ -49,7 +45,7 @@ public class UnSortedTable implements Closeable
                 Iterator<Slice> keyIter = keys.iterator();
                 Iterator<Slice> valIter = values.iterator();
                 while(keyIter.hasNext() && valIter.hasNext()) {
-                    table.add(keyIter.next(), valIter.next());
+                    table.addToNow(keyIter.next(), valIter.next());
                 }
                 keys = new LinkedList<>();
                 values = new LinkedList<>();

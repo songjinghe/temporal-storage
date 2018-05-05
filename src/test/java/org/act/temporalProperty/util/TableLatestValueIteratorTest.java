@@ -25,15 +25,15 @@ public class TableLatestValueIteratorTest
                     Slice idSlice = new Slice( 12 );
                     idSlice.setLong( 0, i );
                     idSlice.setInt( 8, p );
-                    InternalKey key = new InternalKey( idSlice, t, 20, ValueType.VALUE );
-                    table.add( key.encode(), key.encode() );
+                    InternalKey key = new InternalKey( idSlice, t, ValueType.VALUE );
+                    table.addToNow( key, key.encode() );
                 }
     }
     
     @Test
     public void test()
     {
-        TableLatestValueIterator iterator = new TableLatestValueIterator( new PackInternalKeyIterator(table.iterator() ));
+        TableLatestValueIterator iterator = new TableLatestValueIterator( table.iterator() );
         while( iterator.hasNext() )
         {
             InternalKey key = iterator.next().getKey();

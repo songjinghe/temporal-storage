@@ -106,7 +106,8 @@ public class MergeProcess extends Thread
      */
     private void startMergeProcess( MemTable temp ) throws IOException
     {
-        SearchableIterator iterator = new PackInternalKeyIterator(temp.iterator());
+        index.update(temp);
+        SearchableIterator iterator = temp.iterator();
         Map<Integer, MemTable> tables = new HashMap<>();
         while( iterator.hasNext() ){
             InternalEntry entry = iterator.next();
@@ -114,8 +115,7 @@ public class MergeProcess extends Thread
             if(!tables.containsKey(key.getPropertyId())){
                 tables.put(key.getPropertyId(), new MemTable( TableComparator.instance() ));
             }
-            tables.get(key.getPropertyId()).add(entry.getKey().encode(), entry.getValue());
-            index.updateEntry(entry);
+            tables.get(key.getPropertyId()).addToNow(entry.getKey(), entry.getValue());
         }
 
         List<MergeTask> taskList = new LinkedList<>();
@@ -231,7 +231,7 @@ public class MergeProcess extends Thread
 
         private SearchableIterator getDataIterator(){
             if(onlyDumpMemTable()) {
-                return new PackInternalKeyIterator(this.mem.iterator());
+                return this.mem.iterator();
             }else{
                 SameLevelMergeIterator unstableIter = new SameLevelMergeIterator();
                 for (Long fileNumber : mergeParticipants) {
@@ -259,7 +259,7 @@ public class MergeProcess extends Thread
                 } else {
                     diskDataIter = unstableIter;
                 }
-                return TwoLevelMergeIterator.toDisk(new PackInternalKeyIterator(this.mem.iterator()), diskDataIter);
+                return TwoLevelMergeIterator.toDisk(this.mem.iterator(), diskDataIter);
             }
         }
 

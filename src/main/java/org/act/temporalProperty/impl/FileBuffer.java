@@ -48,10 +48,10 @@ public class FileBuffer implements Closeable
      * @param value 值
      * @throws IOException
      */
-    public void add( Slice key, Slice value ) throws IOException{
+    public void add(InternalKey key, Slice value ) throws IOException{
         if(discTable==null || memTable==null ) throw new IOException("should init first!");
-        discTable.add( key, value );
-        this.memTable.add( key, value );
+        discTable.add( key.encode(), value );
+        this.memTable.addToNow( key, value );
     }
 
     public void force() throws IOException{

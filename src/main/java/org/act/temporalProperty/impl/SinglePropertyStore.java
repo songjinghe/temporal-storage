@@ -175,7 +175,7 @@ public class SinglePropertyStore
     // this method runs in the background thread.
     // insert entry to file buffer, and pack remain entries to a MergeTask
     public MergeTask merge(MemTable memTable) throws IOException {
-        SearchableIterator iterator = new PackInternalKeyIterator(memTable.iterator());
+        SearchableIterator iterator = memTable.iterator();
         MemTable stableMemTable = new MemTable(TableComparator.instance());
         boolean stExist = propertyMeta.hasStable();
         boolean unExist = propertyMeta.hasUnstable();
@@ -184,12 +184,12 @@ public class SinglePropertyStore
             InternalKey key = entry.getKey();
             int time = key.getStartTime();
             if( !unExist && !stExist ){
-                stableMemTable.add(entry.getKey().encode(), entry.getValue());
+                stableMemTable.addToNow(entry.getKey(), entry.getValue());
             }else if( unExist && !stExist){
                 if(time <= propertyMeta.unMaxTime()) {
                     insertUnstableBuffer(key, entry.getValue());
                 }else{
-                    stableMemTable.add(entry.getKey().encode(), entry.getValue());
+                    stableMemTable.addToNow(entry.getKey(), entry.getValue());
                 }
             }else if( unExist && stExist){
                 if(time <= propertyMeta.stMaxTime()){
@@ -197,13 +197,13 @@ public class SinglePropertyStore
                 }else if(time <= propertyMeta.unMaxTime()){
                     insertUnstableBuffer(key, entry.getValue());
                 }else{
-                    stableMemTable.add(entry.getKey().encode(), entry.getValue());
+                    stableMemTable.addToNow(entry.getKey(), entry.getValue());
                 }
             }else{ // !unExist && stExist
                 if(time <= propertyMeta.stMaxTime()){
                     insertStableBuffer(key, entry.getValue());
                 }else{
-                    stableMemTable.add(entry.getKey().encode(), entry.getValue());
+                    stableMemTable.addToNow(entry.getKey(), entry.getValue());
                 }
             }
         }
@@ -231,7 +231,7 @@ public class SinglePropertyStore
             buffer = new FileBuffer(new File(this.proDir, fileName), meta.getNumber());
             propertyMeta.addUnstableBuffer(meta.getNumber(), buffer);
         }
-        buffer.add( key.encode(), value );
+        buffer.add( key, value );
         if(buffer.size()>1024*1024*10) {
             unBufferToFile( meta, buffer );
         }
@@ -247,7 +247,7 @@ public class SinglePropertyStore
             buffer = new FileBuffer(new File(this.proDir, fileName), meta.getNumber());
             propertyMeta.addStableBuffer(meta.getNumber(), buffer);
         }
-        buffer.add( key.encode(), value );
+        buffer.add( key, value );
         if(buffer.size()>1024*1024*10) {
             stBufferToFile( meta, buffer );
         }

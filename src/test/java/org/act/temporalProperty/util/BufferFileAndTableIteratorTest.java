@@ -3,9 +3,6 @@ package org.act.temporalProperty.util;
 import java.io.File;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map.Entry;
 
 import junit.framework.Assert;
 
@@ -63,7 +60,7 @@ public class BufferFileAndTableIteratorTest
                     builder.add( key, value );
                 }
                 else
-                    memTable.add( key, value );
+                    memTable.addToNow( key, value );
             }
             builder.finish();
             table = new MMapTable( tablefileName, tableChannel, TableComparator.instance(), false );
@@ -80,7 +77,7 @@ public class BufferFileAndTableIteratorTest
         SameLevelMergeIterator list = new SameLevelMergeIterator();
         TwoLevelMergeIterator iterator = TwoLevelMergeIterator.merge( buffer.iterator(), table.iterator());
         list.add( iterator );
-        list.add( new PackInternalKeyIterator(memTable.iterator()) );
+        list.add( memTable.iterator() );
         int expected = 0;
         while( list.hasNext() )
         {

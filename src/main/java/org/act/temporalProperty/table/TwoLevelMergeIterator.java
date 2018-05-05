@@ -1,8 +1,5 @@
 package org.act.temporalProperty.table;
 
-import java.util.Map.Entry;
-import java.util.Comparator;
-
 import com.google.common.collect.AbstractIterator;
 import org.act.temporalProperty.helper.EqualValFilterIterator;
 import org.act.temporalProperty.helper.InvalidEntityFilterIterator;
@@ -37,7 +34,7 @@ public class TwoLevelMergeIterator extends AbstractIterator<InternalEntry> imple
                 return old.next();
             } else {
                 InternalKey memKey = mem.getKey();
-                if(memKey.getValueType()==ValueType.UNKNOWN){
+                if(memKey.getValueType()==ValueType.UNKNOWN ){
                     latest.next();
                 } else {
                     InternalEntry tmp = latest.next();

@@ -1,17 +1,14 @@
 package org.act.temporalProperty.helper;
 
 import org.act.temporalProperty.exception.TPSMetaLoadFailedException;
-import org.act.temporalProperty.exception.TPSNHException;
 import org.act.temporalProperty.exception.TPSRuntimeException;
 import org.act.temporalProperty.impl.Filename;
-import org.act.temporalProperty.impl.LogReader;
 import org.act.temporalProperty.impl.MemTable;
 import org.act.temporalProperty.index.IndexStore;
 import org.act.temporalProperty.meta.SystemMeta;
 import org.act.temporalProperty.meta.SystemMetaController;
 import org.act.temporalProperty.meta.SystemMetaFile;
 import org.act.temporalProperty.table.*;
-import org.act.temporalProperty.util.DynamicSliceOutput;
 import org.act.temporalProperty.util.Slice;
 
 import java.io.*;
@@ -109,7 +106,7 @@ public class StoreInitial {
                     if (iterator.hasNext()) {
                         while (iterator.hasNext()) {
                             Map.Entry<Slice, Slice> entry = iterator.next();
-                            memTable.add(entry.getKey(), entry.getValue());
+                            memTable.addToNow(entry.getKey(), entry.getValue());
                         }
                     }
                     channel.close();

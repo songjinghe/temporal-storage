@@ -137,7 +137,7 @@ public class TableLatestValueIterator implements SearchableIterator
             if(input.hasNext()){
                 InternalEntry entry = input.next();
                 InternalKey key = entry.getKey();
-                InternalKey newKey = new InternalKey(key.getId(), startTime, key.getValueLength(), key.getValueType());
+                InternalKey newKey = new InternalKey(key.getId(), startTime, key.getValueType());
                 return new InternalEntry(newKey, entry.getValue());
             }else{
                 return endOfData();

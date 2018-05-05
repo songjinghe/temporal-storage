@@ -44,7 +44,7 @@ public class EPMergeIterator extends AbstractIterator<InternalEntry> implements 
     }
 
     private void pollUntil(SearchableIterator iter, int time){
-        InternalKey tmp = new InternalKey(id, time, 0, ValueType.VALUE);
+        InternalKey tmp = new InternalKey(id, time);
         iter.seek(tmp);
         while(iter.hasNext() && time(iter.peek()) < time){
             iter.next();

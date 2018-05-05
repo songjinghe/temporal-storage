@@ -100,7 +100,7 @@ public class MergePerformanceComparison {
             Slice pEid = new Slice(12);
             for(Integer time : d) {
                 InternalKey key = new InternalKey(pEid, time);
-                m.add(key.encode(), new Slice(0));
+                m.addToNow(key.encode(), new Slice(0));
             }
             result.add(m.iterator());
         }

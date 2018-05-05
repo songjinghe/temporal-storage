@@ -54,17 +54,17 @@ public class AggregationIndexManager {
         return minMaxIndex.create(pMeta, start, end, every, timeUnit, type);
     }
 
-    public Object query(long entityId, int proId, int start, int end, long indexId, IndexAggregationQuery query) throws IOException {
+    public AggregationIndexQueryResult query( long entityId, int proId, int start, int end, long indexId, MemTable cache ) throws IOException {
         AggregationIndexMeta meta = idMetaMap.get(indexId);
         if(meta==null || meta.getPropertyIdList().get(0)!=proId){
             throw new TPSRuntimeException("no index with id {}", indexId);
         } else {
             IndexType indexType = meta.getType();
-            if (indexType == AGGR_DURATION && query instanceof Duration) {
-                return durationIndex.query(entityId, meta, start, end, (Duration) query);
-            } else if ((indexType == AGGR_MIN || indexType == AGGR_MAX || indexType == AGGR_MIN_MAX) && query instanceof MinMax) {
+            if (indexType == AGGR_DURATION) {
+                return durationIndex.query(entityId, meta, start, end, cache);
+            } else if (indexType == AGGR_MIN || indexType == AGGR_MAX || indexType == AGGR_MIN_MAX) {
 
-                return minMaxIndex.query(entityId, meta, start, end, (MinMax) query);
+                return minMaxIndex.query(entityId, meta, start, end, cache);
             }else{
                 throw new TPSRuntimeException("index is not aggregation type!");
             }
@@ -135,7 +135,7 @@ public class AggregationIndexManager {
             return indexId;
         }
 
-        public Object query(long entityId, AggregationIndexMeta meta, int start, int end, Duration query) throws IOException {
+        public AggregationIndexQueryResult query( long entityId, AggregationIndexMeta meta, int start, int end, MemTable cache ) throws IOException {
             TreeMap<Integer, Integer> result = new TreeMap<>();
 
             // 找出可以用索引加速的时间区间
@@ -152,12 +152,12 @@ public class AggregationIndexManager {
                 int proId = meta.getPropertyIdList().get(0);
                 for (Pair<Integer, Integer> time : unCoveredList) {
                     // 进行range查询并返回结果
-                    TreeMap<Integer, Integer> rangeQueryResult = (TreeMap<Integer, Integer>) tpStore.aggregate(entityId, proId, start, end, packedQuery);
+                    TreeMap<Integer, Integer> rangeQueryResult = (TreeMap<Integer, Integer>) tpStore.getRangeValue(entityId, proId, start, end, packedQuery, cache);
                     // 合并结果
                     result = mergeAggrResult(result, rangeQueryResult);
                 }
             }
-            return query.onResult(result, timeGroups==null?0:(timeGroups.getRight()-timeGroups.getLeft()+1));
+            return new AggregationIndexQueryResult(result, timeGroups==null?0:(timeGroups.getRight()-timeGroups.getLeft()+1));
         }
 
         private TreeMap<Integer, Integer> queryIndex(long entityId, AggregationIndexMeta meta, int startTimeGroup, int endTimeGroup) throws IOException {
@@ -243,7 +243,7 @@ public class AggregationIndexManager {
         }
 
 
-        public Object query(long entityId, AggregationIndexMeta meta, int start, int end, MinMax query) throws IOException {
+        public AggregationIndexQueryResult query( long entityId, AggregationIndexMeta meta, int start, int end, MemTable cache ) throws IOException {
             TreeMap<Integer, Slice> result = new TreeMap<>();
             Comparator<? super Slice> cp = ValueGroupingMap.getComparator(meta.getValueType());
             boolean shouldAddMin = (meta.getType()==AGGR_MIN || meta.getType()==AGGR_MIN_MAX);
@@ -262,12 +262,12 @@ public class AggregationIndexManager {
                 int proId = meta.getPropertyIdList().get(0);
                 for (Pair<Integer, Integer> time : unCoveredList) {
                     // 进行range查询并返回结果
-                    TreeMap<Integer, Slice> rangeQueryResult = (TreeMap<Integer, Slice>) tpStore.aggregate(entityId, proId, start, end, packedQuery);
+                    TreeMap<Integer, Slice> rangeQueryResult = (TreeMap<Integer, Slice>) tpStore.getRangeValue(entityId, proId, start, end, packedQuery, cache);
                     // 合并结果
                     result = mergeAggrResult(result, rangeQueryResult, cp, shouldAddMin, shouldAddMax);
                 }
             }
-            return query.onResult(result, timeGroups==null?0:(timeGroups.getRight()-timeGroups.getLeft()+1));
+            return new AggregationIndexQueryResult(result, timeGroups==null?0:(timeGroups.getRight()-timeGroups.getLeft()+1), meta.getValueType());
         }
 
         private TreeMap<Integer, Slice> mergeAggrResult(TreeMap<Integer, Slice> map1, TreeMap<Integer, Slice> map2, Comparator<? super Slice> cp, boolean shouldAddMin, boolean shouldAddMax) {

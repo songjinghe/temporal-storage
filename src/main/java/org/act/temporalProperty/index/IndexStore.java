@@ -5,6 +5,7 @@ import org.act.temporalProperty.index.aggregation.*;
 import org.act.temporalProperty.index.value.*;
 import org.act.temporalProperty.index.value.rtree.IndexEntry;
 import org.act.temporalProperty.meta.PropertyMetaData;
+import org.act.temporalProperty.query.aggr.AggregationIndexQueryResult;
 import org.act.temporalProperty.query.aggr.IndexAggregationQuery;
 import org.act.temporalProperty.query.aggr.ValueGroupingMap;
 import org.act.temporalProperty.util.SliceOutput;
@@ -86,16 +87,19 @@ public class IndexStore {
         return value.query(condition);
     }
 
-    public Object queryAggrIndex(long entityId, PropertyMetaData meta, int start, int end, long indexId, IndexAggregationQuery query) throws IOException {
-        return aggr.query(entityId, meta.getPropertyId(), start, end, indexId, query);
+    public AggregationIndexQueryResult queryAggrIndex( long entityId, PropertyMetaData meta, int start, int end, long indexId, MemTable cache ) throws IOException {
+        return aggr.query(entityId, meta.getPropertyId(), start, end, indexId, cache);
     }
 
     public void deleteIndex(int propertyId) {
         //Fixme TODO
     }
 
-    public void updateEntry(InternalEntry entry) {
-        InternalKey key = entry.getKey();
-    }
+    /**
+     * update index batch. called from background thread.
+     * @param temp immutable memtable.
+     */
+    public void update(MemTable temp) {
 
+    }
 }

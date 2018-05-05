@@ -25,7 +25,7 @@ public class EPEntryIterator extends AbstractSearchableIterator {
 
     @Override
     public void seekToFirst() {
-        InternalKey earliestKey = new InternalKey(id, 0, 0, ValueType.VALUE);
+        InternalKey earliestKey = new InternalKey(id, 0);
         iter.seek(earliestKey);
     }
 

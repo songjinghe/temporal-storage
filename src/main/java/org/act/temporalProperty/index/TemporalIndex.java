@@ -11,12 +11,13 @@ import java.util.*;
 /**
  * Created by song on 2018-01-18.
  */
-public class TemporalValueIndex {
+public class TemporalIndex
+{
     private int nextIndexId=0;
     private Multimap<Integer, IndexMetaData> indexes;
     private TableCache cache;
 
-    public TemporalValueIndex(TableCache cache) {
+    public TemporalIndex(TableCache cache) {
         this.cache = cache;
     }
 
