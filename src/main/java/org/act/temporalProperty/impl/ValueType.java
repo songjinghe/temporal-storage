@@ -17,13 +17,19 @@
  */
 package org.act.temporalProperty.impl;
 
+import org.act.temporalProperty.exception.TPSNHException;
+import org.act.temporalProperty.meta.ValueContentType;
+
+/**
+ * Types that a time point entry value can be.
+ */
 public enum ValueType
 {
-    VALUE( 0 ),
-    INVALID( 1 ),
     /**
-     * means this entry is inserted by system when user performs a time interval modification operation.
-     * for example, if we have temporal property <9, A>, <20, B> (9 and 20 is start time point, A and B is value) and
+     * UNKNOWN occurs when system convert a time interval modification operation into time point entries, because
+     * temporal properties are stored as list of time point entries on disk files.
+     *
+     * For example, if we have temporal property <9, A>, <20, B> (9 and 20 is start time point, A and B is value) and
      * perform a time interval modification:
      * setProperty(12, 16, C) (12 is start, 16 is end, C is value)
      * then we got:
@@ -31,21 +37,42 @@ public enum ValueType
      * so 17 is marked UNKNOWN, and its value is either:
      * - queried by system before apply the time interval operation. or
      * - left with any random value which should not be relied on, should query low-level disk layer for correct value.
-     * note that 12 is **NOT** marked UNKNOWN.
+     *
+     * Note
+     * - 12 is **NOT** marked UNKNOWN.
+     * - UNKNOWN mark is convert into actual value type or INVALID when the entry is written to disk.
      */
-    UNKNOWN( 2 );
+    UNKNOWN( 0 ),
+    INVALID( 1 ),
+    // VALUE means we do not know which exact type the value is, it may be followings.
+    VALUE( 2 ),
+    INT( 3 ),
+    LONG( 4 ),
+    FLOAT( 5 ),
+    DOUBLE( 6 ),
+    STRING( 7 );
 
     public static ValueType getValueTypeByPersistentId( int persistentId )
     {
-        persistentId = persistentId & 3;
+        persistentId = persistentId & 7;
         switch ( persistentId )
         {
         case 0:
-            return VALUE;
+            return UNKNOWN;
         case 1:
             return INVALID;
         case 2:
-            return UNKNOWN;
+            return VALUE;
+        case 3:
+            return INT;
+        case 4:
+            return LONG;
+        case 5:
+            return FLOAT;
+        case 6:
+            return DOUBLE;
+        case 7:
+            return STRING;
         default:
             throw new IllegalArgumentException( "invalid persistentId!" );
         }
@@ -61,5 +88,32 @@ public enum ValueType
     public int getPersistentId()
     {
         return persistentId;
+    }
+
+    public boolean isValue()
+    {
+        return persistentId >= 2;
+    }
+
+    public boolean isExactValueType()
+    {
+        return persistentId >= 3;
+    }
+
+    public ValueContentType toValueContentType()
+    {
+        if ( persistentId >= 3 )
+        {
+            return ValueContentType.decode( persistentId - 2 );
+        }
+        else
+        {
+            throw new TPSNHException( "can not convert to ValueContentType! got {}", this );
+        }
+    }
+
+    public static ValueType fromValueContentType( ValueContentType valueContentType )
+    {
+        return getValueTypeByPersistentId( valueContentType.getId() + 2 );
     }
 }

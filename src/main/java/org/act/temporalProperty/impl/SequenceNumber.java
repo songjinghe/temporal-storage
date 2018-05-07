@@ -51,25 +51,25 @@ public final class SequenceNumber
     /**
      *  NEW FORMAT BY SJH (2018.5)
      * | ValueType | time |
-     *      2bit    62bits
+     *      3bit    61bits
      */
     public static long packSequenceAndValueType(int time, ValueType valueType)
     {
         Preconditions.checkNotNull(valueType, "valueType is null");
         long tmp = 0L;
         tmp = tmp | valueType.getPersistentId();
-        tmp = tmp << 62;
+        tmp = tmp << 61;
         tmp = tmp | time;
         return tmp;
     }
 
     public static ValueType unpackValueType(long num)
     {
-        return ValueType.getValueTypeByPersistentId( (int) (num >>> 62) );
+        return ValueType.getValueTypeByPersistentId( (int) (num >>> 61) );
     }
 
     public static int unpackTime( long num )
     {
-        return (int) (num & 0x3FFF_FFFF_FFFF_FFFFL);
+        return (int) (num & 0x1FFF_FFFF_FFFF_FFFFL);
     }
 }

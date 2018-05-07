@@ -1,6 +1,7 @@
 package org.act.temporalProperty.query;
 
 import com.google.common.base.Objects;
+import com.google.common.base.Preconditions;
 import org.act.temporalProperty.impl.InternalKey;
 import org.act.temporalProperty.impl.MemTable;
 import org.act.temporalProperty.impl.ValueType;
@@ -22,10 +23,12 @@ public class TimeIntervalKey
         this.key = start;
         this.start = start.getStartTime();
         this.end = end;
+        Preconditions.checkArgument( this.start<=end );
     }
 
     private TimeIntervalKey( InternalKey key, long newStart, long end )
     {
+        Preconditions.checkArgument( newStart<=end );
         this.key = key;
         this.start = newStart;
         this.end = end;

@@ -11,6 +11,7 @@ import org.apache.commons.lang3.tuple.Triple;
 
 import java.util.Iterator;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Objects;
 import java.util.TreeMap;
 
@@ -19,7 +20,7 @@ import java.util.TreeMap;
  */
 public class MinMaxAggrEntryIterator extends AbstractIterator<Triple<Long,Integer,Slice>> implements PeekingIterator<Triple<Long,Integer,Slice>> {
     private final Iterator<EntityTimeIntervalEntry> tpIter;
-    private final TreeMap<Integer, Integer> intervalStarts;
+    private final NavigableMap<Integer,Integer> intervalStarts;
     private final int intervalBegin;
     private final int intervalFinish;
 
@@ -31,7 +32,7 @@ public class MinMaxAggrEntryIterator extends AbstractIterator<Triple<Long,Intege
      * @param iterator should only contains one property.
      * @param intervalStarts interval start time point TreeSet
      */
-    public MinMaxAggrEntryIterator(Iterator<EntityTimeIntervalEntry> iterator, TreeMap<Integer, Integer> intervalStarts) {
+    public MinMaxAggrEntryIterator( Iterator<EntityTimeIntervalEntry> iterator, NavigableMap<Integer,Integer> intervalStarts ) {
         this.tpIter = iterator;
         this.intervalStarts = intervalStarts;
         if(intervalStarts.size()<2) throw new TPSNHException("time interval too less!");

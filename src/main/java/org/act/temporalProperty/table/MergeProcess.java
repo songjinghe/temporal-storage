@@ -12,6 +12,7 @@ import java.util.Map.Entry;
 import org.act.temporalProperty.helper.SameLevelMergeIterator;
 import org.act.temporalProperty.impl.*;
 import org.act.temporalProperty.index.IndexStore;
+import org.act.temporalProperty.index.IndexUpdater;
 import org.act.temporalProperty.meta.PropertyMetaData;
 import org.act.temporalProperty.meta.SystemMeta;
 import org.act.temporalProperty.util.TableLatestValueIterator;
@@ -28,6 +29,7 @@ public class MergeProcess extends Thread
     private final String storeDir;
     private volatile MemTable memTable = null;
     private volatile boolean shouldGo = true;
+    private volatile boolean hasIndexToCreate = false;
     private static Logger log = LoggerFactory.getLogger( MergeProcess.class );
     private final IndexStore index;
 
@@ -74,13 +76,23 @@ public class MergeProcess extends Thread
         try{
             while(!Thread.interrupted()) {
                 if(shouldGo) {
-                    if (memTable != null && !memTable.isEmpty()) {
+                    if ( memTable != null )
+                    {
                         startMergeProcess(memTable);
                     } else {
-                        Thread.sleep(100);
+                        if ( hasIndexToCreate )
+                        {
+                            hasIndexToCreate = false;
+                            startMergeProcess( new MemTable() );
+                        }
+                        else
+                        {
+                            Thread.sleep( 100 );
+                        }
                     }
                 }else{
-                    if (memTable != null && !memTable.isEmpty()) {
+                    if ( memTable != null )
+                    {
                         startMergeProcess(memTable);
                         return;
                     } else {
@@ -101,49 +113,66 @@ public class MergeProcess extends Thread
 
     /**
      * 触发数据写入磁盘，如果需要还需要对文件进行合并
+     *
      * @param temp 需要写入磁盘的MemTable
      * @throws IOException
      */
     private void startMergeProcess( MemTable temp ) throws IOException
     {
-        index.update(temp);
-        SearchableIterator iterator = temp.iterator();
-        Map<Integer, MemTable> tables = new HashMap<>();
-        while( iterator.hasNext() ){
-            InternalEntry entry = iterator.next();
-            InternalKey key = entry.getKey();
-            if(!tables.containsKey(key.getPropertyId())){
-                tables.put(key.getPropertyId(), new MemTable( TableComparator.instance() ));
+        List<BackgroundTask> taskList = new LinkedList<>();
+        if ( !temp.isEmpty() )
+        {
+
+            Map<Integer,MemTable> tables = temp.separateByProperty();
+            for ( Entry<Integer,MemTable> propEntry : tables.entrySet() )
+            {
+                MergeTask task = systemMeta.getStore( propEntry.getKey() ).merge( propEntry.getValue() );
+                if ( task != null )
+                {
+                    taskList.add( task );
+                }
             }
-            tables.get(key.getPropertyId()).addToNow(entry.getKey(), entry.getValue());
+        }
+        else
+        {
+            taskList.addAll( index.createNewIndexTasks() );
         }
 
-        List<MergeTask> taskList = new LinkedList<>();
-        for(Entry<Integer, MemTable> propEntry : tables.entrySet()){
-            MergeTask task = systemMeta.getStore(propEntry.getKey()).merge(propEntry.getValue());
-            if(task!=null){
-                task.buildNewFile();
-                taskList.add(task);
-            }
+        for ( BackgroundTask task : taskList )
+        {
+            task.runTask();
         }
 
         systemMeta.lock.mergeLockExclusive();
-        try {
-            for (MergeTask task : taskList) task.updateMetaInfo();
-            systemMeta.force(new File(storeDir));
+        try
+        {
+            for ( BackgroundTask task : taskList )
+            {
+                task.updateMeta();
+            }
+            systemMeta.force( new File( storeDir ) );
             memTable = null;
             systemMeta.lock.mergeDone();
-        }finally {
+        }
+        finally
+        {
             systemMeta.lock.mergeUnlockExclusive();
         }
 
-        for(MergeTask task : taskList){
-            task.deleteObsoleteFiles();
+        for ( BackgroundTask task : taskList )
+        {
+            task.cleanUp();
         }
     }
 
+    public void createNewIndex()
+    {
+        hasIndexToCreate = true;
+    }
+
     // 将MemTable写入磁盘并与UnStableFile进行合并
-    public static class MergeTask{
+    public static class MergeTask implements BackgroundTask
+    {
         private final File propStoreDir;
         private final MemTable mem;
         private final TableCache cache;
@@ -160,17 +189,20 @@ public class MergeProcess extends Thread
         private int minTime;
         private int maxTime;
         private FileChannel targetChannel;
+        private IndexStore index;
 
         /**
          * @param memTable2merge 写入磁盘的MemTable
          * @param proMeta 属性元信息
          * @param cache 用来读取UnStableFile的缓存结构
+         * @param index
          */
-        public MergeTask(File propStoreDir, MemTable memTable2merge, PropertyMetaData proMeta, TableCache cache){
+        public MergeTask( File propStoreDir, MemTable memTable2merge, PropertyMetaData proMeta, TableCache cache, IndexStore index ){
             this.propStoreDir = propStoreDir;
             this.mem = memTable2merge;
             this.pMeta = proMeta;
             this.cache = cache;
+            this.index = index;
             this.mergeParticipants = getFile2Merge(proMeta.getUnStableFiles());
             if(!onlyDumpMemTable()) {
                 this.mergeParticipantsMinTime = calcMergeMinTime();
@@ -215,7 +247,10 @@ public class MergeProcess extends Thread
             for( String filePath : table2evict ) cache.evict( filePath );
         }
 
-        public void deleteObsoleteFiles() throws IOException {
+        //deleteObsoleteFiles
+        @Override
+        public void cleanUp() throws IOException
+        {
             for( File f : files2delete ) Files.delete( f.toPath() );
         }
 
@@ -271,16 +306,28 @@ public class MergeProcess extends Thread
             return mergeParticipants.isEmpty();
         }
 
-        public void buildNewFile() throws IOException {
+        // build new File
+        @Override
+        public void runTask() throws IOException
+        {
             maxTime = -1;
             minTime = Integer.MAX_VALUE;
             entryCount = 0;
 
             String targetFileName;
+            IndexUpdater indexUpdater;
             if(createStableFile()) {
-                targetFileName = Filename.stableFileName(pMeta.nextStableId());
+                long fileId = pMeta.nextStableId();
+                targetFileName = Filename.stableFileName( fileId );
+                indexUpdater = index.onMergeUpdate( pMeta.getPropertyId(), true, fileId, mem, mergeParticipants );
+            }else if(!onlyDumpMemTable()){
+                long fileId = mergeParticipants.size();
+                targetFileName = Filename.unStableFileName( fileId );
+                indexUpdater = index.onMergeUpdate( pMeta.getPropertyId(), true, fileId, mem, mergeParticipants );
             }else{
-                targetFileName = Filename.unStableFileName( mergeParticipants.size() );
+                long fileId = mergeParticipants.size();
+                targetFileName = Filename.unStableFileName( fileId );
+                indexUpdater = index.emptyUpdate();
             }
 
             TableBuilder builder = this.mergeInit(targetFileName);
@@ -291,12 +338,17 @@ public class MergeProcess extends Thread
                 if( key.getStartTime() < minTime ) minTime = key.getStartTime();
                 if( key.getStartTime() > maxTime ) maxTime = key.getStartTime();
                 builder.add( entry.getKey().encode(), entry.getValue() );
+                indexUpdater.update( entry );
                 entryCount++;
             }
             builder.finish();
+            indexUpdater.updateMeta();
+            indexUpdater.cleanUp();
         }
 
-        public void updateMetaInfo() throws IOException {
+        @Override
+        public void updateMeta() throws IOException
+        {
             // build new meta
             FileMetaData targetMeta;
 
@@ -348,6 +400,9 @@ public class MergeProcess extends Thread
         }
 
 
+        {
+            //
+        }
     }
 
 }

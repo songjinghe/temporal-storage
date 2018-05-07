@@ -6,7 +6,6 @@ import org.act.temporalProperty.index.value.*;
 import org.act.temporalProperty.index.value.rtree.IndexEntry;
 import org.act.temporalProperty.meta.PropertyMetaData;
 import org.act.temporalProperty.query.aggr.AggregationIndexQueryResult;
-import org.act.temporalProperty.query.aggr.IndexAggregationQuery;
 import org.act.temporalProperty.query.aggr.ValueGroupingMap;
 import org.act.temporalProperty.util.SliceOutput;
 
@@ -21,27 +20,18 @@ import java.util.concurrent.atomic.AtomicLong;
 public class IndexStore {
     private final TemporalPropertyStoreImpl tpStore;
     private IndexTableCache cache;
-    private File indexDir;
-    private AtomicLong nextId;
 
-    private AggregationIndexManager aggr;
-    private ValueIndexManager value;
+    private AggregationIndexOperator aggr;
+    private ValueIndexOperator value;
+    private IndexMetaManager meta;
 
-    public IndexStore(File indexDir, TemporalPropertyStoreImpl store, Set<IndexMetaData> indexes, long nextId) throws IOException {
+    public IndexStore(File indexDir, TemporalPropertyStoreImpl store, Set<IndexMetaData> indexes, long nextId, long nextFileId) throws IOException {
         if(!indexDir.exists() && !indexDir.mkdir()) throw new IOException("unable to create index dir");
-        this.indexDir = indexDir;
         this.tpStore = store;
         this.cache = new IndexTableCache(indexDir, 4);
-        this.nextId = new AtomicLong(nextId);
-        this.aggr = new AggregationIndexManager(indexDir, store, cache, this.nextId);
-        this.value = new ValueIndexManager(indexDir, store, cache, this.nextId);
-        for(IndexMetaData meta : indexes){
-            if(meta.getType().isValueIndex()){
-                value.addMeta(meta);
-            }else{
-                aggr.addMeta((AggregationIndexMeta) meta);
-            }
-        }
+        this.meta = new IndexMetaManager( indexes, nextId, nextFileId );
+        this.aggr = new AggregationIndexOperator( indexDir, store, cache, meta );
+        this.value = new ValueIndexOperator( indexDir, store, cache, meta );
     }
 
     public void close(){
@@ -96,10 +86,106 @@ public class IndexStore {
     }
 
     /**
-     * update index batch. called from background thread.
-     * @param temp immutable memtable.
+     * update index if needed.
      */
-    public void update(MemTable temp) {
+    public List<BackgroundTask> createNewIndexTasks()
+    {
+        List<BackgroundTask> result = new ArrayList<>();
+        result.addAll( this.value.createIndexTasks() );
+        result.addAll( this.aggr.createIndexTasks() );
+        return result;
+    }
 
+    public boolean isOnline( long indexId )
+    {
+        return false;
+    }
+
+    public IndexUpdater onBufferDelUpdate( int propertyId, boolean isStable, FileMetaData fMeta, MemTable mem )
+    {
+        List<IndexFileMeta> fileToUpdate = new ArrayList<>();
+        List<IndexMetaData> indexes = meta.getByProId( propertyId );
+        for ( IndexMetaData i : indexes )
+        {
+            if ( i.getType() == IndexType.MULTI_VALUE )
+            {
+                for(IndexFileMeta fileMeta : i.allFiles())
+                {
+                    if(mem.overlap( fileMeta.getStartTime(), fileMeta.getEndTime() ))
+                    {
+                        fileToUpdate.add( fileMeta );
+                    }
+                }
+            }
+            else
+            {
+                IndexFileMeta fileMeta = i.getByFileId( fMeta.getNumber() );
+                if ( fileMeta != null )
+                {
+                    if(mem.overlap( fileMeta.getStartTime(), fileMeta.getEndTime() ))
+                    {
+                        fileToUpdate.add( fileMeta );
+                    }
+                }
+            }
+        }
+        if ( fileToUpdate.isEmpty() )
+        {
+            return emptyUpdate();
+        }
+        return new IndexUpdater( meta, propertyId, isStable, fMeta.getNumber(), fileToUpdate );
+    }
+
+    public IndexUpdater onMergeUpdate( int propertyId, boolean isStable, long newStorefileId, MemTable mem, List<Long> mergeParticipants )
+    {
+        List<IndexFileMeta> fileToDelete = new ArrayList<>();
+        List<IndexMetaData> indexes = meta.getByProId( propertyId );
+        for ( IndexMetaData i : indexes )
+        {
+            if ( i.getType() == IndexType.MULTI_VALUE )
+            {
+                for(IndexFileMeta fileMeta : i.allFiles())
+                {
+                    if(mem.overlap( fileMeta.getStartTime(), fileMeta.getEndTime() ))
+                    {
+                        fileToDelete.add( fileMeta );
+                    }
+                }
+            }
+            else
+            {
+                for(Long obsoleteFileId : mergeParticipants)
+                {
+                    IndexFileMeta fileMeta = i.getByFileId( obsoleteFileId );
+                    if ( fileMeta != null )
+                    {
+                        fileToDelete.add( fileMeta );
+                    }
+                }
+            }
+        }
+        if ( fileToDelete.isEmpty() )
+        {
+            return emptyUpdate();
+        }
+        return new IndexUpdater( meta, propertyId, isStable, newStorefileId, fileToDelete );
+    }
+
+    public IndexUpdater emptyUpdate()
+    {
+        return new IndexUpdater()
+        {
+            public void update( InternalEntry entry )
+            {
+            }
+
+            public void updateMeta()
+            {
+            }
+
+            public void cleanUp()
+            {
+            }
+        };
     }
 }

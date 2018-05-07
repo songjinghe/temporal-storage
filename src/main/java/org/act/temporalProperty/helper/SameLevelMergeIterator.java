@@ -9,6 +9,7 @@ import org.act.temporalProperty.impl.SeekingIterator;
 import org.act.temporalProperty.table.TableComparator;
 import org.act.temporalProperty.util.Slice;
 
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.PriorityQueue;
 
@@ -27,6 +28,13 @@ public class SameLevelMergeIterator extends AbstractIterator<InternalEntry> impl
             throw new TPSNHException("iterators which ran out should not in heap!");
         }
     });
+
+    public SameLevelMergeIterator( List<SearchableIterator> iterators )
+    {
+        for(SearchableIterator iterator : iterators) add(iterator);
+    }
+
+    public SameLevelMergeIterator(){}
 
     public void add(SearchableIterator in){
         if(in.hasNext()) heap.add(in);

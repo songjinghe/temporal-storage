@@ -31,6 +31,7 @@ import java.nio.charset.Charset;
 import java.util.Arrays;
 
 import org.act.temporalProperty.impl.SequenceNumber;
+import org.act.temporalProperty.query.TimeIntervalKey;
 
 import static java.nio.ByteOrder.LITTLE_ENDIAN;
 import static org.act.temporalProperty.util.SizeOf.*;

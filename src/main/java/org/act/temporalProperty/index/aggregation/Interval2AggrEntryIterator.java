@@ -17,7 +17,7 @@ import java.util.*;
 public class Interval2AggrEntryIterator extends AbstractIterator<AggregationIndexEntry> implements PeekingIterator<AggregationIndexEntry> {
     private final Iterator<EntityTimeIntervalEntry> tpIter;
     private final TreeMap<Slice, Integer> valueGrouping;
-    private final TreeMap<Integer, Integer> intervalStarts;
+    private final NavigableMap<Integer,Integer> intervalStarts;
     private final int intervalBegin;
     private final int intervalFinish;
 
@@ -29,7 +29,7 @@ public class Interval2AggrEntryIterator extends AbstractIterator<AggregationInde
      * @param iterator should only contains one property.
      * @param intervalStarts interval start time point TreeSet
      */
-    public Interval2AggrEntryIterator(Iterator<EntityTimeIntervalEntry> iterator, TreeMap<Slice, Integer> valueGrouping, TreeMap<Integer, Integer> intervalStarts) {
+    public Interval2AggrEntryIterator( Iterator<EntityTimeIntervalEntry> iterator, TreeMap<Slice, Integer> valueGrouping, NavigableMap<Integer,Integer> intervalStarts ) {
         this.tpIter = iterator;
         this.valueGrouping = valueGrouping;
         this.intervalStarts = intervalStarts;

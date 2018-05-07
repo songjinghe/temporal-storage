@@ -1,6 +1,8 @@
 package org.act.temporalProperty.util;
 
 import com.google.common.base.Preconditions;
+import org.act.temporalProperty.impl.ValueType;
+import org.act.temporalProperty.meta.ValueContentType;
 
 public class TemporalPropertyValueConvertor
 {
@@ -91,7 +93,54 @@ public class TemporalPropertyValueConvertor
         }
     }
 
+    public static Object fromSlice(ValueContentType valueType, Slice value)
+    {
+        SliceInput in = value.input();
+        switch ( valueType )
+        {
+        case INT:
+            return in.readInt();
+        case DOUBLE:
+            return in.readDouble();
+        case FLOAT:
+            return in.readFloat();
+        case LONG:
+            return in.readLong();
+        case STRING:
+            return value.toString();
+        default:
+            throw new UnsupportedOperationException("Unsupported value type");
+        }
+    }
 
+    public static ValueContentType str2type(String className)
+    {
+        switch (className) {
+        case INT_NAME:
+            return ValueContentType.INT;
+        case DOUBLE_NAME:
+            return ValueContentType.DOUBLE;
+        case FLOAT_NAME:
+            return ValueContentType.FLOAT;
+        case LONG_NAME:
+            return ValueContentType.LONG;
+        case STRING_NAME:
+            return ValueContentType.STRING;
+        case BYTE_NAME:
+        case CHAR_NAME:
+        case INT_ARRAY_NAME:
+        case CHAR_ARRAY_NAME:
+        case DOUBLE_ARRAY_NAME:
+        case FLOAT_ARRAY_NAME:
+        case LONG_ARRAY_NAME:
+        case BYTE_ARRAY_NAME:
+        case STRING_ARRAY_NAME:
+        case SHORT_NAME:
+        case SHORT_ARRAY_NAME:
+        default:
+            throw new UnsupportedOperationException("Unsupported value type");
+        }
+    }
     
 //    public static int convert( byte[] result, Object value )
 //    {

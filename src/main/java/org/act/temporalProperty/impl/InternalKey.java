@@ -95,14 +95,14 @@ public class InternalKey implements Comparable<InternalKey>
         this.valueType = SequenceNumber.unpackValueType(packedSequenceAndType);
     }
 
-    /**
-     * 新建一个InternalKey，将相关byte数组传入，可用于解码相关信息。如起始时间，record类型，id等
-     * @param data
-     */
-    public InternalKey(byte[] data)
-    {
-        this(Slices.wrappedBuffer(data));
-    }
+//    /**
+//     * 新建一个InternalKey，将相关byte数组传入，可用于解码相关信息。如起始时间，record类型，id等
+//     * @param data
+//     */
+//    public InternalKey(byte[] data)
+//    {
+//        this(Slices.wrappedBuffer(data));
+//    }
 
     /**
      * 返回唯一确定某个动态属性的标识，其中其点/边id保存在返回值的前8位，属性id保存在返回值的后4位。
@@ -221,5 +221,10 @@ public class InternalKey implements Comparable<InternalKey>
         }else {
             return Long.compare(this.getStartTime(), o.getStartTime());
         }
+    }
+
+    public static int idSliceProId( Slice idSlice )
+    {
+        return idSlice.getInt( 8 );
     }
 }

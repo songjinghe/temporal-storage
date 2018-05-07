@@ -22,6 +22,8 @@ import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.SliceInput;
 import org.act.temporalProperty.util.Slices;
 
+import static org.act.temporalProperty.impl.TemporalPropertyStoreImpl.toSlice;
+
 /**
  * Modified MemTable, which stores time interval only.
  */
@@ -199,6 +201,59 @@ public class MemTable
     public PeekingIterator<Entry<TimeIntervalKey,Slice>> intervalEntryIterator()
     {
         return new IntervalIterator();
+    }
+
+    public boolean overlap( Slice id, int startTime, int endTime )
+    {
+        TreeMap<TimeIntervalKey,Slice> entityMap = table.get( id );
+        if ( entityMap == null )
+        {
+            return false;
+        }
+        else
+        {
+            TimeIntervalKey searchKey = new TimeIntervalKey( new InternalKey( id, startTime ), endTime );
+            TimeIntervalKey entry = entityMap.floorKey( searchKey );
+            if( entry.getEnd() >= startTime ) return true;
+            TimeIntervalKey higherKey = entityMap.higherKey( searchKey );
+            return higherKey != null && higherKey.getStart() <= endTime;
+        }
+    }
+
+    public Map<Integer,MemTable> separateByProperty()
+    {
+        Map<Integer,MemTable> result = new TreeMap<>();
+        for ( Entry<Slice,TreeMap<TimeIntervalKey,Slice>> e : table.entrySet() )
+        {
+            int proId = InternalKey.idSliceProId( e.getKey() );
+            if ( !result.containsKey( proId ) )
+            {
+                result.put( proId, new MemTable() );
+            }
+            result.get( proId ).addEntry( e.getKey(), e.getValue() );
+        }
+        return result;
+    }
+
+    private void addEntry( Slice key, TreeMap<TimeIntervalKey,Slice> value )
+    {
+        table.put( key, value );
+    }
+
+    public boolean overlap( int startTime, int endTime )
+    {
+        TimeIntervalKey searchKey = new TimeIntervalKey( new InternalKey( 0, 0, startTime, ValueType.VALUE ), endTime );
+        for ( TreeMap<TimeIntervalKey,Slice> entityMap : table.values() )
+        {
+            TimeIntervalKey entry = entityMap.floorKey( searchKey );
+            if ( entry != null )
+            {
+                if( entry.getEnd() >= startTime ) return true;
+                TimeIntervalKey higherKey = entityMap.higherKey( searchKey );
+                if( higherKey != null && higherKey.getStart() <= endTime ) return true;
+            }
+        }
+        return false;
     }
 
     public static class MemTableIterator extends AbstractIterator<InternalEntry> implements SearchableIterator

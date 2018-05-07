@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 
 import org.act.temporalProperty.impl.MemTable.MemTableIterator;
+import org.act.temporalProperty.query.TimeIntervalKey;
 import org.act.temporalProperty.table.TableComparator;
 import org.act.temporalProperty.table.UnSortedTable;
 import org.act.temporalProperty.util.Slice;
@@ -100,5 +101,10 @@ public class FileBuffer implements Closeable
     public static FileBuffer decode(SliceInput in) {
         long id = in.readLong();
         return new FileBuffer(id);
+    }
+
+    public MemTable getMemTable()
+    {
+        return memTable;
     }
 }

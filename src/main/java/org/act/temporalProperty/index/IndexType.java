@@ -1,6 +1,7 @@
 package org.act.temporalProperty.index;
 
 import com.google.common.base.Preconditions;
+import org.act.temporalProperty.meta.ValueContentType;
 
 /**
  * Created by song on 2018-01-18.
