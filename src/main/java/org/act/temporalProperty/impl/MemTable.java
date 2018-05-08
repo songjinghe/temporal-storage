@@ -4,17 +4,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.PeekingIterator;
-
-import java.util.Comparator;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.NavigableMap;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.concurrent.atomic.AtomicLong;
-
 import org.act.temporalProperty.exception.TPSNHException;
 import org.act.temporalProperty.exception.ValueUnknownException;
 import org.act.temporalProperty.query.TimeIntervalKey;
@@ -25,14 +14,23 @@ import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.SliceInput;
 import org.act.temporalProperty.util.Slices;
 
-import static org.act.temporalProperty.impl.TemporalPropertyStoreImpl.toSlice;
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.NavigableMap;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicLong;
+
+import static org.act.temporalProperty.TemporalPropertyStore.NOW;
 
 /**
  * Modified MemTable, which stores time interval only.
  */
 public class MemTable
 {
-    private static final long NOW = Long.MAX_VALUE;
+
     private final TreeMap<Slice,TreeMap<TimeIntervalKey,Slice>> table;
     private final AtomicLong approximateMemoryUsage = new AtomicLong();
     private final Comparator<TimeIntervalKey> cp;
@@ -71,14 +69,9 @@ public class MemTable
 
     public void addInterval( InternalKey key, int endTime, Slice value )
     {
-        Preconditions.checkArgument( key.getValueType() != ValueType.UNKNOWN );
+        Preconditions.checkNotNull( key );
         Preconditions.checkArgument( key.getStartTime() <= endTime );
-        Slice id = key.getId();
-        if ( !table.containsKey( id ) )
-        {
-            table.put( id, new TreeMap<>( cp ) );
-        }
-        addEntry( table.get( id ), new TimeIntervalKey( key, endTime ), value );
+        addInterval( new TimeIntervalKey( key, endTime ), value );
     }
 
     public void addInterval( TimeIntervalKey key, Slice value )

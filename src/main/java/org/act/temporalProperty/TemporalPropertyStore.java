@@ -28,6 +28,9 @@ public interface TemporalPropertyStore
 	String MagicNumber = "c003bf3c9563aa283d49c17fc13f736e5493107c"; //40bytes==160bits
 
 	int Version = 1;
+
+	int INIT = -1;
+	long NOW = Long.MAX_VALUE;
 	/**
 	 * 对某个时态属性进行时间点查询，返回查询的 结果
 	 * @param entityId 时态属性所属的点/边的id

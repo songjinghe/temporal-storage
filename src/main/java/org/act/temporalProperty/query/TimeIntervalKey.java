@@ -97,4 +97,28 @@ public class TimeIntervalKey
         return new InternalKey( key.getId(), Math.toIntExact( end + 1 ), ValueType.UNKNOWN );
     }
 
+    public boolean lessThan( int time )
+    {
+        return time > end;
+    }
+
+    public boolean greaterOrEq( int time )
+    {
+        return start >= time;
+    }
+
+    public boolean span( int time )
+    {
+        return start < time && time <= end;
+    }
+
+    public boolean span( int start, int end )
+    {
+        return this.start < start && start <= end && end <= this.end;
+    }
+
+    public boolean between( int start, int end )
+    {
+        return start <= this.start && this.end <= end;
+    }
 }

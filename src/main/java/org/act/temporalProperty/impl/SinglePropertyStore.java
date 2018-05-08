@@ -1,11 +1,13 @@
 package org.act.temporalProperty.impl;
 
-import com.google.common.collect.Lists;
+import com.google.common.collect.PeekingIterator;
 import org.act.temporalProperty.TemporalPropertyStore;
+import org.act.temporalProperty.exception.TPSNHException;
 import org.act.temporalProperty.helper.EPAppendIterator;
 import org.act.temporalProperty.index.IndexStore;
 import org.act.temporalProperty.index.IndexUpdater;
 import org.act.temporalProperty.meta.PropertyMetaData;
+import org.act.temporalProperty.query.TimeIntervalKey;
 import org.act.temporalProperty.table.TwoLevelMergeIterator;
 import org.act.temporalProperty.table.MergeProcess.MergeTask;
 import org.act.temporalProperty.table.Table;
@@ -181,40 +183,62 @@ public class SinglePropertyStore
     // this method runs in the background thread.
     // insert entry to file buffer, and pack remain entries to a MergeTask
     public MergeTask merge(MemTable memTable) throws IOException {
-        SearchableIterator iterator = memTable.iterator();
-        MemTable stableMemTable = new MemTable(TableComparator.instance());
+        PeekingIterator<Entry<TimeIntervalKey,Slice>> iterator = memTable.intervalEntryIterator();
+        MemTable toMerge = new MemTable();
         boolean stExist = propertyMeta.hasStable();
         boolean unExist = propertyMeta.hasUnstable();
         while( iterator.hasNext() ){
-            InternalEntry entry = iterator.next();
-            InternalKey key = entry.getKey();
-            int time = key.getStartTime();
+            Entry<TimeIntervalKey,Slice> entry = iterator.next();
+            TimeIntervalKey timeInterval = entry.getKey();
+            Slice val = entry.getValue();
             if( !unExist && !stExist ){
-                stableMemTable.addToNow(entry.getKey(), entry.getValue());
+                toMerge.addInterval(timeInterval, val);
             }else if( unExist && !stExist){
-                if(time <= propertyMeta.unMaxTime()) {
-                    insertUnstableBuffer(key, entry.getValue());
+                int unMaxTime = propertyMeta.unMaxTime();
+                if(timeInterval.lessThan( unMaxTime + 1 ) ) {
+                    insertUnstableBuffer(timeInterval, val);
+                }else if(timeInterval.greaterOrEq( unMaxTime + 1 )){
+                    toMerge.addInterval(entry.getKey(), val);
                 }else{
-                    stableMemTable.addToNow(entry.getKey(), entry.getValue());
+                    insertUnstableBuffer( timeInterval.changeEnd( unMaxTime ), val );
+                    toMerge.addInterval( timeInterval.changeStart( unMaxTime + 1 ), val );
                 }
             }else if( unExist && stExist){
-                if(time <= propertyMeta.stMaxTime()){
-                    insertStableBuffer(key, entry.getValue());
-                }else if(time <= propertyMeta.unMaxTime()){
-                    insertUnstableBuffer(key, entry.getValue());
+                int stMaxTime = propertyMeta.stMaxTime();
+                int unMaxTime = propertyMeta.unMaxTime();
+                if( timeInterval.span( stMaxTime, unMaxTime + 1 )){
+                    insertStableBuffer( timeInterval.changeEnd( stMaxTime ), val );
+                    insertUnstableBuffer( timeInterval.changeStart( stMaxTime + 1 ).changeEnd( unMaxTime ), val );
+                    toMerge.addInterval( timeInterval.changeStart( stMaxTime + 1 ), val );
+                }else if( timeInterval.lessThan( stMaxTime + 1 )){
+                    insertStableBuffer(timeInterval, val );
+                }else if(timeInterval.greaterOrEq( unMaxTime + 1 )){
+                    toMerge.addInterval( timeInterval, val );
+                }else if(timeInterval.span( stMaxTime + 1 )){
+                    insertStableBuffer( timeInterval.changeEnd( stMaxTime ), val );
+                    insertUnstableBuffer( timeInterval.changeStart( stMaxTime + 1 ), val );
+                }else if(timeInterval.span( unMaxTime + 1 )){
+                    insertUnstableBuffer( timeInterval.changeEnd( unMaxTime ), val );
+                    toMerge.addInterval( timeInterval.changeStart( unMaxTime + 1 ), val );
+                }else if(timeInterval.between( stMaxTime + 1, unMaxTime )){
+                    insertUnstableBuffer( timeInterval, val );
                 }else{
-                    stableMemTable.addToNow(entry.getKey(), entry.getValue());
+                    throw new TPSNHException( "no such scenery!" );
                 }
             }else{ // !unExist && stExist
-                if(time <= propertyMeta.stMaxTime()){
-                    insertStableBuffer(key, entry.getValue());
+                int stMaxTime = propertyMeta.stMaxTime();
+                if( timeInterval.lessThan( stMaxTime + 1 )){
+                    insertStableBuffer(timeInterval, val);
+                }else if(timeInterval.greaterOrEq( stMaxTime + 1 )){
+                    toMerge.addInterval(timeInterval, val);
                 }else{
-                    stableMemTable.addToNow(entry.getKey(), entry.getValue());
+                    insertStableBuffer( timeInterval.changeEnd( stMaxTime ), val );
+                    toMerge.addInterval( timeInterval.changeStart( stMaxTime + 1 ), val );
                 }
             }
         }
-        if(!stableMemTable.isEmpty()){
-            return new MergeTask( proDir, stableMemTable, propertyMeta, this.cache, index );
+        if(!toMerge.isEmpty()){
+            return new MergeTask( proDir, toMerge, propertyMeta, this.cache, index );
         }else{
             return null;
         }
@@ -226,9 +250,9 @@ public class SinglePropertyStore
      * @param key
      * @param value
      */
-    private void insertUnstableBuffer(InternalKey key, Slice value ) throws IOException
+    private void insertUnstableBuffer( TimeIntervalKey key, Slice value ) throws IOException
     {
-        FileMetaData meta = propertyMeta.unFloorTimeOneMeta( key.getStartTime() );
+        FileMetaData meta = propertyMeta.unFloorTimeOneMeta( Math.toIntExact( key.getStart() ) );
         assert meta!=null : "SNH: meta should not null!";
 
         FileBuffer buffer = propertyMeta.getUnstableBuffers( meta.getNumber() );
@@ -243,8 +267,8 @@ public class SinglePropertyStore
         }
     }
 
-    private void insertStableBuffer(InternalKey key, Slice value) throws IOException {
-        FileMetaData meta = propertyMeta.stFloorTimeOneMeta( key.getStartTime() );
+    private void insertStableBuffer( TimeIntervalKey key, Slice value ) throws IOException {
+        FileMetaData meta = propertyMeta.stFloorTimeOneMeta( Math.toIntExact( key.getStart() ) );
         assert meta!=null : "SNH: meta should not null!";
 
         FileBuffer buffer = propertyMeta.getStableBuffers( meta.getNumber() );

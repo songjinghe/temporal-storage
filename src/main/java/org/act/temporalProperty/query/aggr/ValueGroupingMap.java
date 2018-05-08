@@ -73,7 +73,7 @@ public class ValueGroupingMap {
 //        }
 //    }
 
-    private Slice int2Slice(int val){
+    public Slice int2Slice( int val ){
         Slice s = new Slice(4);
         s.setInt(0, val);
         return s;
