@@ -7,8 +7,11 @@ import com.google.common.collect.PeekingIterator;
 
 import java.util.Comparator;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.NavigableMap;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -30,7 +33,7 @@ import static org.act.temporalProperty.impl.TemporalPropertyStoreImpl.toSlice;
 public class MemTable
 {
     private static final long NOW = Long.MAX_VALUE;
-    private final Map<Slice,TreeMap<TimeIntervalKey,Slice>> table;
+    private final TreeMap<Slice,TreeMap<TimeIntervalKey,Slice>> table;
     private final AtomicLong approximateMemoryUsage = new AtomicLong();
     private final Comparator<TimeIntervalKey> cp;
 
@@ -240,20 +243,59 @@ public class MemTable
         table.put( key, value );
     }
 
-    public boolean overlap( int startTime, int endTime )
+    public boolean overlap( int proId, int startTime, int endTime )
     {
-        TimeIntervalKey searchKey = new TimeIntervalKey( new InternalKey( 0, 0, startTime, ValueType.VALUE ), endTime );
-        for ( TreeMap<TimeIntervalKey,Slice> entityMap : table.values() )
+        TimeIntervalKey searchKey = new TimeIntervalKey( new InternalKey( proId, 0, startTime, ValueType.VALUE ), endTime );
+        for ( Entry<Slice,TreeMap<TimeIntervalKey,Slice>> entityEntry : table.entrySet() )
         {
-            TimeIntervalKey entry = entityMap.floorKey( searchKey );
-            if ( entry != null )
+            if ( InternalKey.idSliceProId( entityEntry.getKey() ) == proId )
             {
-                if( entry.getEnd() >= startTime ) return true;
-                TimeIntervalKey higherKey = entityMap.higherKey( searchKey );
-                if( higherKey != null && higherKey.getStart() <= endTime ) return true;
+                TreeMap<TimeIntervalKey,Slice> entityMap = entityEntry.getValue();
+                TimeIntervalKey entry = entityMap.floorKey( searchKey );
+                if ( entry != null )
+                {
+                    if ( entry.getEnd() >= startTime )
+                    {
+                        return true;
+                    }
+                    TimeIntervalKey higherKey = entityMap.higherKey( searchKey );
+                    if ( higherKey != null && higherKey.getStart() <= endTime )
+                    {
+                        return true;
+                    }
+                }
             }
         }
         return false;
+    }
+
+    public void coverTime( TreeMap<Integer,Boolean> tMap, Set<Integer> proIds, int timeMin, int timeMax )
+    {
+        TimeIntervalKey searchKey = new TimeIntervalKey( new InternalKey( 0, 0, timeMin, ValueType.VALUE ), timeMax );
+        for ( Entry<Slice,TreeMap<TimeIntervalKey,Slice>> entityEntry : table.entrySet() )
+        {
+            if ( proIds.contains( InternalKey.idSliceProId( entityEntry.getKey() ) ) )
+            {
+                NavigableMap<TimeIntervalKey,Slice> entityMap = entityEntry.getValue().tailMap( searchKey, true );
+                for ( Entry<TimeIntervalKey,Slice> entry : entityMap.entrySet() )
+                {
+                    TimeIntervalKey key = entry.getKey();
+                    if ( key.getEnd() >= timeMin )
+                    {
+                        int start = Math.toIntExact( key.getStart() );
+                        int endPlusOne = Math.toIntExact( key.getEnd() + 1 );
+                        boolean valAtEndPlusOne = tMap.get( endPlusOne );
+                        tMap.subMap( start, true, endPlusOne, false ).clear();
+                        tMap.put( start, true );
+                        tMap.put( endPlusOne, valAtEndPlusOne );
+                    }
+                    if ( key.getStart() > timeMax )
+                    {
+                        break;
+                    }
+                }
+            }
+        }
     }
 
     public static class MemTableIterator extends AbstractIterator<InternalEntry> implements SearchableIterator
@@ -401,7 +443,8 @@ public class MemTable
         private final TimeIntervalKey key;
         private final Slice val;
 
-        private TimeIntervalValueEntry(TimeIntervalKey key, Slice val){
+        public TimeIntervalValueEntry( TimeIntervalKey key, Slice val )
+        {
             this.key = key;
             this.val = val;
         }

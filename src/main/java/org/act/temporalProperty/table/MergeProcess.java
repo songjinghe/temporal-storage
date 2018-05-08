@@ -190,6 +190,8 @@ public class MergeProcess extends Thread
         private int maxTime;
         private FileChannel targetChannel;
         private IndexStore index;
+        private IndexUpdater indexUpdater;
+        private FileMetaData targetMeta;
 
         /**
          * @param memTable2merge 写入磁盘的MemTable
@@ -239,19 +241,24 @@ public class MergeProcess extends Thread
             }
         }
 
-        private void closeUnused() throws IOException {
-            for( Closeable c : channel2close ) c.close();
-        }
-
-        private void evictUnused(TableCache cache) {
-            for( String filePath : table2evict ) cache.evict( filePath );
-        }
-
         //deleteObsoleteFiles
         @Override
         public void cleanUp() throws IOException
         {
+//            close Unused
+            for ( Closeable c : channel2close )
+            {
+                c.close();
+            }
+//            evictUnused(cache);
+            for ( String filePath : table2evict )
+            {
+                cache.evict( filePath );
+            }
+//            delete unused.
             for( File f : files2delete ) Files.delete( f.toPath() );
+//            clean up index.
+            indexUpdater.cleanUp();
         }
 
         private List<Long> getFile2Merge(SortedMap<Long, FileMetaData> files) {
@@ -315,15 +322,15 @@ public class MergeProcess extends Thread
             entryCount = 0;
 
             String targetFileName;
-            IndexUpdater indexUpdater;
+
             if(createStableFile()) {
                 long fileId = pMeta.nextStableId();
                 targetFileName = Filename.stableFileName( fileId );
-                indexUpdater = index.onMergeUpdate( pMeta.getPropertyId(), true, fileId, mem, mergeParticipants );
+                indexUpdater = index.onMergeUpdate( pMeta.getPropertyId(), mergedMemTableAndBuffer(), mergeParticipants );
             }else if(!onlyDumpMemTable()){
                 long fileId = mergeParticipants.size();
                 targetFileName = Filename.unStableFileName( fileId );
-                indexUpdater = index.onMergeUpdate( pMeta.getPropertyId(), true, fileId, mem, mergeParticipants );
+                indexUpdater = index.onMergeUpdate( pMeta.getPropertyId(), mergedMemTableAndBuffer(), mergeParticipants );
             }else{
                 long fileId = mergeParticipants.size();
                 targetFileName = Filename.unStableFileName( fileId );
@@ -342,12 +349,25 @@ public class MergeProcess extends Thread
                 entryCount++;
             }
             builder.finish();
-            indexUpdater.updateMeta();
-            indexUpdater.cleanUp();
+            this.targetMeta = generateNewFileMeta();
+            indexUpdater.finish( targetMeta );
         }
 
-        @Override
-        public void updateMeta() throws IOException
+        private MemTable mergedMemTableAndBuffer()
+        {
+//            MemTable result = new MemTable();
+//            for ( Long fileNumber : mergeParticipants )
+//            {
+//                FileBuffer filebuffer = pMeta.getUnstableBuffers( fileNumber );
+//                if ( null != filebuffer )
+//                {
+//                    result.merge( filebuffer.getMemTable() );
+//                }
+//            }
+            return mem;
+        }
+
+        private FileMetaData generateNewFileMeta() throws IOException
         {
             // build new meta
             FileMetaData targetMeta;
@@ -370,6 +390,12 @@ public class MergeProcess extends Thread
                 assert mergeParticipantsMinTime<=minTime:"start time should <= minTime! ("+mergeParticipantsMinTime+", min:"+minTime+")";
                 targetMeta = new FileMetaData( fileNumber, targetChannel.size(), mergeParticipantsMinTime, maxTime );
             }
+            return targetMeta;
+        }
+
+        @Override
+        public void updateMeta()
+        {
 
             // remove old meta
             for( Long fileNum : mergeParticipants ){
@@ -378,13 +404,12 @@ public class MergeProcess extends Thread
             }
 
             if(createStableFile()){
-                pMeta.addStable(targetMeta);
+                pMeta.addStable( targetMeta );
             }else{
-                pMeta.addUnstable(targetMeta);
+                pMeta.addUnstable( targetMeta );
             }
 
-            closeUnused();
-            evictUnused(cache);
+            indexUpdater.updateMeta();
         }
 
         // this should only be called when pMeta.hasStable() is true.

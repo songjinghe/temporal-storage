@@ -3,7 +3,9 @@ package org.act.temporalProperty.helper;
 import com.google.common.collect.AbstractIterator;
 import org.act.temporalProperty.exception.TPSNHException;
 import org.act.temporalProperty.impl.InternalKey;
+import org.act.temporalProperty.impl.IntervalIterator;
 import org.act.temporalProperty.impl.SeekingIterator;
+import org.act.temporalProperty.query.TimeIntervalKey;
 import org.act.temporalProperty.table.TableComparator;
 import org.act.temporalProperty.util.Slice;
 
@@ -52,5 +54,37 @@ public class DebugAssertTimeIncIterator extends AbstractIterator<Entry<Slice,Sli
     @Override
     public void seek(Slice targetKey) {
         in.seek(targetKey);
+    }
+
+    public static class ForInterval extends AbstractIterator<Entry<TimeIntervalKey,Slice>> implements IntervalIterator
+    {
+        private TimeIntervalKey preKey;
+        private IntervalIterator in;
+
+        public ForInterval( IntervalIterator it )
+        {
+            this.in = it;
+        }
+
+        @Override
+        protected Entry<TimeIntervalKey,Slice> computeNext()
+        {
+            if(in.hasNext()){
+                if(preKey == null){
+                    preKey = in.peek().getKey();
+                    return in.next();
+                }else{
+                    TimeIntervalKey curT = in.peek().getKey();
+                    if(curT.getKey().compareTo( preKey.getKey() )>=0){
+                        throw new TPSNHException("key not inc! "+ preKey +" "+ curT);
+                    }else{
+                        preKey = curT;
+                        return in.next();
+                    }
+                }
+            }else{
+                return endOfData();
+            }
+        }
     }
 }

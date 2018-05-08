@@ -1,6 +1,8 @@
 package org.act.temporalProperty.index.aggregation;
 
+import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
+import com.google.common.collect.PeekingIterator;
 import org.act.temporalProperty.exception.TPSRuntimeException;
 import org.act.temporalProperty.impl.*;
 import org.act.temporalProperty.index.EntityTimeIntervalEntry;
@@ -8,9 +10,11 @@ import org.act.temporalProperty.index.IndexFileMeta;
 import org.act.temporalProperty.index.IndexMetaManager;
 import org.act.temporalProperty.index.IndexTableCache;
 import org.act.temporalProperty.index.IndexType;
+import org.act.temporalProperty.index.IndexUpdater;
 import org.act.temporalProperty.index.IndexValueType;
 import org.act.temporalProperty.index.PropertyFilterIterator;
 import org.act.temporalProperty.index.SimplePoint2IntervalIterator;
+import org.act.temporalProperty.index.value.IndexMetaData;
 import org.act.temporalProperty.meta.PropertyMetaData;
 import org.act.temporalProperty.query.aggr.*;
 import org.act.temporalProperty.query.aggr.IndexAggregationQuery.MinMax;
@@ -20,6 +24,7 @@ import org.apache.commons.lang3.tuple.Triple;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.*;
 import java.util.Map.Entry;
 
@@ -370,7 +375,7 @@ public class AggregationIndexOperator
                 else
                 {
                     int iEnd = entry.getValue();
-                    if ( !tpStore.cacheOverlap( proId, entityId, iStart, iEnd - 1 ) )
+                    if ( !tpStore.cacheOverlap( proId, entityId, iStart, iEnd - 1, cache ) )
                     {
                         status.addValidTimeGroup( timeGroupId, iStart, iEnd - 1 );
                     }
@@ -572,4 +577,6 @@ public class AggregationIndexOperator
             // do nothing.
         }
     }
+
+
 }

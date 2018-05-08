@@ -4,7 +4,6 @@ import com.google.common.collect.PeekingIterator;
 import org.act.temporalProperty.TemporalPropertyStore;
 import org.act.temporalProperty.exception.TPSRuntimeException;
 import org.act.temporalProperty.exception.ValueUnknownException;
-import org.act.temporalProperty.helper.SameLevelMergeIterator;
 import org.act.temporalProperty.helper.StoreInitial;
 import org.act.temporalProperty.helper.EPEntryIterator;
 import org.act.temporalProperty.helper.EPMergeIterator;
@@ -35,6 +34,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 import static com.google.common.base.Preconditions.*;
 
@@ -421,9 +421,9 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
     }
 
     @Override
-    public List<Long> getEntities( IndexQueryRegion condition )
+    public List<Long> getEntities( IndexQueryRegion condition, MemTable cache )
     {
-        List<IndexEntry> result = getEntries( condition );
+        List<IndexEntry> result = getEntries( condition, cache );
         Set<Long> set = new HashSet<>();
         for ( IndexEntry entry : result )
         {
@@ -433,16 +433,21 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
     }
 
     @Override
-    public List<IndexEntry> getEntries( IndexQueryRegion condition )
+    public List<IndexEntry> getEntries( IndexQueryRegion condition, MemTable cache )
     {
+        meta.lock.lockShared();
         try
         {
-            return index.queryValueIndex( condition );
+            return index.queryValueIndex( condition, cache );
         }
         catch ( IOException e )
         {
             e.printStackTrace();
             throw new RuntimeException( e );
+        }
+        finally
+        {
+            meta.lock.unlockShared();
         }
     }
 
@@ -576,10 +581,11 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
         }
     }
 
-    public boolean cacheOverlap( int proId, long entityId, int startTime, int endTime )
+    public boolean cacheOverlap( int proId, long entityId, int startTime, int endTime, MemTable cache )
     {
         Slice id = toSlice( proId, entityId );
-        boolean memtableOverlap = this.memTable.overlap( id, startTime, endTime ) || this.stableMemTable.overlap( id, startTime, endTime );
+        boolean memtableOverlap = cache.overlap( id, startTime, endTime ) || this.memTable.overlap( id, startTime, endTime ) ||
+                this.stableMemTable.overlap( id, startTime, endTime );
         if ( memtableOverlap )
         {
             return true;
@@ -594,5 +600,51 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
             }
         }
         return false;
+    }
+
+    public boolean cacheOverlap( int proId, int startTime, int endTime, MemTable cache )
+    {
+        if ( cache.overlap( proId, startTime, endTime ) )
+        {
+            return true;
+        }
+        if ( this.memTable.overlap( proId, startTime, endTime ) )
+        {
+            return true;
+        }
+        if ( this.stableMemTable != null && this.stableMemTable.overlap( proId, startTime, endTime ) )
+        {
+            return true;
+        }
+
+        PropertyMetaData p = this.meta.getProperties().get( proId );
+        for ( FileBuffer buffer : p.overlappedBuffers( startTime, endTime ) )
+        {
+            if ( buffer.getMemTable().overlap( proId, startTime, endTime ) )
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public TreeMap<Integer,Boolean> coverTime( Set<Integer> proIdSet, int timeMin, int timeMax, MemTable cache )
+    {
+        TreeMap<Integer,Boolean> tMap = new TreeMap<>();
+        for ( Integer proId : proIdSet )
+        {
+            PropertyMetaData p = this.meta.getProperties().get( proId );
+            for ( FileBuffer buffer : p.overlappedBuffers( timeMin, timeMax ) )
+            {
+                buffer.getMemTable().coverTime( tMap, proIdSet, timeMin, timeMax );
+            }
+        }
+        if ( this.stableMemTable != null )
+        {
+            stableMemTable.coverTime( tMap, proIdSet, timeMin, timeMax );
+        }
+        this.memTable.coverTime( tMap, proIdSet, timeMin, timeMax );
+        cache.coverTime( tMap, proIdSet, timeMin, timeMax );
+        return tMap;
     }
 }

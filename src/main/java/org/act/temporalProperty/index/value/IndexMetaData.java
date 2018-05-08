@@ -24,7 +24,8 @@ public class IndexMetaData {
     private List<Integer> propertyIdList;
     private int timeStart;
     private int timeEnd;
-    private Map<Long,IndexFileMeta> fileIdList;
+    private Map<Long,IndexFileMeta> stableFileIds;
+    private Map<Long,IndexFileMeta> unstableFileIds;
     private boolean online;
 
     public IndexMetaData( long id, IndexType type, List<Integer> pidList, List<IndexValueType> types, int start, int end ) {
@@ -154,16 +155,44 @@ public class IndexMetaData {
 
     public void addFile( IndexFileMeta fileMeta )
     {
-        fileIdList.put(fileMeta.getFileId(), fileMeta);
+        if ( fileMeta.isCorIsStable() )
+        {
+            stableFileIds.put( fileMeta.getCorFileId(), fileMeta );
+        }
+        else
+        {
+            unstableFileIds.put( fileMeta.getCorFileId(), fileMeta );
+        }
     }
 
-    public IndexFileMeta getByFileId( long fileId )
+    public IndexFileMeta getByCorFileId( long fileId, boolean isStable )
     {
-        return fileIdList.get(fileId);
+        if ( isStable )
+        {
+            return stableFileIds.get( fileId );
+        }
+        else
+        {
+            return unstableFileIds.get( fileId );
+        }
     }
 
     public List<IndexFileMeta> allFiles()
     {
-        return new ArrayList<>( fileIdList.values() );
+        List<IndexFileMeta> result = new ArrayList<>( stableFileIds.values() );
+        result.addAll( unstableFileIds.values() );
+        return result;
+    }
+
+    public void delFileByCorFileId( long fileId, boolean isStable )
+    {
+        if ( isStable )
+        {
+            stableFileIds.remove( fileId );
+        }
+        else
+        {
+            unstableFileIds.remove( fileId );
+        }
     }
 }

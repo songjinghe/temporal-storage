@@ -1,6 +1,7 @@
 package org.act.temporalProperty.index.value;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
 import com.google.common.collect.PeekingIterator;
 import org.act.temporalProperty.exception.TPSRuntimeException;
@@ -8,12 +9,14 @@ import org.act.temporalProperty.helper.SameLevelMergeIterator;
 import org.act.temporalProperty.impl.*;
 import org.act.temporalProperty.index.IndexFileMeta;
 import org.act.temporalProperty.index.IndexMetaManager;
+import org.act.temporalProperty.index.IndexTable;
 import org.act.temporalProperty.index.IndexTableCache;
 import org.act.temporalProperty.index.IndexValueType;
 import org.act.temporalProperty.index.PropertyFilterIterator;
 import org.act.temporalProperty.index.value.rtree.IndexEntry;
 import org.act.temporalProperty.index.value.rtree.IndexEntryOperator;
 import org.act.temporalProperty.util.TimeIntervalUtil;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
 
 import java.io.File;
@@ -21,11 +24,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.*;
-import java.util.Map.Entry;
 
 import static org.act.temporalProperty.index.IndexType.*;
 import java.util.List;
-import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 /**
@@ -56,9 +57,10 @@ public class ValueIndexOperator
         return indexId;
     }
 
-    public List<IndexEntry> query(IndexQueryRegion condition) throws IOException {
+    public List<IndexEntry> query( IndexQueryRegion condition, MemTable cache ) throws IOException
+    {
         IndexMetaData meta = valIndexCoverRegion(condition);
-        Iterator<IndexEntry> iter = this.getQueryIterator(condition, meta);
+        Iterator<IndexEntry> iter = this.getQueryIterator( condition, meta, cache );
         List<IndexEntry> result = new ArrayList<>();
         while(iter.hasNext()){
             result.add(iter.next());
@@ -83,9 +85,17 @@ public class ValueIndexOperator
         throw new TPSRuntimeException("no valid index for query!");
     }
 
-    private Iterator<IndexEntry> getQueryIterator(IndexQueryRegion condition, IndexMetaData meta) throws IOException {
+    private Iterator<IndexEntry> getQueryIterator( IndexQueryRegion condition, IndexMetaData meta, MemTable cache ) throws IOException
+    {
         String fileName = Filename.valIndexFileName(meta.getId());
-        return cache.getTable(new File(this.indexDir, fileName).getAbsolutePath()).iterator(condition);
+        List<IndexQueryRegion> regionsCanSpeedUp = excludeInvalidTime( condition, cache );
+        IndexTable file = this.cache.getTable( new File( this.indexDir, fileName ).getAbsolutePath() );
+        List<Iterator<IndexEntry>> results = new ArrayList<>();
+        for ( IndexQueryRegion subQuery : regionsCanSpeedUp )
+        {
+            results.add( file.iterator( subQuery ) );
+        }
+        return Iterators.concat( results.iterator() );
     }
 
     public List<BackgroundTask> createIndexTasks()
@@ -104,6 +114,51 @@ public class ValueIndexOperator
             }
         }
         return result;
+    }
+
+    private List<IndexQueryRegion> excludeInvalidTime( IndexQueryRegion condition, MemTable cache )
+    {
+        Set<Integer> proIdSet = condition.getPropertyValueIntervals().stream().map( PropertyValueInterval::getProId ).collect( Collectors.toSet() );
+        TreeMap<Integer,Boolean> validTime = tpStore.coverTime( proIdSet, condition.getTimeMin(), condition.getTimeMax(), cache );
+        if ( validTime.isEmpty() )
+        {
+            return Lists.newArrayList( condition );
+        }
+        List<Pair<Integer,Integer>> validTimeList = new ArrayList<>();
+        if ( condition.getTimeMin() < validTime.firstKey() )
+        {
+            validTimeList.add( Pair.of( condition.getTimeMin(), validTime.firstKey() - 1 ) );
+        }
+        int start = -1, end = -2;
+        for ( Map.Entry<Integer,Boolean> entry : validTime.entrySet() )
+        {
+            if ( !entry.getValue() )
+            {
+                start = entry.getKey();
+            }
+            else
+            {
+                end = entry.getKey() - 1;
+                assert end >= start;
+                validTimeList.add( Pair.of( start, end ) );
+            }
+        }
+        if ( end < start && start < condition.getTimeMax() )
+        {
+            validTimeList.add( Pair.of( start, condition.getTimeMax() ) );
+        }
+        return subQueryRegions( validTimeList, condition );
+    }
+
+    public List<IndexQueryRegion> subQueryRegions( List<Pair<Integer,Integer>> validTime, IndexQueryRegion condition )
+    {
+        List<PropertyValueInterval> proVals = condition.getPropertyValueIntervals();
+        return validTime.stream().map( pair ->
+                                       {
+                                           IndexQueryRegion query = new IndexQueryRegion( pair.getLeft(), pair.getRight() );
+                                           proVals.forEach( query::add );
+                                           return query;
+                                       } ).collect( Collectors.toList() );
     }
 
     public class CreateSinglePropertyValueIndexTask implements BackgroundTask
