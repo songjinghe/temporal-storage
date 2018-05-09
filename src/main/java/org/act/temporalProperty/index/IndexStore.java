@@ -106,7 +106,7 @@ public class IndexStore {
 
     public boolean isOnline( long indexId )
     {
-        return false;
+        return meta.isOnline( indexId );
     }
 
     public IndexUpdater onBufferDelUpdate( int propertyId, boolean isStable, FileMetaData fMeta, MemTable mem )
@@ -220,5 +220,10 @@ public class IndexStore {
             {
             }
         };
+    }
+
+    public List<IndexMetaData> list()
+    {
+        return meta.allIndexes();
     }
 }

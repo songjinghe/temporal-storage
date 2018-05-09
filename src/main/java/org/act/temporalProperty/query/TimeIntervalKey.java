@@ -8,6 +8,8 @@ import org.act.temporalProperty.impl.ValueType;
 import org.act.temporalProperty.util.DynamicSliceOutput;
 import org.act.temporalProperty.util.Slice;
 
+import static org.act.temporalProperty.TemporalPropertyStore.NOW;
+
 /**
  * Created by song on 2018-05-05.
  */
@@ -120,5 +122,10 @@ public class TimeIntervalKey
     public boolean between( int start, int end )
     {
         return start <= this.start && this.end <= end;
+    }
+
+    public boolean isEndEqNOW()
+    {
+        return end == NOW;
     }
 }

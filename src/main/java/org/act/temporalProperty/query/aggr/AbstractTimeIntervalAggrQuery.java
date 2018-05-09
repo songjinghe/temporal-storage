@@ -3,6 +3,7 @@ package org.act.temporalProperty.query.aggr;
 import com.google.common.base.Preconditions;
 import org.act.temporalProperty.impl.InternalEntry;
 import org.act.temporalProperty.impl.InternalKey;
+import org.act.temporalProperty.impl.ValueType;
 import org.act.temporalProperty.index.aggregation.TimeIntervalEntry;
 import org.act.temporalProperty.meta.ValueContentType;
 import org.act.temporalProperty.query.range.InternalEntryRangeQueryCallBack;
@@ -23,8 +24,7 @@ public abstract class AbstractTimeIntervalAggrQuery<K,V> implements TimeInterval
     private final Map<K, List<TimeIntervalEntry>> groupListMap = new HashMap<>();
     private final int endTime;
     private boolean hasEntry = false;
-    private int lastTime = -1;
-    private Slice lastVal;
+    private InternalEntry lastEntry;
 
     protected AbstractTimeIntervalAggrQuery(int endTime) {
         this.endTime = endTime;
@@ -36,20 +36,26 @@ public abstract class AbstractTimeIntervalAggrQuery<K,V> implements TimeInterval
     }
 
     public void onNewEntry(InternalEntry entry) {
+        hasEntry = true;
         InternalKey key = entry.getKey();
         int time = key.getStartTime();
-        if (!hasEntry) {
-            hasEntry = true;
-        } else {
-            onEntry(lastTime, time-1, lastVal);
+        if ( lastEntry != null )
+        {
+            onEntry( lastEntry.getKey().getStartTime(), time - 1, lastEntry.getValue() );
+        }//else: do nothing
+        if ( key.getValueType().isValue() )
+        {
+            lastEntry = entry;
         }
-        lastTime = time;
-        lastVal = entry.getValue();
+        else
+        {
+            lastEntry = null;
+        }
     }
 
     public Object onReturn() {
-        if(hasEntry && lastTime<=endTime){
-            onEntry(lastTime, endTime, lastVal);
+        if(hasEntry && lastEntry!=null && lastEntry.getKey().getStartTime()<=endTime){
+            onEntry(lastEntry.getKey().getStartTime(), endTime, lastEntry.getValue());
         }
         for(Entry<K, List<TimeIntervalEntry>> entry : groupListMap.entrySet()){
             V aggrValue = aggregate(entry.getKey(), entry.getValue());

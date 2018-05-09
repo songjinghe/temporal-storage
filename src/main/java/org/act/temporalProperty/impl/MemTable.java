@@ -315,19 +315,23 @@ public class MemTable
                 return endOfData();
             }
 
-            while ( entryIter == null || !entryIter.hasNext() )
+            InternalEntry entry;
+            do
             {
-                if ( iterator.hasNext() )
-                {
-                    nextIsStart = true;
-                    entryIter = Iterators.peekingIterator( iterator.next().getValue().entrySet().iterator() );
-                }
-                else
+                entryIter = getValidEntryIterator();
+                if ( entryIter == null )
                 {
                     return endOfData();
                 }
+                entry = getNextEntry( entryIter );
             }
+            while ( entry == null );
 
+            return entry;
+        }
+
+        private InternalEntry getNextEntry( PeekingIterator<Entry<TimeIntervalKey,Slice>> entryIter )
+        {
             while ( entryIter.hasNext() )
             {
                 Entry<TimeIntervalKey,Slice> entry = entryIter.peek();
@@ -357,11 +361,35 @@ public class MemTable
                     else
                     {
                         nextIsStart = true;
-                        return new InternalEntry( entry.getKey().getEndKey(), Slices.EMPTY_SLICE );
+                        if ( !entry.getKey().isEndEqNOW() )
+                        {
+                            return new InternalEntry( entry.getKey().getEndKey(), Slices.EMPTY_SLICE );
+                        }
+                        else
+                        {
+                            return null;
+                        }
                     }
                 }
             }
-            throw new TPSNHException( "should never reach here!" );
+            return null;
+        }
+
+        private PeekingIterator<Entry<TimeIntervalKey,Slice>> getValidEntryIterator()
+        {
+            while ( entryIter == null || !entryIter.hasNext() )
+            {
+                if ( iterator.hasNext() )
+                {
+                    nextIsStart = true;
+                    entryIter = Iterators.peekingIterator( iterator.next().getValue().entrySet().iterator() );
+                }
+                else
+                {
+                    return null;
+                }
+            }
+            return entryIter;
         }
 
         @Override
@@ -382,23 +410,29 @@ public class MemTable
             {
                 throw new TPSNHException( "should call seek before call hasNext" );
             }
-            TreeMap<TimeIntervalKey,Slice> entityMap = table.get( targetKey.getId() );
-            if ( entityMap == null )
+            iterator = Iterators.peekingIterator( table.entrySet().iterator() );
+            while ( iterator.hasNext() )
             {
-                seekHasNext = false;
-                return;
+                Entry<Slice,TreeMap<TimeIntervalKey,Slice>> entry = iterator.next();
+                if ( entry.getKey().equals( targetKey.getId() ) )
+                {
+                    TreeMap<TimeIntervalKey,Slice> entityMap = entry.getValue();
+                    TimeIntervalKey searchKey = new TimeIntervalKey( targetKey, NOW );
+                    TimeIntervalKey higher = entityMap.ceilingKey( searchKey );
+                    if ( null == higher )
+                    {
+                        seekHasNext = false;
+                        return;
+                    }
+                    else
+                    {
+                        seekHasNext = true;
+                        entryIter = Iterators.peekingIterator( entityMap.tailMap( searchKey, true ).entrySet().iterator() );
+                        return;
+                    }
+                }
             }
-            TimeIntervalKey searchKey = new TimeIntervalKey( targetKey, NOW );
-            TimeIntervalKey higher = entityMap.ceilingKey( searchKey );
-            if ( null == higher )
-            {
-                seekHasNext = false;
-            }
-            else
-            {
-                seekHasNext = true;
-                entryIter = Iterators.peekingIterator( entityMap.tailMap( searchKey, true ).entrySet().iterator() );
-            }
+            seekHasNext = false;
         }
     }
 

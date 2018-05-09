@@ -158,6 +158,8 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
                 mergedIterator = new EPMergeIterator( idSlice, mergedIterator, cache.iterator() );
             }
 
+            mergedIterator = new UnknownToInvalidIterator( mergedIterator );
+
             InternalKey searchKey = new InternalKey( idSlice, start );
             mergedIterator.seek( searchKey );
             while ( mergedIterator.hasNext() )
@@ -466,7 +468,7 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
     @Override
     public List<IndexMetaData> listIndex()
     {
-        return null;
+        return index.list();
     }
 
     private SearchableIterator getMemTableIter( int start, int end )

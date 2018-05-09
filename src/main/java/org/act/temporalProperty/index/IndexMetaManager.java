@@ -79,7 +79,9 @@ public class IndexMetaManager
 
     public void setOnline( IndexMetaData meta )
     {
+        meta.setOnline();
         offLineIndexes.remove( meta );
+        addMeta( meta );
     }
 
     public IndexMetaData getByIndexId( long indexId )
@@ -129,5 +131,18 @@ public class IndexMetaManager
     {
         Set<Integer> ta = new HashSet<>( a );
         return b.stream().allMatch( ta::contains );
+    }
+
+    public List<IndexMetaData> allIndexes()
+    {
+        List<IndexMetaData> all = new ArrayList<>();
+        all.addAll( byId.values() );
+        all.addAll( offLineIndexes );
+        return all;
+    }
+
+    public boolean isOnline( long indexId )
+    {
+        return byId.get( indexId ) != null;
     }
 }
