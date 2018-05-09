@@ -19,7 +19,7 @@ public final class SequenceNumber
     {
     }
 
-//    public static long packSequenceAndValueType(int time, int valueLength, ValueType valueType)
+//    public static long packTimeAndValueType(int time, int valueLength, ValueType valueType)
 //    {
 //        Preconditions.checkArgument( valueLength <= MAX_VALUE_LENGTH, "valueLength lager than the max length" );
 //        Preconditions.checkNotNull(valueType, "valueType is null");
@@ -53,7 +53,7 @@ public final class SequenceNumber
      * | ValueType | time |
      *      3bit    61bits
      */
-    public static long packSequenceAndValueType(int time, ValueType valueType)
+    public static long packTimeAndValueType( int time, ValueType valueType )
     {
         Preconditions.checkNotNull(valueType, "valueType is null");
         long tmp = 0L;

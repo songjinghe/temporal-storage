@@ -149,7 +149,7 @@ public class InternalKey implements Comparable<InternalKey>
         Slice slice = Slices.allocate(Id.length() + SIZE_OF_LONG );
         SliceOutput sliceOutput = slice.output();
         sliceOutput.writeBytes(Id);
-        sliceOutput.writeLong(SequenceNumber.packSequenceAndValueType(startTime, valueType));
+        sliceOutput.writeLong(SequenceNumber.packTimeAndValueType( startTime, valueType ) );
         return slice;
     }
 

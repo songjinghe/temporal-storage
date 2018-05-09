@@ -3,10 +3,15 @@ package org.act.temporalProperty.table;
 import java.io.File;
 import java.util.Map.Entry;
 
+import com.google.common.collect.PeekingIterator;
 import junit.framework.Assert;
 
+import org.act.temporalProperty.impl.InternalEntry;
+import org.act.temporalProperty.impl.InternalKey;
 import org.act.temporalProperty.impl.MemTable;
 import org.act.temporalProperty.impl.MemTable.MemTableIterator;
+import org.act.temporalProperty.impl.ValueType;
+import org.act.temporalProperty.query.TimeIntervalKey;
 import org.act.temporalProperty.util.Slice;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -30,8 +35,7 @@ public class UnSortTableTest
             table = new UnSortedTable( file );
             for( int i = 0; i<DATA_SIZE; i++ )
             {
-                Slice key = new Slice( 20 );
-                key.setLong( 0, i );
+                TimeIntervalKey key = new TimeIntervalKey( new InternalKey( i, i, i, ValueType.VALUE ), i + 3 );
                 Slice value = new Slice(4);
                 value.setInt( 0, i );
                 table.add( key, value );
@@ -47,11 +51,14 @@ public class UnSortTableTest
         try
         {
             table.initFromFile( memtable );
-            MemTableIterator iterator = memtable.iterator();
+            PeekingIterator<Entry<TimeIntervalKey,Slice>> iterator = memtable.intervalEntryIterator();
             for( int i = 0; i<DATA_SIZE; i++ )
             {
-                Entry<Slice,Slice> entry = iterator.next();
-                Assert.assertEquals( entry.getKey().getLong( 0 ), (long)i );
+                Entry<TimeIntervalKey,Slice> entry = iterator.next();
+                Assert.assertEquals( entry.getKey().getStart(), (long) i );
+                Assert.assertEquals( entry.getKey().getEnd(), (long) i + 3 );
+                Assert.assertEquals( entry.getKey().getKey().getPropertyId(), (long) i );
+                Assert.assertEquals( entry.getKey().getKey().getEntityId(), (long) i );
                 Assert.assertEquals( entry.getValue().getInt( 0 ), i );
             }
         }

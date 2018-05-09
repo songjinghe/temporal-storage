@@ -421,6 +421,12 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
     }
 
     @Override
+    public List<Long> getEntities( IndexQueryRegion condition )
+    {
+        return getEntities( condition, new MemTable() );
+    }
+
+    @Override
     public List<Long> getEntities( IndexQueryRegion condition, MemTable cache )
     {
         List<IndexEntry> result = getEntries( condition, cache );
@@ -430,6 +436,12 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
             set.add( entry.getEntityId() );
         }
         return new ArrayList<>( set );
+    }
+
+    @Override
+    public List<IndexEntry> getEntries( IndexQueryRegion condition )
+    {
+        return getEntries( condition, new MemTable() );
     }
 
     @Override

@@ -25,6 +25,20 @@ public class AggregationIndexQueryResult
     {
         this.minMaxResult = result;
         this.speedUpTime = speedUpTime;
+    }
 
+    public TreeMap<Integer,Slice> getMinMaxResult()
+    {
+        return minMaxResult;
+    }
+
+    public TreeMap<Integer,Integer> getDurationResult()
+    {
+        return durationResult;
+    }
+
+    public int getAccelerateTime()
+    {
+        return speedUpTime;
     }
 }

@@ -9,6 +9,7 @@ import org.act.temporalProperty.index.value.IndexMetaData;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -88,7 +89,15 @@ public class IndexMetaManager
 
     public List<IndexMetaData> getByProId( int propertyId )
     {
-        return new ArrayList<>( byProIdTime.get( propertyId ).values() );
+        TreeMap<Integer,IndexMetaData> indexTimeMap = byProIdTime.get( propertyId );
+        if ( indexTimeMap != null )
+        {
+            return new ArrayList<>( indexTimeMap.values() );
+        }
+        else
+        {
+            return Collections.emptyList();
+        }
     }
 
     public void addMeta( IndexMetaData indexMeta )

@@ -6,6 +6,7 @@ import org.act.temporalProperty.index.IndexType;
 import org.act.temporalProperty.index.aggregation.TimeIntervalEntry;
 import org.act.temporalProperty.index.value.rtree.IndexEntry;
 import org.act.temporalProperty.meta.ValueContentType;
+import org.act.temporalProperty.query.aggr.AggregationIndexQueryResult;
 import org.act.temporalProperty.query.aggr.DurationStatisticAggregationQuery;
 import org.act.temporalProperty.query.aggr.IndexAggregationQuery;
 import org.act.temporalProperty.query.aggr.ValueGroupingMap;
@@ -72,7 +73,7 @@ public class SourceCompare
         int fileNum = Math.min(dataFileList.size(), inputFileCount);
         for (int i = 0; i < fileNum; i++) {
             File file = dataFileList.get(i);
-            int sTime = timeStr2int(file.getName().substring(9, 21)) - 1288800000;
+            int sTime = timeStr2int(file.getName().substring(9, 21)) - 1288886400; // for 2010-11-05 data. //1288800000;for 2010-11-04
             try (BufferedReader br = new BufferedReader(new FileReader(file))) {
                 String line = br.readLine();
                 while ((line = br.readLine()) != null) {
@@ -104,7 +105,7 @@ public class SourceCompare
         int fileNum = Math.min(dataFileList.size(), inputFileCount);
         for (int i = 0; i < fileNum; i++) {
             File file = dataFileList.get(i);
-            int sTime = timeStr2int(file.getName().substring(9, 21)) - 1288800000;
+            int sTime = timeStr2int(file.getName().substring(9, 21)) - 1288886400; // for 2010-11-05 data. //1288800000;for 2010-11-04
             try (BufferedReader br = new BufferedReader(new FileReader(file))) {
                 String line = br.readLine();
                 while ((line = br.readLine()) != null) {
@@ -311,60 +312,22 @@ public class SourceCompare
         group.range2group(group.int2Slice(maxPValue + 1), group.int2Slice(0x40000000), 2);
 
         long indexId = store.createAggrDurationIndex(propertyId, start, end, group, 20, Calendar.MINUTE);
-        store.aggrWithIndex(indexId, entityId, propertyId, start, end, new IndexAggregationQuery.Duration() {
-            @Override
-            public Object onResult(Map<Integer, Integer> valueGroupMap, int indexQueryOverlap) {
+        AggregationIndexQueryResult result = store.aggrWithIndex( indexId, entityId, propertyId, start, end );
 
-                for (Map.Entry<Integer, Integer> entry : valueGroupMap.entrySet()) {
-                    System.out.println(entry.getKey() + "," + entry.getValue());
-                }
-
-                return null;
-            }
-
-            @Override
-            public void setValueType(ValueContentType valueType) {
-
-            }
-
-            @Override
-            public void onNewEntry(InternalEntry entry) {
-
-            }
-
-            @Override
-            public Object onReturn() {
-                return null;
-            }
-        });
+        for ( Map.Entry<Integer,Integer> entry : result.getDurationResult().entrySet() )
+        {
+            System.out.println( entry.getKey() + "," + entry.getValue() );
+        }
+        System.out.println("accelerate time: "+ result.getAccelerateTime());
     }
 
     public void indexMinMax(Long entityId, int propertyId, int start, int end) {
         long indexId = store.createAggrMinMaxIndex(propertyId, start, end, 20, Calendar.MINUTE, IndexType.AGGR_MIN_MAX);
-        store.aggrWithIndex(indexId, entityId, propertyId, start, end, new IndexAggregationQuery.MinMax() {
-            @Override
-            public Object onResult(Map<Integer, Slice> valueGroupMap, int indexQueryOverlap) {
-                for (Map.Entry<Integer, Slice> entry : valueGroupMap.entrySet()) {
-                    System.out.println(entry.getKey() + "," + entry.getValue().getInt(0));
-                }
-                return null;
-            }
-
-            @Override
-            public void setValueType(ValueContentType valueType) {
-
-            }
-
-            @Override
-            public void onNewEntry(InternalEntry entry) {
-
-            }
-
-            @Override
-            public Object onReturn() {
-                return null;
-            }
-        });
+        AggregationIndexQueryResult result = store.aggrWithIndex(indexId, entityId, propertyId, start, end );
+        for (Map.Entry<Integer, Slice> entry : result.getMinMaxResult().entrySet()) {
+            System.out.println(entry.getKey() + "," + entry.getValue().getInt(0));
+        }
+        System.out.println("accelerate time: "+ result.getAccelerateTime());
     }
 
     private Long getEntityId(String gridId, String chainId){

@@ -32,7 +32,7 @@ public class SequenceNumberTest
             {
                 valueTypes[i] = ValueType.INVALID;
             }
-            sequences[i] = SequenceNumber.packSequenceAndValueType( times[i], valueTypes[i] );
+            sequences[i] = SequenceNumber.packTimeAndValueType( times[i], valueTypes[i] );
         }
     }
     

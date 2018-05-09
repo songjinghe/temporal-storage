@@ -145,12 +145,16 @@ public interface TemporalPropertyStore
 	 */
 	List<Long> getEntities(IndexQueryRegion condition, MemTable cache);
 
+	List<Long> getEntities(IndexQueryRegion condition);
+
 	/**
 	 * get index entries which satisfy query condition
 	 * @param condition query condition of one property
 	 * @return null if no index available;
 	 */
 	List<IndexEntry> getEntries(IndexQueryRegion condition, MemTable cache);
+
+	List<IndexEntry> getEntries(IndexQueryRegion condition);
 
 	List<IndexMetaData> listIndex();
 
