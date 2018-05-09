@@ -7,6 +7,7 @@ import org.act.temporalProperty.query.range.InternalEntryRangeQueryCallBack;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.StoreBuilder;
 import org.apache.commons.lang3.SystemUtils;
+import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,12 +38,11 @@ public class CorrectnessTest {
             StoreBuilder.setIntProperty(store, (int)i, 2, 0, (int)i);
         }
         Slice val = store.getPointValue(1,0, sep*2-10);
-        log.debug("point query result {}", val.getInt(0));
-        log.debug("if you see next line, then means no bug.");
+        Assert.assertEquals( sep - 1, val.getInt( 0 ) );
         Object result = store.getRangeValue(1, 0, sep*2-10, sep*2, new InternalEntryRangeQueryCallBack(){
             public void setValueType(ValueContentType valueType) {}
             public void onNewEntry(InternalEntry entry) {
-                log.debug("if you see this line, then means no bug. val={}", entry.getValue().getInt(0));
+                Assert.assertEquals( entry.getValue().getInt( 0 ), entry.getKey().getStartTime() );
             }
             public Object onReturn() {
                 return null;

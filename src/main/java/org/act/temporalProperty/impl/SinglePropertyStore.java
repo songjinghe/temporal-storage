@@ -142,7 +142,7 @@ public class SinglePropertyStore
             }
             InternalKey resultKey = entry.getKey();
             if (    resultKey.getId().equals(searchKey.getId()) &&
-                    resultKey.getValueType() == ValueType.VALUE &&
+                    resultKey.getValueType().isValue() &&
                     resultKey.getStartTime() <= searchKey.getStartTime()) {
                 return entry.getValue();
             } // else continue
@@ -172,7 +172,7 @@ public class SinglePropertyStore
         InternalKey resultKey = entry.getKey();
         if (    resultKey.getId().equals(searchKey.getId()) &&
                 resultKey.getStartTime()<=searchKey.getStartTime() &&
-                resultKey.getValueType() == ValueType.VALUE) {
+                resultKey.getValueType().isValue()) {
             return entry.getValue();
         }else{
             return null;

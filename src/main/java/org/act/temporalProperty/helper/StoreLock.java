@@ -78,4 +78,8 @@ public class StoreLock{
         mergeDone.signalAll();
     }
 
+    public void shutdownLockExclusive()
+    {
+        lock.writeLock().lock();
+    }
 }

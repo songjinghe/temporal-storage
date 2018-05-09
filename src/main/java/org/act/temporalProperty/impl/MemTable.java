@@ -298,7 +298,7 @@ public class MemTable
         private PeekingIterator<Entry<TimeIntervalKey,Slice>> entryIter;
         private boolean nextIsStart = true;
         private boolean allowSeek = true;
-        private boolean seekHasNext = false;
+        private boolean seekHasNext = true;
 
         public MemTableIterator(Map<Slice,TreeMap<TimeIntervalKey,Slice>> table)
         {
@@ -347,7 +347,7 @@ public class MemTable
                     if ( entryIter.hasNext() )
                     {
                         Entry<TimeIntervalKey,Slice> nextEntry = entryIter.peek();
-                        if ( nextEntry.getKey().getStartKey().getStartTime() == key.getStartTime() + 1 )
+                        if ( nextEntry.getKey().getStart() == entry.getKey().getEnd() + 1 )
                         {
                             nextIsStart = true;
                             //continue;

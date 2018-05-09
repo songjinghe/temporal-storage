@@ -128,4 +128,11 @@ public class TimeIntervalKey
     {
         return end == NOW;
     }
+
+    @Override
+    public String toString()
+    {
+        return "TimeIntervalKey{start=" + start + ", end=" + end + ", pro=" + key.getPropertyId() + ", eid=" + key.getEntityId() + ", type=" +
+                key.getValueType() + '}';
+    }
 }

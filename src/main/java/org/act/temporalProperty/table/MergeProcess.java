@@ -273,7 +273,7 @@ public class MergeProcess extends Thread
 
         private SearchableIterator getDataIterator(){
             if(onlyDumpMemTable()) {
-                return this.mem.iterator();
+                return new UnknownToInvalidIterator( this.mem.iterator() );
             }else{
                 SameLevelMergeIterator unstableIter = new SameLevelMergeIterator();
                 for (Long fileNumber : mergeParticipants) {
@@ -301,7 +301,7 @@ public class MergeProcess extends Thread
                 } else {
                     diskDataIter = unstableIter;
                 }
-                return TwoLevelMergeIterator.toDisk(this.mem.iterator(), diskDataIter);
+                return new UnknownToInvalidIterator( TwoLevelMergeIterator.toDisk(this.mem.iterator(), diskDataIter) );
             }
         }
 
