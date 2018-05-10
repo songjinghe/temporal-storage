@@ -1,11 +1,10 @@
 package org.act.temporalProperty.index.aggregation;
 
 import com.google.common.collect.Lists;
+import org.act.temporalProperty.exception.TPSRuntimeException;
 import org.act.temporalProperty.index.IndexValueType;
 import org.act.temporalProperty.index.value.IndexMetaData;
 import org.act.temporalProperty.index.IndexType;
-import org.act.temporalProperty.meta.PropertyMetaData;
-import org.act.temporalProperty.meta.ValueContentType;
 import org.act.temporalProperty.query.aggr.ValueGroupingMap;
 import org.act.temporalProperty.util.DynamicSliceOutput;
 import org.act.temporalProperty.util.Slice;
@@ -14,9 +13,12 @@ import org.act.temporalProperty.util.SliceOutput;
 import org.apache.commons.lang3.time.DateUtils;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 
 /**
@@ -26,7 +28,7 @@ public class AggregationIndexMeta extends IndexMetaData {
     private final TreeMap<Slice, Integer> vGroupMap;
     private final int tEvery;
     private final int timeUnit;
-    private TreeMap<Integer, Integer> tGroupMap;
+    private TimeGroupMap tGroupMap;
 
     public AggregationIndexMeta( long indexId, IndexType type, int pid, IndexValueType vType, int start, int end,
                                 int tEvery, int timeUnit, TreeMap<Slice, Integer> valueGroup) {
@@ -34,16 +36,15 @@ public class AggregationIndexMeta extends IndexMetaData {
         this.vGroupMap = valueGroup;
         this.tEvery = tEvery;
         this.timeUnit = timeUnit;
+        this.tGroupMap = new TimeGroupMap( getTimeStart(), getTimeEnd(), tEvery, timeUnit );
     }
 
     public TreeMap<Slice, Integer> getValGroupMap() {
         return vGroupMap;
     }
 
-    public TreeMap<Integer, Integer> getTimeGroupMap() {
-        if(tGroupMap==null){
-            tGroupMap = calcInterval(getTimeStart(), getTimeEnd(), tEvery, timeUnit);
-        }
+    public TimeGroupMap getTimeGroupMap()
+    {
         return tGroupMap;
     }
 
@@ -118,35 +119,5 @@ public class AggregationIndexMeta extends IndexMetaData {
         return decode(in.input());
     }
 
-     /**
-      * 计算指定时间区间上建立索引分组的每组的起始时间及组ID。
-      * 例如，给定start, end为某天的8:04:33到8:23:15, timeUnit为分钟, every=7, 则切分结果为:
-      * [groupId=0]  8:05:00~8:11:59
-      * [groupId=1]  8:12:00~8:18:59
-      * Aggregation索引会在每个group上分别计算索引值, 并在查询时读取被查询时间区间完全覆盖的group的索引值以加速查询.
-      * 返回结果为TreeMap{<8:05:00的时间戳, 0>, <8:12:00的时间戳, 1>}
-      * 其中8:05:00是时间轴按分钟划分后, start之后(>=)group开始的最小时间.(通过DateUtils.round函数实现)
-      * 8:19:00=8:19:00-0:0:1是时间轴按分钟划分后, end之前的最大时间时间减一秒.
-      * 由于every=7, 所以每连续的7分钟作为一组
-      * @param start    in second
-      * @param end      in second
-      * @param every    count
-      * @param timeUnit can be Calendar.SECOND|HOUR|DAY|WEEK|SEMI_MONTH|MONTH|YEAR
-      * @return TreeMap{Key(group start time), Value(group id)}
-      */
-    public static TreeMap<Integer, Integer> calcInterval(int start, int end, int every, int timeUnit) {
-        TreeMap<Integer, Integer> set = new TreeMap<>();
-        int timeGroupId = 0;
-        Calendar cur = Calendar.getInstance();
-        cur.setTimeInMillis(start*1000);
-        // set `iStart` to the smallest interval discrete time, which larger than `cur`.
-        Calendar iStart = DateUtils.round(cur, timeUnit);// be careful with `daylight saving time`, check doc.
-        while(iStart.getTimeInMillis()<=end*1000) {
-            set.put((int) (iStart.getTimeInMillis()/1000), timeGroupId);
-            timeGroupId++;
-            iStart.add(timeUnit, every);
-        }
-        return set;
-    }
 
 }

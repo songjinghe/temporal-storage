@@ -23,10 +23,13 @@ public abstract class AbstractTimeIntervalAggrQuery<K,V> implements TimeInterval
     private final Map<K, V> groupValMap = new HashMap<>();
     private final Map<K, List<TimeIntervalEntry>> groupListMap = new HashMap<>();
     private final int endTime;
+    private final int startTime;
     private boolean hasEntry = false;
     private InternalEntry lastEntry;
 
-    protected AbstractTimeIntervalAggrQuery(int endTime) {
+    protected AbstractTimeIntervalAggrQuery( int startTime, int endTime )
+    {
+        this.startTime = startTime;
         this.endTime = endTime;
     }
 
@@ -41,7 +44,13 @@ public abstract class AbstractTimeIntervalAggrQuery<K,V> implements TimeInterval
         int time = key.getStartTime();
         if ( lastEntry != null )
         {
-            onEntry( lastEntry.getKey().getStartTime(), time - 1, lastEntry.getValue() );
+            int lastTime = lastEntry.getKey().getStartTime();
+            if ( lastTime < startTime )
+            {
+                lastTime = startTime;
+                assert time > startTime;
+            }
+            onEntry( lastTime, time - 1, lastEntry.getValue() );
         }//else: do nothing
         if ( key.getValueType().isValue() )
         {

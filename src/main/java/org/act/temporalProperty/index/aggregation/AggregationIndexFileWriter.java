@@ -1,6 +1,7 @@
 package org.act.temporalProperty.index.aggregation;
 
 import org.act.temporalProperty.impl.*;
+import org.act.temporalProperty.query.aggr.AggregationIndexKey;
 import org.act.temporalProperty.table.TableBuilder;
 import org.act.temporalProperty.table.TableComparator;
 import org.act.temporalProperty.util.Slice;
@@ -27,7 +28,7 @@ public class AggregationIndexFileWriter {
     public long write() throws IOException {
         try(FileOutputStream targetStream = new FileOutputStream(file)) {
             FileChannel targetChannel = targetStream.getChannel();
-            TableBuilder builder = new TableBuilder(new Options(), targetChannel, TableComparator.forAggrIndex());
+            TableBuilder builder = new TableBuilder( new Options(), targetChannel, AggregationIndexKey.sliceComparator);
             // merge same AggregationIndexKey, sum up their duration.
             AggregationIndexEntry lastEntry = null;
             int duration = 0;
@@ -49,8 +50,10 @@ public class AggregationIndexFileWriter {
                 dur.setInt(0, duration);
                 builder.add(lastEntry.getKey().encode(), dur);
             }
-            targetChannel.force(true);
-            return targetChannel.size();
+            builder.finish();
+            long fileSize = targetChannel.size();
+            targetChannel.close();
+            return fileSize;
         }
     }
 }

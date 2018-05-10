@@ -1,5 +1,6 @@
 package org.act.temporalProperty.impl;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.PeekingIterator;
 import org.act.temporalProperty.TemporalPropertyStore;
 import org.act.temporalProperty.exception.TPSRuntimeException;
@@ -15,6 +16,7 @@ import org.act.temporalProperty.meta.PropertyMetaData;
 import org.act.temporalProperty.meta.SystemMeta;
 import org.act.temporalProperty.meta.SystemMetaController;
 import org.act.temporalProperty.meta.ValueContentType;
+import org.act.temporalProperty.query.TemporalValue;
 import org.act.temporalProperty.query.TimeIntervalKey;
 import org.act.temporalProperty.query.aggr.AggregationIndexQueryResult;
 import org.act.temporalProperty.query.aggr.ValueGroupingMap;
@@ -34,7 +36,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 
 import static com.google.common.base.Preconditions.*;
 
@@ -140,6 +141,9 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
 
     public Object getRangeValue( long entityId, int proId, int start, int end, InternalEntryRangeQueryCallBack callback, MemTable cache )
     {
+        Preconditions.checkArgument( start <= end );
+        Preconditions.checkArgument( entityId >= 0 && proId >= 0 );
+        Preconditions.checkArgument( callback != null );
         meta.lock.lockShared();
         try
         {
@@ -162,17 +166,33 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
 
             InternalKey searchKey = new InternalKey( idSlice, start );
             mergedIterator.seek( searchKey );
+            boolean firstLoop = true;
             while ( mergedIterator.hasNext() )
             {
                 InternalEntry entry = mergedIterator.next();
                 InternalKey key = entry.getKey();
-                if ( key.getStartTime() <= end )
+                int time = key.getStartTime();
+                if ( firstLoop )
                 {
-                    callback.onNewEntry( entry );
+                    firstLoop = false;
+                    if ( time < start )
+                    { callback.onNewEntry( new InternalEntry( new InternalKey( key.getId(), start, key.getValueType() ), entry.getValue() ) ); }
+                    else
+                    {
+                        callback.onNewEntry( entry );
+                    }
                 }
                 else
                 {
-                    break;
+                    assert time > start;
+                    if ( time <= end )
+                    {
+                        callback.onNewEntry( entry );
+                    }
+                    else
+                    {
+                        break;
+                    }
                 }
             }
             return callback.onReturn();
@@ -598,9 +618,15 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
     public boolean cacheOverlap( int proId, long entityId, int startTime, int endTime, MemTable cache )
     {
         Slice id = toSlice( proId, entityId );
-        boolean memtableOverlap = cache.overlap( id, startTime, endTime ) || this.memTable.overlap( id, startTime, endTime ) ||
-                this.stableMemTable.overlap( id, startTime, endTime );
-        if ( memtableOverlap )
+        if ( cache!=null && cache.overlap( id, startTime, endTime ) )
+        {
+            return true;
+        }
+        if ( this.memTable.overlap( id, startTime, endTime ) )
+        {
+            return true;
+        }
+        if ( this.stableMemTable != null && this.stableMemTable.overlap( id, startTime, endTime ) )
         {
             return true;
         }
@@ -642,9 +668,9 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
         return false;
     }
 
-    public TreeMap<Integer,Boolean> coverTime( Set<Integer> proIdSet, int timeMin, int timeMax, MemTable cache )
+    public TemporalValue<Boolean> coverTime( Set<Integer> proIdSet, int timeMin, int timeMax, MemTable cache )
     {
-        TreeMap<Integer,Boolean> tMap = new TreeMap<>();
+        TemporalValue<Boolean> tMap = new TemporalValue<>();
         for ( Integer proId : proIdSet )
         {
             PropertyMetaData p = this.meta.getProperties().get( proId );

@@ -23,9 +23,38 @@ public class TableBuildAndIterateTest
 {
     private static final String dbDir = "./target/BigFileTest";
     private static final int FILE_SIZE = (int)(1024*1024*10);
-    
-    
-    @Before
+
+    @Test
+    public void main() throws IOException
+    {
+        File tmp = File.createTempFile( "hehe", "temp" );
+        FileChannel channel = new FileOutputStream( tmp ).getChannel();
+        TableBuilder builder = new TableBuilder( new Options(), channel, new BytewiseComparator() );
+        for ( long i = 0; i <= 100; i += 10 )
+        {
+            Slice key = new Slice( 8 );
+            key.setLong( 0, i );
+            Slice value = new Slice( 8 );
+            value.setLong( 0, i );
+            builder.add( key, value );
+        }
+        builder.finish();
+        channel.close();
+
+        channel = new FileInputStream( tmp ).getChannel();
+        Table table = new MMapTable( "", channel, new BytewiseComparator(), false );
+        TableIterator iterator = table.iterator();
+        Slice searchKey = new Slice( 8 );
+        searchKey.setLong( 0, 41 );
+        iterator.seek( searchKey );
+        while ( iterator.hasNext() )
+        {
+            System.out.println( iterator.next().getKey().getLong( 0 ) );
+        }
+        channel.close();
+    }
+
+    //    @Before
     public void buildFile()
     {
         try

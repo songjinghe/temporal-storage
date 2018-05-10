@@ -3,6 +3,7 @@ package org.act.temporalProperty.query.aggr;
 import org.act.temporalProperty.meta.ValueContentType;
 import org.act.temporalProperty.util.Slice;
 
+import java.util.Map;
 import java.util.TreeMap;
 
 /**
@@ -11,28 +12,28 @@ import java.util.TreeMap;
 public class AggregationIndexQueryResult
 {
 
-    private TreeMap<Integer,Slice> minMaxResult;
-    private TreeMap<Integer,Integer> durationResult;
+    private Map<Integer,Slice> minMaxResult;
+    private Map<Integer,Integer> durationResult;
     private final int speedUpTime;
 
-    public AggregationIndexQueryResult( TreeMap<Integer,Integer> result, int speedUpTime )
+    public AggregationIndexQueryResult( Map<Integer,Integer> result, int speedUpTime )
     {
         this.durationResult = result;
         this.speedUpTime = speedUpTime;
     }
 
-    public AggregationIndexQueryResult( TreeMap<Integer,Slice> result, int speedUpTime, ValueContentType valueType )
+    public AggregationIndexQueryResult( Map<Integer,Slice> result, int speedUpTime, ValueContentType valueType )
     {
         this.minMaxResult = result;
         this.speedUpTime = speedUpTime;
     }
 
-    public TreeMap<Integer,Slice> getMinMaxResult()
+    public Map<Integer,Slice> getMinMaxResult()
     {
         return minMaxResult;
     }
 
-    public TreeMap<Integer,Integer> getDurationResult()
+    public Map<Integer,Integer> getDurationResult()
     {
         return durationResult;
     }

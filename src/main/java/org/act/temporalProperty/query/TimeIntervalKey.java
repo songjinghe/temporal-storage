@@ -18,7 +18,13 @@ public class TimeIntervalKey extends TimeInterval
         this.key = start;
     }
 
-    private TimeIntervalKey( InternalKey key, long newStart, long end )
+    public TimeIntervalKey( InternalKey start )
+    {
+        super( start.getStartTime() );
+        this.key = start;
+    }
+
+    public TimeIntervalKey( InternalKey key, long newStart, long end )
     {
         super( newStart, end );
         this.key = key;
@@ -26,13 +32,13 @@ public class TimeIntervalKey extends TimeInterval
 
     public InternalKey getStartKey()
     {
-        if ( start() == key.getStartTime() )
+        if ( from() == key.getStartTime() )
         {
             return key;
         }
         else
         {
-            return new InternalKey( key.getId(), Math.toIntExact( start() ), key.getValueType() );
+            return new InternalKey( key.getId(), Math.toIntExact( from() ), key.getValueType() );
         }
     }
 
@@ -53,34 +59,59 @@ public class TimeIntervalKey extends TimeInterval
             return false;
         }
         TimeIntervalKey that = (TimeIntervalKey) o;
-        return start() == that.start();
+        return from() == that.from();
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hashCode( start() );
+        return Objects.hashCode( from() );
     }
 
     public TimeIntervalKey changeEnd( long newEnd )
     {
-        return new TimeIntervalKey( this.key, start(), newEnd );
+        return new TimeIntervalKey( this.key, from(), newEnd );
     }
 
     public TimeIntervalKey changeStart( long newStart )
     {
-        return new TimeIntervalKey( this.key, newStart, end() );
+        return new TimeIntervalKey( this.key, newStart, to() );
     }
 
     public InternalKey getEndKey()
     {
-        return new InternalKey( key.getId(), Math.toIntExact( end() + 1 ), ValueType.UNKNOWN );
+        return new InternalKey( key.getId(), Math.toIntExact( to() + 1 ), ValueType.UNKNOWN );
     }
 
     @Override
     public String toString()
     {
-        return "TimeIntervalKey{start=" + start() + ", end=" + end() + ", pro=" + key.getPropertyId() + ", eid=" + key.getEntityId() + ", type=" +
+        return "TimeIntervalKey{start=" + from() + ", end=" + to() + ", pro=" + key.getPropertyId() + ", eid=" + key.getEntityId() + ", type=" +
                 key.getValueType() + '}';
+    }
+
+    public boolean lessThan( int time )
+    {
+        return this.lessThan( new TimePointL( time ) );
+    }
+
+    public boolean greaterOrEq( int time )
+    {
+        return this.greaterOrEq( new TimePointL( time ) );
+    }
+
+    public boolean span( int minTime, int maxTime )
+    {
+        return this.span( new TimePointL( minTime ), new TimePointL( maxTime ) );
+    }
+
+    public boolean span( int time )
+    {
+        return this.span( new TimePointL( time ) );
+    }
+
+    public boolean between( int min, int maxTime )
+    {
+        return this.between( new TimePointL( min ), new TimePointL( maxTime ) );
     }
 }

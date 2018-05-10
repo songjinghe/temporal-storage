@@ -14,12 +14,14 @@ import org.act.temporalProperty.index.aggregation.AggregationIndexMeta;
 import org.act.temporalProperty.index.aggregation.Interval2AggrEntryIterator;
 import org.act.temporalProperty.index.aggregation.MinMaxAggrEntryIterator;
 import org.act.temporalProperty.index.aggregation.MinMaxAggrIndexWriter;
+import org.act.temporalProperty.index.aggregation.TimeGroupMap;
 import org.act.temporalProperty.index.value.IndexBuilderCallback;
 import org.act.temporalProperty.index.value.IndexMetaData;
 import org.act.temporalProperty.index.value.IndexTableReader;
 import org.act.temporalProperty.index.value.IndexTableWriter;
 import org.act.temporalProperty.index.value.rtree.IndexEntry;
 import org.act.temporalProperty.index.value.rtree.IndexEntryOperator;
+import org.act.temporalProperty.query.TemporalValue;
 import org.act.temporalProperty.query.aggr.ValueGroupingMap;
 import org.act.temporalProperty.table.TwoLevelMergeIterator;
 import org.act.temporalProperty.util.Slice;
@@ -36,6 +38,7 @@ import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NavigableMap;
+import java.util.NavigableSet;
 import java.util.TreeMap;
 
 /**
@@ -325,7 +328,7 @@ public interface IndexUpdater
     abstract class AggregationIndexFileUpdater implements IndexUpdater
     {
         protected final AggregationIndexMeta meta;
-        protected final TreeMap<Integer,Integer> timeGroup;
+        protected final TimeGroupMap timeGroup;
         protected final List<Long> delFileId;
         protected final List<InternalEntry> data = new ArrayList<>();
         protected IndexFileMeta newFileMeta;
@@ -387,7 +390,7 @@ public interface IndexUpdater
             Iterator<EntityTimeIntervalEntry> interval = new SimplePoint2IntervalIterator( iterator, targetMeta.getLargest() );
 
             // 根据时间分块和value分区, 计算得出索引文件的Entry
-            NavigableMap<Integer,Integer> subTimeGroup = timeGroup.subMap( targetMeta.getSmallest(), true, targetMeta.getLargest(), true );
+            NavigableSet<Integer> subTimeGroup = timeGroup.calcNewGroup( targetMeta.getSmallest(), targetMeta.getLargest() );
             Iterator<AggregationIndexEntry> aggrEntries = new Interval2AggrEntryIterator( interval, meta.getValGroupMap(), subTimeGroup );
             // 将iterator的entry放入数组进行排序
             List<AggregationIndexEntry> data = Lists.newArrayList( aggrEntries );
@@ -417,7 +420,7 @@ public interface IndexUpdater
             Iterator<EntityTimeIntervalEntry> interval = new SimplePoint2IntervalIterator( iterator, targetMeta.getLargest() );
 
             // 根据时间分块和value分区, 计算得出索引文件的Entry
-            NavigableMap<Integer,Integer> subTimeGroup = timeGroup.subMap( targetMeta.getSmallest(), true, targetMeta.getLargest(), true );
+            NavigableSet<Integer> subTimeGroup = timeGroup.calcNewGroup( targetMeta.getSmallest(), targetMeta.getLargest() );
             Iterator<Triple<Long,Integer,Slice>> minMax = new MinMaxAggrEntryIterator( interval, subTimeGroup );
             // 将iterator的entry放入数组进行排序
             List<Triple<Long,Integer,Slice>> data = Lists.newArrayList( minMax );

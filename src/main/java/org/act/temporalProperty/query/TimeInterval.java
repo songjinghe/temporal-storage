@@ -4,63 +4,57 @@ import com.google.common.base.Preconditions;
 
 import java.util.Objects;
 
-import static org.act.temporalProperty.TemporalPropertyStore.NOW;
-
 /**
  * Created by song on 2018-05-09.
  */
 public class TimeInterval extends TInterval<TimePointL>
 {
-    private long from;
-    private long to;
-
     public TimeInterval( long startTime, long endTime )
     {
-        Preconditions.checkArgument( startTime <= endTime );
-        this.from = startTime;
-        this.to = endTime;
+        super( new TimePointL( startTime ), new TimePointL( endTime ) );
     }
 
-    public long start()
+    public TimeInterval( long startTime )
     {
-        return from;
+        super( new TimePointL( startTime ), TimePointL.Now );
     }
 
-    public long end()
+    public TimeInterval( TimePointL startTime, TimePointL endTime )
     {
-        return to;
+        super( startTime , endTime );
     }
 
-    public boolean lessThan( int time )
+    public long from()
     {
-        return time > to;
+        return start().val();
     }
 
-    public boolean greaterOrEq( int time )
+    public int fromInt()
     {
-        return from >= time;
+        return Math.toIntExact( start().val() );
     }
 
-    public boolean span( int time )
+    public long to()
     {
-        return from < time && time <= to;
+        return end().val();
     }
 
-    public boolean span( int start, int end )
+    public int toInt()
     {
-        return this.from < start && start <= end && end <= this.to;
+        return Math.toIntExact( end().val() );
     }
 
-    public boolean between( int start, int end )
+    @Override
+    public TInterval<TimePointL> changeEnd( TimePointL newEnd )
     {
-        return start <= this.from && this.to <= end;
+        return new TimeInterval( from(), newEnd.val() );
     }
 
-    public boolean toNow()
+    @Override
+    public TInterval<TimePointL> changeStart( TimePointL newStart )
     {
-        return to == NOW;
+        return new TimeInterval( newStart.val(), to() );
     }
-
 
     @Override
     public boolean equals( Object o )
@@ -74,19 +68,19 @@ public class TimeInterval extends TInterval<TimePointL>
             return false;
         }
         TimeInterval that = (TimeInterval) o;
-        return from == that.from;
+        return from() == that.from();
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hashCode( from );
+        return Objects.hashCode( from() );
     }
 
     @Override
     public String toString()
     {
-        return "TimeInterval{start=" + from + ", end=" + to + '}';
+        return "TimeInterval{start=" + from() + ", end=" + to() + '}';
     }
 
 }

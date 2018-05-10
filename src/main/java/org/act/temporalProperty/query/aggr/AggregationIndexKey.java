@@ -1,7 +1,9 @@
 package org.act.temporalProperty.query.aggr;
 
+import com.google.common.base.Objects;
 import org.act.temporalProperty.table.UserComparator;
 import org.act.temporalProperty.util.Slice;
+import org.act.temporalProperty.util.SliceOutput;
 
 /**
  * Created by song on 2018-04-05.
@@ -37,9 +39,10 @@ public class AggregationIndexKey implements Comparable<AggregationIndexKey>{
 
     public Slice encode(){
         Slice raw = new Slice(16);
-        raw.setLong(0, entityId);
-        raw.setInt(8, timeGroupId);
-        raw.setInt(12, valueGroupId);
+        SliceOutput out = raw.output();
+        out.writeLong( entityId );
+        out.writeInt( timeGroupId );
+        out.writeInt( valueGroupId );
         return raw;
     }
 
@@ -74,5 +77,28 @@ public class AggregationIndexKey implements Comparable<AggregationIndexKey>{
         }else{
             return r;
         }
+    }
+
+    @Override
+    public String toString()
+    {
+        return "AggregationIndexKey{" + "entityId=" + entityId + ", timeGroupId=" + timeGroupId + ", valueGroupId=" + valueGroupId + '}';
+    }
+
+    @Override
+    public boolean equals( Object o )
+    {
+        if ( this == o )
+        { return true; }
+        if ( o == null || getClass() != o.getClass() )
+        { return false; }
+        AggregationIndexKey that = (AggregationIndexKey) o;
+        return entityId == that.entityId && timeGroupId == that.timeGroupId && valueGroupId == that.valueGroupId;
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return Objects.hashCode( entityId, timeGroupId, valueGroupId );
     }
 }

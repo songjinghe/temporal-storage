@@ -1,6 +1,7 @@
 package org.act.temporalProperty.index.value;
 
 import com.google.common.base.Objects;
+import com.google.common.base.Preconditions;
 import org.act.temporalProperty.index.IndexFileMeta;
 import org.act.temporalProperty.index.IndexType;
 import org.act.temporalProperty.index.IndexValueType;
@@ -11,6 +12,7 @@ import org.act.temporalProperty.util.SliceInput;
 import org.act.temporalProperty.util.SliceOutput;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -24,11 +26,12 @@ public class IndexMetaData {
     private List<Integer> propertyIdList;
     private int timeStart;
     private int timeEnd;
-    private Map<Long,IndexFileMeta> stableFileIds;
-    private Map<Long,IndexFileMeta> unstableFileIds;
+    private Map<Long,IndexFileMeta> stableFileIds = new HashMap<>();
+    private Map<Long,IndexFileMeta> unstableFileIds = new HashMap<>();
     private boolean online;
 
     public IndexMetaData( long id, IndexType type, List<Integer> pidList, List<IndexValueType> types, int start, int end ) {
+        Preconditions.checkArgument( start <= end );
         this.id = id;
         this.type = type;
         this.propertyIdList = pidList;

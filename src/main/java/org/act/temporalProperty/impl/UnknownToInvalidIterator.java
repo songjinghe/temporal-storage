@@ -35,12 +35,12 @@ public class UnknownToInvalidIterator extends AbstractIterator<InternalEntry> im
     @Override
     public void seekToFirst()
     {
-        //
+        in.seekToFirst();
     }
 
     @Override
     public void seek( InternalKey targetKey )
     {
-        //
+        in.seek( targetKey );
     }
 }

@@ -31,7 +31,7 @@ public class FileBuffer implements Closeable
     public FileBuffer(File unSortedTableFile, long id) throws IOException{
         this(id);
         this.fName = unSortedTableFile.getAbsolutePath();
-        this.memTable = new MemTable( TableComparator.instance() );
+        this.memTable = new MemTable();
         Files.deleteIfExists(unSortedTableFile.toPath());
         Files.createFile(unSortedTableFile.toPath());
         this.discTable = new UnSortedTable(unSortedTableFile);

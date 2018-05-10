@@ -281,12 +281,17 @@ public class SourceCompare
 
     public void rangeDuration(Long entityId, int propertyId, int start, int end, int minPValue, int maxPValue) {
 
-        Object object = store.aggregate(entityId, propertyId, start, end, new DurationStatisticAggregationQuery<Integer>(end) {
+        Object object = store.aggregate( entityId, propertyId, start, end, new DurationStatisticAggregationQuery<Integer>( start, end )
+        {
             @Override
             public Integer computeGroupId(TimeIntervalEntry entry) {
-                if (entry.value().getInt(0) < minPValue) {
+                int val = asInt( entry.value() );
+                if ( val < minPValue )
+                {
                     return 0;
-                } else if (entry.value().getInt(0) <= maxPValue) {
+                }
+                else if ( val <= maxPValue )
+                {
                     return 1;
                 } else {
                     return 2;
@@ -301,7 +306,22 @@ public class SourceCompare
 
                 return result;
             }
-        });
+        } );
+    }
+
+    private void waitUntilIndexReady(long indexId)
+    {
+        try
+        {
+            while ( store.listIndex().stream().filter( indexMetaData -> indexMetaData.getId() == indexId && indexMetaData.isOnline() ).count() == 0 )
+            {
+                Thread.sleep( 100 );
+            }
+        }
+        catch ( InterruptedException e )
+        {
+            e.printStackTrace();
+        }
     }
 
     public void indexDuration(Long entityId, int propertyId, int start, int end, int minPValue, int maxPValue) {
@@ -312,6 +332,7 @@ public class SourceCompare
         group.range2group(group.int2Slice(maxPValue + 1), group.int2Slice(0x40000000), 2);
 
         long indexId = store.createAggrDurationIndex(propertyId, start, end, group, 20, Calendar.MINUTE);
+        waitUntilIndexReady( indexId );
         AggregationIndexQueryResult result = store.aggrWithIndex( indexId, entityId, propertyId, start, end );
 
         for ( Map.Entry<Integer,Integer> entry : result.getDurationResult().entrySet() )
@@ -323,6 +344,7 @@ public class SourceCompare
 
     public void indexMinMax(Long entityId, int propertyId, int start, int end) {
         long indexId = store.createAggrMinMaxIndex(propertyId, start, end, 20, Calendar.MINUTE, IndexType.AGGR_MIN_MAX);
+        waitUntilIndexReady( indexId );
         AggregationIndexQueryResult result = store.aggrWithIndex(indexId, entityId, propertyId, start, end );
         for (Map.Entry<Integer, Slice> entry : result.getMinMaxResult().entrySet()) {
             System.out.println(entry.getKey() + "," + entry.getValue().getInt(0));

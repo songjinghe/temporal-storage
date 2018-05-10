@@ -3,13 +3,11 @@ package org.act.temporalProperty.impl;
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.PeekingIterator;
 import org.act.temporalProperty.exception.TPSNHException;
-import org.act.temporalProperty.helper.PairViewFilterByNextIterator;
 import org.act.temporalProperty.impl.MemTable.TimeIntervalValueEntry;
 import org.act.temporalProperty.query.TimeIntervalKey;
 import org.act.temporalProperty.util.Slice;
 import org.apache.commons.lang3.tuple.Pair;
 
-import java.util.Iterator;
 import java.util.Map.Entry;
 
 public class TwoLevelIntervalMergeIterator extends AbstractIterator<Entry<TimeIntervalKey,Slice>> implements IntervalIterator
@@ -41,7 +39,7 @@ public class TwoLevelIntervalMergeIterator extends AbstractIterator<Entry<TimeIn
             {
                 if ( r < 0 )
                 {
-                    if ( oldKey.getEnd() < newKey.getStart() )
+                    if ( oldKey.to() < newKey.from() )
                     {
                         old.next();
                         return mayChangedOldEntry( oldKey, oldEntry.getValue() );
@@ -49,19 +47,19 @@ public class TwoLevelIntervalMergeIterator extends AbstractIterator<Entry<TimeIn
                     else
                     {
                         old.next();
-                        return changeEndOldEntry( oldKey, oldEntry.getValue(), newKey.getStart() - 1 );
+                        return changeEndOldEntry( oldKey, oldEntry.getValue(), newKey.from() - 1 );
                     }
                 }
                 else
                 {
                     changedNextOldKey = null;
-                    if ( oldKey.getStart() > newKey.getStart() )
+                    if ( oldKey.from() > newKey.from() )
                     {
                         return latest.next();
                     }
                     else
                     {
-                        pollOldUntil( newInternalKey.getId(), newKey.getEnd() );
+                        pollOldUntil( newInternalKey.getId(), newKey.to() );
                         return latest.next();
                     }
                 }
@@ -141,7 +139,7 @@ public class TwoLevelIntervalMergeIterator extends AbstractIterator<Entry<TimeIn
                 changedNextOldKey = null;
                 return;
             }
-            if ( oldKey.getEnd() <= end )
+            if ( oldKey.to() <= end )
             {
                 old.next();
             }
@@ -154,7 +152,7 @@ public class TwoLevelIntervalMergeIterator extends AbstractIterator<Entry<TimeIn
         {
             Entry<TimeIntervalKey,Slice> oldEntry = old.peek();
             TimeIntervalKey oldKey = oldEntry.getKey();
-            if ( oldKey.getStart() <= end )
+            if ( oldKey.from() <= end )
             {
                 changedNextOldKey = Pair.of( oldKey, oldKey.changeStart( end + 1 ) );
             }

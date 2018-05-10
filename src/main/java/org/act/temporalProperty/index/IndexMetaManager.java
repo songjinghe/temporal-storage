@@ -109,7 +109,7 @@ public class IndexMetaManager
             byId.put( indexMeta.getId(), indexMeta );
             for ( Integer proId : indexMeta.getPropertyIdList() )
             {
-                byProIdTime.putIfAbsent( proId, new TreeMap<>() ).put( indexMeta.getTimeStart(), indexMeta );
+                byProIdTime.computeIfAbsent( proId, i -> new TreeMap<>() ).put( indexMeta.getTimeStart(), indexMeta );
             }
         }
         else

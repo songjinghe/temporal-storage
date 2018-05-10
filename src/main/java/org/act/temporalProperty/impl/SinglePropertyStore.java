@@ -252,7 +252,7 @@ public class SinglePropertyStore
      */
     private void insertUnstableBuffer( TimeIntervalKey key, Slice value ) throws IOException
     {
-        FileMetaData meta = propertyMeta.unFloorTimeOneMeta( Math.toIntExact( key.getStart() ) );
+        FileMetaData meta = propertyMeta.unFloorTimeOneMeta( Math.toIntExact( key.from() ) );
         assert meta!=null : "SNH: meta should not null!";
 
         FileBuffer buffer = propertyMeta.getUnstableBuffers( meta.getNumber() );
@@ -268,7 +268,7 @@ public class SinglePropertyStore
     }
 
     private void insertStableBuffer( TimeIntervalKey key, Slice value ) throws IOException {
-        FileMetaData meta = propertyMeta.stFloorTimeOneMeta( Math.toIntExact( key.getStart() ) );
+        FileMetaData meta = propertyMeta.stFloorTimeOneMeta( Math.toIntExact( key.from() ) );
         assert meta!=null : "SNH: meta should not null!";
 
         FileBuffer buffer = propertyMeta.getStableBuffers( meta.getNumber() );

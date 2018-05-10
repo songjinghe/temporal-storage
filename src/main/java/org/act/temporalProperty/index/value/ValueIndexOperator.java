@@ -15,6 +15,9 @@ import org.act.temporalProperty.index.IndexValueType;
 import org.act.temporalProperty.index.PropertyFilterIterator;
 import org.act.temporalProperty.index.value.rtree.IndexEntry;
 import org.act.temporalProperty.index.value.rtree.IndexEntryOperator;
+import org.act.temporalProperty.query.TemporalValue;
+import org.act.temporalProperty.query.TimeInterval;
+import org.act.temporalProperty.query.TimePointL;
 import org.act.temporalProperty.util.TimeIntervalUtil;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
@@ -27,6 +30,7 @@ import java.util.*;
 
 import static org.act.temporalProperty.index.IndexType.*;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.stream.Collectors;
 
 /**
@@ -119,34 +123,15 @@ public class ValueIndexOperator
     private List<IndexQueryRegion> excludeInvalidTime( IndexQueryRegion condition, MemTable cache )
     {
         Set<Integer> proIdSet = condition.getPropertyValueIntervals().stream().map( PropertyValueInterval::getProId ).collect( Collectors.toSet() );
-        TreeMap<Integer,Boolean> validTime = tpStore.coverTime( proIdSet, condition.getTimeMin(), condition.getTimeMax(), cache );
+        TemporalValue<Boolean> validTime = tpStore.coverTime( proIdSet, condition.getTimeMin(), condition.getTimeMax(), cache );
         if ( validTime.isEmpty() )
         {
-            return Lists.newArrayList( condition );
+            return Collections.singletonList( condition );
         }
-        List<Pair<Integer,Integer>> validTimeList = new ArrayList<>();
-        if ( condition.getTimeMin() < validTime.firstKey() )
-        {
-            validTimeList.add( Pair.of( condition.getTimeMin(), validTime.firstKey() - 1 ) );
-        }
-        int start = -1, end = -2;
-        for ( Map.Entry<Integer,Boolean> entry : validTime.entrySet() )
-        {
-            if ( !entry.getValue() )
-            {
-                start = entry.getKey();
-            }
-            else
-            {
-                end = entry.getKey() - 1;
-                assert end >= start;
-                validTimeList.add( Pair.of( start, end ) );
-            }
-        }
-        if ( end < start && start < condition.getTimeMax() )
-        {
-            validTimeList.add( Pair.of( start, condition.getTimeMax() ) );
-        }
+
+        PeekingIterator<Entry<TimeInterval,Boolean>> iter;
+        iter = validTime.intervalEntries( new TimePointL( condition.getTimeMin() ), new TimePointL( condition.getTimeMax() ) );
+        List<Pair<Integer,Integer>> validTimeList = Lists.newArrayList( Iterators.transform( iter, entry -> Pair.of( Math.toIntExact( entry.getKey().from() ), Math.toIntExact( entry.getKey().to() ) )) );
         return subQueryRegions( validTimeList, condition );
     }
 
@@ -168,7 +153,7 @@ public class ValueIndexOperator
         public CreateSinglePropertyValueIndexTask( IndexMetaData meta )
         {
             this.iMeta = meta;
-            Preconditions.checkArgument( meta.getPropertyIdList().size() == 1 );
+            Preconditions.checkArgument( meta.getPropertyIdList().size() == 1, "expect one property, got " + meta.getPropertyIdList().size() );
         }
 
         @Override

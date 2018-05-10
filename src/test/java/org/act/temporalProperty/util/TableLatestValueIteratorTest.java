@@ -10,7 +10,7 @@ import org.junit.Test;
 
 public class TableLatestValueIteratorTest
 {
-    private MemTable table = new MemTable( TableComparator.instance() );
+    private MemTable table = new MemTable();
     private final int ID_NUM = 20;
     private final int PRO_NUM = 10;
     private final int TIME_NUM = 10;

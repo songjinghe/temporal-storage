@@ -6,10 +6,8 @@ import java.util.Map.Entry;
 import com.google.common.collect.PeekingIterator;
 import junit.framework.Assert;
 
-import org.act.temporalProperty.impl.InternalEntry;
 import org.act.temporalProperty.impl.InternalKey;
 import org.act.temporalProperty.impl.MemTable;
-import org.act.temporalProperty.impl.MemTable.MemTableIterator;
 import org.act.temporalProperty.impl.ValueType;
 import org.act.temporalProperty.query.TimeIntervalKey;
 import org.act.temporalProperty.util.Slice;
@@ -47,7 +45,7 @@ public class UnSortTableTest
     @Test
     public void test()
     {
-        MemTable memtable = new MemTable( TableComparator.instance() );
+        MemTable memtable = new MemTable();
         try
         {
             table.initFromFile( memtable );
@@ -55,8 +53,8 @@ public class UnSortTableTest
             for( int i = 0; i<DATA_SIZE; i++ )
             {
                 Entry<TimeIntervalKey,Slice> entry = iterator.next();
-                Assert.assertEquals( entry.getKey().getStart(), (long) i );
-                Assert.assertEquals( entry.getKey().getEnd(), (long) i + 3 );
+                Assert.assertEquals( entry.getKey().from(), (long) i );
+                Assert.assertEquals( entry.getKey().to(), (long) i + 3 );
                 Assert.assertEquals( entry.getKey().getKey().getPropertyId(), (long) i );
                 Assert.assertEquals( entry.getKey().getKey().getEntityId(), (long) i );
                 Assert.assertEquals( entry.getValue().getInt( 0 ), i );
