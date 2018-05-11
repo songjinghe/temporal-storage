@@ -3,6 +3,7 @@ package org.act.temporalProperty.impl.query.range;
 import org.act.temporalProperty.TemporalPropertyStore;
 import org.act.temporalProperty.impl.InternalEntry;
 import org.act.temporalProperty.meta.ValueContentType;
+import org.act.temporalProperty.query.aggr.IndexAggregationQuery;
 import org.act.temporalProperty.query.range.InternalEntryRangeQueryCallBack;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.StoreBuilder;
@@ -50,6 +51,39 @@ public class CorrectnessTest {
         });
 
         store.shutDown();
+    }
+
+    @Test
+    public void simple() throws Throwable
+    {
+        StoreBuilder stBuilder = new StoreBuilder( dbDir(), false );
+        TemporalPropertyStore store = stBuilder.store();
+        try
+        {
+            store.getRangeValue( 5, 1, 0, Integer.MAX_VALUE - 10, new IndexAggregationQuery()
+            {
+                @Override
+                public void setValueType( ValueContentType valueType )
+                {
+                }
+
+                @Override
+                public void onNewEntry( InternalEntry entry )
+                {
+                    System.out.println( entry );
+                }
+
+                @Override
+                public Object onReturn()
+                {
+                    return null;
+                }
+            } );
+        }
+        finally
+        {
+            store.shutDown();
+        }
     }
 
 }

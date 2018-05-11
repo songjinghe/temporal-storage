@@ -179,8 +179,8 @@ public class ValueIndexOperator
                         dataCollector.onCall( key.getPropertyId(), key.getEntityId(), key.getStartTime(), entry.getValue() );
                     }
                 }
-                FileMetaData dataFileMetaData = i.getMiddle();
-                PeekingIterator<IndexEntry> data = dataCollector.getIterator( dataFileMetaData.getSmallest(), dataFileMetaData.getLargest() );
+                FileMetaData dataFileMeta = i.getMiddle();
+                PeekingIterator<IndexEntry> data = dataCollector.getIterator( dataFileMeta.getSmallest(), dataFileMeta.getLargest() );
 
                 long fileId = sysIndexMeta.nextFileId();
                 String indexFilePath = Filename.valIndexFileName( fileId );
@@ -193,7 +193,7 @@ public class ValueIndexOperator
                     }
                     writer.finish();
                     long fileSize = channel.size();
-                    IndexFileMeta fileMeta = new IndexFileMeta( iMeta.getId(), fileId, fileSize, i.getMiddle().getNumber(), i.getLeft() );
+                    IndexFileMeta fileMeta = new IndexFileMeta( iMeta.getId(), fileId, fileSize, dataFileMeta.getSmallest(), dataFileMeta.getLargest(), i.getMiddle().getNumber(), i.getLeft() );
                     iMeta.addFile( fileMeta );
                 }
             }
@@ -262,7 +262,7 @@ public class ValueIndexOperator
                 }
                 writer.finish();
                 long fileSize = channel.size();
-                IndexFileMeta fileMeta = new IndexFileMeta( iMeta.getId(), fileId, fileSize, 0, false );
+                IndexFileMeta fileMeta = new IndexFileMeta( iMeta.getId(), fileId, fileSize, iMeta.getTimeStart(), iMeta.getTimeEnd(), 0, false );
                 iMeta.addFile( fileMeta );
             }
         }

@@ -42,6 +42,7 @@ public class AggregationIndexFileWriter {
                     Slice dur = new Slice(4);
                     dur.setInt(0, duration);
                     builder.add(lastEntry.getKey().encode(), dur);
+                    duration = entry.getDuration();
                 }
                 lastEntry = entry;
             }

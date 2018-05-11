@@ -12,8 +12,6 @@ import org.act.temporalProperty.index.IndexValueType;
 import org.act.temporalProperty.index.PropertyFilterIterator;
 import org.act.temporalProperty.index.SimplePoint2IntervalIterator;
 import org.act.temporalProperty.meta.PropertyMetaData;
-import org.act.temporalProperty.query.TemporalValue;
-import org.act.temporalProperty.query.TimeInterval;
 import org.act.temporalProperty.query.aggr.*;
 import org.act.temporalProperty.query.aggr.IndexAggregationQuery.MinMax;
 import org.act.temporalProperty.util.Slice;
@@ -149,34 +147,44 @@ public class AggregationIndexOperator
             return new AggregationIndexQueryResult( result, timeGroups.getAccelerateTime() );
         }
 
-        private TreeMap<Integer,Integer> queryIndex( long entityId, AggregationIndexMeta meta, IntervalStatus status ) throws IOException
+        private Map<Integer,Integer> queryIndex( long entityId, AggregationIndexMeta meta, IntervalStatus status ) throws IOException
         {
             int startTimeGroup = status.getTimeStartGroup();
             int endTimeGroup = status.getTimeEndGroup();
-            TreeMap<Integer, Integer> result = new TreeMap<>();
-            String filePath = new File(indexDir, Filename.aggrIndexFileName(meta.getId())).getAbsolutePath();
-            SeekingIterator<Slice, Slice> iterator = cache.getTable(filePath).aggrIterator(filePath);
+            Map<Integer,Integer> result = new TreeMap<>();
+            for ( IndexFileMeta fMeta : meta.getFilesByTime( startTimeGroup, endTimeGroup ) )
+            {
+                queryOneFile( result, fMeta.getFileId(), entityId, startTimeGroup, endTimeGroup, status );
+            }
+            return result;
+        }
 
-            iterator.seek(new AggregationIndexKey(entityId, startTimeGroup, 0).encode());
-            while(iterator.hasNext()){
-                Entry<Slice, Slice> entry = iterator.next();
-                AggregationIndexKey key = new AggregationIndexKey(entry.getKey());
+        private void queryOneFile( Map<Integer,Integer> result, long indexFileId, long entityId, int startTimeGroup, int endTimeGroup, IntervalStatus status ) throws IOException
+        {
+            String filePath = new File( indexDir, Filename.aggrIndexFileName( indexFileId ) ).getAbsolutePath();
+            SeekingIterator<Slice,Slice> iterator = cache.getTable( filePath ).aggrIterator( filePath );
+            AggregationIndexKey searchKey = new AggregationIndexKey( entityId, startTimeGroup, 0 );
+            iterator.seek( searchKey.encode() );
+            while ( iterator.hasNext() )
+            {
+                Entry<Slice,Slice> entry = iterator.next();
+                AggregationIndexKey key = new AggregationIndexKey( entry.getKey() );
+                if ( key.compareTo( searchKey ) < 0 ) {continue;}
                 int timeGroupId = key.getTimeGroupId();
                 if ( key.getEntityId() == entityId && startTimeGroup <= timeGroupId && timeGroupId <= endTimeGroup )
                 {
                     if ( status.isValid( timeGroupId ) )
                     {
-                        result.putIfAbsent(key.getValueGroupId(), 0);
-                        int duration = entry.getValue().getInt(0);
-                        result.merge(key.getValueGroupId(), duration, (oldVal, newVal) -> oldVal + newVal);
+                        result.putIfAbsent( key.getValueGroupId(), 0 );
+                        int duration = entry.getValue().getInt( 0 );
+                        result.merge( key.getValueGroupId(), duration, ( oldVal, newVal ) -> oldVal + newVal );
                     }//else: continue
                 }
                 else
                 {
-                    return result;
+                    return;
                 }
             }
-            return result;
         }
 
         private DurationStatisticAggregationQuery packQuery( AggregationIndexMeta meta, int start, int end )
@@ -226,8 +234,6 @@ public class AggregationIndexOperator
                 // 如果可以加速, 则使用索引得到这段时间的结果（排除不可加速的区间）
                 result = queryIndex( entityId, meta, cp, timeGroups, shouldAddMin, shouldAddMax );
             }
-            // 找出不用索引加速的时间区间(列表)
-//            List<Pair<Integer, Integer>> unCoveredList = unCoveredTime(meta, start, end);
             if ( timeGroups.needQueryStorage() )
             {
                 // 根据索引信息(timeUnit, every, valueGroup)构建一个range查询
@@ -271,13 +277,21 @@ public class AggregationIndexOperator
             return larger;
         }
 
-        private TreeMap<Integer,Slice> queryIndex( long entityId, AggregationIndexMeta meta, Comparator<? super Slice> cp, IntervalStatus status, boolean shouldAddMin, boolean shouldAddMax ) throws
-                IOException
+        private TreeMap<Integer,Slice> queryIndex( long entityId, AggregationIndexMeta meta, Comparator<? super Slice> cp, IntervalStatus status, boolean shouldAddMin, boolean shouldAddMax ) throws IOException
         {
             int startTimeGroup = status.getTimeStartGroup();
             int endTimeGroup = status.getTimeEndGroup();
             TreeMap<Integer,Slice> result = new TreeMap<>();
-            String filePath = new File( indexDir, Filename.aggrIndexFileName( meta.getId() ) ).getAbsolutePath();
+            for ( IndexFileMeta fMeta : meta.getFilesByTime( startTimeGroup, endTimeGroup ) )
+            {
+                queryOneFile( result, fMeta.getFileId(), entityId, startTimeGroup, endTimeGroup, cp, status, shouldAddMin, shouldAddMax );
+            }
+            return result;
+        }
+
+        private void queryOneFile( Map<Integer,Slice> result, long indexFileId, long entityId, int startTimeGroup, int endTimeGroup, Comparator<? super Slice> cp, IntervalStatus status, boolean shouldAddMin, boolean shouldAddMax ) throws IOException
+        {
+            String filePath = new File( indexDir, Filename.aggrIndexFileName( indexFileId ) ).getAbsolutePath();
             SeekingIterator<Slice,Slice> iterator = cache.getTable( filePath ).aggrIterator( filePath );
 
             iterator.seek( new AggregationIndexKey( entityId, startTimeGroup, MinMax.MIN ).encode() );
@@ -303,10 +317,9 @@ public class AggregationIndexOperator
                 }
                 else
                 {
-                    return result;
+                    return;
                 }
             }
-            return result;
         }
 
         private AbstractTimeIntervalAggrQuery packQuery( AggregationIndexMeta meta, Comparator<? super Slice> cp, int start, int end )
@@ -493,8 +506,8 @@ public class AggregationIndexOperator
                 Iterator<EntityTimeIntervalEntry> interval = new SimplePoint2IntervalIterator( iterator, meta.getTimeEnd() );
 
                 // 根据时间分块和value分区, 计算得出索引文件的Entry
-                FileMetaData dataFileMetaData = i.getMiddle();
-                NavigableSet<Integer> subTimeGroup = timeGroup.calcNewGroup( dataFileMetaData.getSmallest(), dataFileMetaData.getLargest() );
+                FileMetaData dataFileMeta = i.getMiddle();
+                NavigableSet<Integer> subTimeGroup = timeGroup.calcNewGroup( dataFileMeta.getSmallest(), dataFileMeta.getLargest() );
 
                 Iterator<AggregationIndexEntry> aggrEntries = new Interval2AggrEntryIterator( interval, meta.getValGroupMap(), subTimeGroup );
                 // 将iterator的entry放入数组进行排序
@@ -505,7 +518,7 @@ public class AggregationIndexOperator
                 File indexFile = new File( indexDir, Filename.aggrIndexFileName( fileId ) );
                 AggregationIndexFileWriter w = new AggregationIndexFileWriter( data, indexFile );
                 long fileSize = w.write();
-                IndexFileMeta fileMeta = new IndexFileMeta( meta.getId(), fileId, fileSize, i.getMiddle().getNumber(), i.getLeft());
+                IndexFileMeta fileMeta = new IndexFileMeta( meta.getId(), fileId, fileSize, dataFileMeta.getSmallest(), dataFileMeta.getLargest(), i.getMiddle().getNumber(), i.getLeft());
                 meta.addFile( fileMeta );
             }
         }
@@ -547,8 +560,8 @@ public class AggregationIndexOperator
                 Iterator<EntityTimeIntervalEntry> interval = new SimplePoint2IntervalIterator( iterator, meta.getTimeEnd() );
 
                 // 根据时间分块和value分区, 计算得出索引文件的Entry(最大最小值)
-                FileMetaData dataFileMetaData = i.getMiddle();
-                NavigableSet<Integer> subTimeGroup = timeGroup.calcNewGroup( dataFileMetaData.getSmallest(), dataFileMetaData.getLargest() );
+                FileMetaData dataFileMeta = i.getMiddle();
+                NavigableSet<Integer> subTimeGroup = timeGroup.calcNewGroup( dataFileMeta.getSmallest(), dataFileMeta.getLargest() );
                 Iterator<Triple<Long,Integer,Slice>> minMax = new MinMaxAggrEntryIterator( interval, subTimeGroup );
                 // 将iterator的entry放入数组进行排序
                 List<Triple<Long,Integer,Slice>> data = Lists.newArrayList( minMax );
@@ -559,7 +572,7 @@ public class AggregationIndexOperator
                 File indexFile = new File( indexDir, Filename.aggrIndexFileName( fileId ) );
                 MinMaxAggrIndexWriter w = new MinMaxAggrIndexWriter( data, indexFile, ValueGroupingMap.getComparator( this.meta.getValueTypes().get( 0 ) ), this.meta.getType() );
                 long fileSize = w.write();
-                IndexFileMeta fileMeta = new IndexFileMeta( meta.getId(), fileId, fileSize, i.getMiddle().getNumber(), i.getLeft());
+                IndexFileMeta fileMeta = new IndexFileMeta( meta.getId(), fileId, fileSize, dataFileMeta.getSmallest(), dataFileMeta.getLargest(), i.getMiddle().getNumber(), i.getLeft());
                 meta.addFile( fileMeta );
             }
         }

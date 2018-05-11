@@ -58,6 +58,7 @@ public class SourceCompare
 
         indexDuration(Long.valueOf(5), 1, 555, 2777, 20, 24);
         indexMinMax(Long.valueOf(5), 1,1560, 2760);
+        store.shutDown();
     }
 
     public void dataImporter() throws Throwable {

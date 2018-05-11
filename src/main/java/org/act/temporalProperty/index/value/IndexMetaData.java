@@ -2,6 +2,9 @@ package org.act.temporalProperty.index.value;
 
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.MultimapBuilder;
+import com.google.common.collect.TreeMultimap;
 import org.act.temporalProperty.index.IndexFileMeta;
 import org.act.temporalProperty.index.IndexType;
 import org.act.temporalProperty.index.IndexValueType;
@@ -12,9 +15,13 @@ import org.act.temporalProperty.util.SliceInput;
 import org.act.temporalProperty.util.SliceOutput;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.TreeMap;
 
 /**
  * Created by song on 2018-01-17.
@@ -26,8 +33,9 @@ public class IndexMetaData {
     private List<Integer> propertyIdList;
     private int timeStart;
     private int timeEnd;
-    private Map<Long,IndexFileMeta> stableFileIds = new HashMap<>();
+    private Map<Long,IndexFileMeta> stableFileIds = new HashMap<>(); // key is corFileId, not indexFile id.
     private Map<Long,IndexFileMeta> unstableFileIds = new HashMap<>();
+    private TreeMap<Integer,IndexFileMeta> fileByTime = new TreeMap<>();
     private boolean online;
 
     public IndexMetaData( long id, IndexType type, List<Integer> pidList, List<IndexValueType> types, int start, int end ) {
@@ -161,10 +169,12 @@ public class IndexMetaData {
         if ( fileMeta.isCorIsStable() )
         {
             stableFileIds.put( fileMeta.getCorFileId(), fileMeta );
+            fileByTime.put( fileMeta.getStartTime(), fileMeta );
         }
         else
         {
             unstableFileIds.put( fileMeta.getCorFileId(), fileMeta );
+            fileByTime.put( fileMeta.getStartTime(), fileMeta );
         }
     }
 
@@ -196,6 +206,33 @@ public class IndexMetaData {
         else
         {
             unstableFileIds.remove( fileId );
+        }
+        fileByTime.entrySet().removeIf( entry -> {
+            IndexFileMeta fMeta = entry.getValue();
+            return fMeta.isCorIsStable()==isStable && fMeta.getCorFileId() == fileId;
+        });
+    }
+
+    /**
+     * @param start inclusive
+     * @param end non-inclusive
+     * @return file which time overlaps this range.
+     */
+    public Collection<IndexFileMeta> getFilesByTime( int start, int end )
+    {
+        Entry<Integer,IndexFileMeta> floorKey = fileByTime.floorEntry( start );
+        if ( floorKey == null )
+        {
+            return fileByTime.subMap( start, true, end, false ).values();
+        }
+        else if ( floorKey.getKey() == start )
+        {
+            return fileByTime.subMap( start, true, end, false ).values();
+        }else{
+            List<IndexFileMeta> result = new ArrayList<>();
+            result.add(floorKey.getValue());
+            result.addAll(fileByTime.subMap( start, true, end, false ).values());
+            return result;
         }
     }
 }

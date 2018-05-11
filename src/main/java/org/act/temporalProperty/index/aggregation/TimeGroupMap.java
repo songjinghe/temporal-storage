@@ -56,10 +56,9 @@ public class TimeGroupMap
 
     public NavigableSet<Integer> calcNewGroup( int min, int max )
     {
-        if ( min < timeStart )
-        { min = timeStart; }
-        if ( max > timeEnd )
-        { max = timeEnd; }
+        min = Math.max( min, timeStart );
+        max = Math.min( max, timeEnd );
+        assert min <= max;
         TreeSet<Integer> set = new TreeSet<>();
         Iterators.addAll( set, new TimeGroupIterator( min, max, true ) );
         return set;
@@ -67,10 +66,9 @@ public class TimeGroupMap
 
     public NavigableSet<Integer> groupAvailable( int min, int max )
     {
-        if ( min < timeStart )
-        { min = timeStart; }
-        if ( max > timeEnd )
-        { max = timeEnd; }
+        min = Math.max( min, timeStart );
+        max = Math.min( max, timeEnd );
+        assert min <= max;
         TreeSet<Integer> set = new TreeSet<>();
         Iterators.addAll( set, new TimeGroupIterator( min, max, false ) );
         return set;

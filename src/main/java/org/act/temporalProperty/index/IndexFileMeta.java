@@ -5,21 +5,23 @@ package org.act.temporalProperty.index;
  */
 public class IndexFileMeta
 {
-    private long indexId;
-    private long fileId;
-    private long fileSize;
-    private int startTime;
-    private int endTime;
+    private final long indexId;
+    private final long fileId;
+    private final long fileSize;
+    private final int startTime;
+    private final int endTime;
 
     //corresponding storage file properties, for single-property time value index and aggregation index.
     private long corFileId;
     private boolean corIsStable;
 
-    public IndexFileMeta( long indexId, long fileId, long fileSize, long corFileId, Boolean corIsStable )
+    public IndexFileMeta( long indexId, long fileId, long fileSize, int startTime, int endTime, long corFileId, Boolean corIsStable )
     {
         this.indexId = indexId;
         this.fileId = fileId;
         this.fileSize = fileSize;
+        this.startTime = startTime;
+        this.endTime = endTime;
         this.corFileId = corFileId;
         this.corIsStable = corIsStable;
     }
