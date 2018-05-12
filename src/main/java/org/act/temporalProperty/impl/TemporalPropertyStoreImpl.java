@@ -377,13 +377,13 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
     }
 
     @Override
-    public AggregationIndexQueryResult aggrWithIndex( long indexId, long entityId, int proId, int startTime, int endTime)
+    public AggregationIndexQueryResult getByIndex( long indexId, long entityId, int proId, int startTime, int endTime )
     {
-        return aggrWithIndex( indexId, entityId, proId, startTime, endTime, null );
+        return getByIndex( indexId, entityId, proId, startTime, endTime, null );
     }
 
     @Override
-    public AggregationIndexQueryResult aggrWithIndex( long indexId, long entityId, int proId, int startTime, int endTime, MemTable cache)
+    public AggregationIndexQueryResult getByIndex( long indexId, long entityId, int proId, int startTime, int endTime, MemTable cache )
     {
         meta.lock.lockShared();
         try

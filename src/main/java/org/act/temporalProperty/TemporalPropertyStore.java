@@ -125,10 +125,10 @@ public interface TemporalPropertyStore
 	 * @param endTime   结束时间
 	 * @return CallBack定义的返回
 	 */
-	AggregationIndexQueryResult aggrWithIndex(long indexId, long entityId, int proId, int startTime, int endTime);
+	AggregationIndexQueryResult getByIndex( long indexId, long entityId, int proId, int startTime, int endTime );
 
 	// query together with cache data
-	AggregationIndexQueryResult aggrWithIndex(long indexId, long entityId, int proId, int startTime, int endTime, MemTable cache);
+	AggregationIndexQueryResult getByIndex( long indexId, long entityId, int proId, int startTime, int endTime, MemTable cache );
 	/**
 	 * 创建一个值索引
 	 * @param start  索引开始时间

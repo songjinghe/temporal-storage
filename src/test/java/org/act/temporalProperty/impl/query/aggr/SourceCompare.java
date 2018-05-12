@@ -352,7 +352,7 @@ public class SourceCompare
         long indexId = store.createAggrDurationIndex(propertyId, start, end, group, 20, Calendar.MINUTE);
         waitUntilIndexReady( indexId );
         log.info("build duration index done");
-        AggregationIndexQueryResult result = store.aggrWithIndex( indexId, entityId, propertyId, start, end );
+        AggregationIndexQueryResult result = store.getByIndex( indexId, entityId, propertyId, start, end );
 
         for ( Map.Entry<Integer,Integer> entry : result.getDurationResult().entrySet() )
         {
@@ -365,7 +365,7 @@ public class SourceCompare
         long indexId = store.createAggrMinMaxIndex(propertyId, start, end, 20, Calendar.MINUTE, IndexType.AGGR_MIN_MAX);
         waitUntilIndexReady( indexId );
         log.info("build min max index done");
-        AggregationIndexQueryResult result = store.aggrWithIndex(indexId, entityId, propertyId, start, end );
+        AggregationIndexQueryResult result = store.getByIndex( indexId, entityId, propertyId, start, end );
         for (Map.Entry<Integer, Slice> entry : result.getMinMaxResult().entrySet()) {
             log.info(entry.getKey() + "," + entry.getValue().getInt(0));
         }
