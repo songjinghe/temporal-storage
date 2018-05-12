@@ -3,7 +3,7 @@ package org.act.temporalProperty.impl.query.range;
 import org.act.temporalProperty.TemporalPropertyStore;
 import org.act.temporalProperty.impl.InternalEntry;
 import org.act.temporalProperty.meta.ValueContentType;
-import org.act.temporalProperty.query.aggr.IndexAggregationQuery;
+import org.act.temporalProperty.query.aggr.AggregationQuery;
 import org.act.temporalProperty.query.range.InternalEntryRangeQueryCallBack;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.StoreBuilder;
@@ -60,7 +60,7 @@ public class CorrectnessTest {
         TemporalPropertyStore store = stBuilder.store();
         try
         {
-            store.getRangeValue( 5, 1, 0, Integer.MAX_VALUE - 10, new IndexAggregationQuery()
+            store.getRangeValue( 5, 1, 0, Integer.MAX_VALUE - 10, new AggregationQuery()
             {
                 @Override
                 public void setValueType( ValueContentType valueType )

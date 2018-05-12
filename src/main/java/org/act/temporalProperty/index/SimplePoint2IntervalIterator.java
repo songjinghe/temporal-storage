@@ -40,6 +40,9 @@ public class SimplePoint2IntervalIterator extends AbstractIterator<EntityTimeInt
                 InternalKey lastKey = lastEntry.getKey();
                 InternalEntry e = tpIter.next();
                 InternalKey curKey = e.getKey();
+                if ( curKey.getStartTime() > endTime )
+                { continue; }
+
                 if(lastKey.getValueType()!=ValueType.INVALID) {
                     if (curKey.getEntityId() == lastKey.getEntityId()) {
                         newEntry = new EntityTimeIntervalEntry(lastKey.getEntityId(), lastKey.getStartTime(), curKey.getStartTime() - 1, lastEntry.getValue());

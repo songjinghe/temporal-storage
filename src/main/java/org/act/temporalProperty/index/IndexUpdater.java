@@ -33,6 +33,7 @@ import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
@@ -168,7 +169,8 @@ public interface IndexUpdater
                 }
                 writer.finish();
                 long fileSize = channel.size();
-                this.newFileMeta = new IndexFileMeta( meta.getId(), fileId, fileSize, targetMeta.getSmallest(), targetMeta.getLargest(), targetMeta.getNumber(), corIsStable );
+                this.newFileMeta = new IndexFileMeta( meta.getId(), fileId, fileSize, targetMeta.getSmallest(), targetMeta.getLargest(), targetMeta.getNumber(), corIsStable,
+                                                      Collections.emptySet() );
             }
         }
     }
@@ -298,7 +300,8 @@ public interface IndexUpdater
 
                 writer.finish();
                 long fileSize = channel.size();
-                this.newFileMeta = new IndexFileMeta( meta.getId(), fileId, fileSize, targetMeta.getSmallest(), targetMeta.getLargest(), 0, false );
+                this.newFileMeta = new IndexFileMeta( meta.getId(), fileId, fileSize, targetMeta.getSmallest(), targetMeta.getLargest(), 0, false,
+                                                      Collections.emptyList() );
             }
         }
     }
@@ -397,7 +400,8 @@ public interface IndexUpdater
             File indexFile = new File( indexDir, Filename.aggrIndexFileName( fileId ) );
             AggregationIndexFileWriter w = new AggregationIndexFileWriter( data, indexFile );
             long fileSize = w.write();
-            this.newFileMeta = new IndexFileMeta( meta.getId(), fileId, fileSize, targetMeta.getSmallest(), targetMeta.getLargest(), targetMeta.getNumber(), corIsStable );
+            this.newFileMeta = new IndexFileMeta( meta.getId(), fileId, fileSize, targetMeta.getSmallest(), targetMeta.getLargest(), targetMeta.getNumber(), corIsStable,
+                                                  subTimeGroup );
         }
     }
 
@@ -429,7 +433,8 @@ public interface IndexUpdater
             MinMaxAggrIndexWriter w =
                     new MinMaxAggrIndexWriter( data, indexFile, ValueGroupingMap.getComparator( this.meta.getValueTypes().get( 0 ) ), this.meta.getType() );
             long fileSize = w.write();
-            this.newFileMeta = new IndexFileMeta( meta.getId(), fileId, fileSize, targetMeta.getSmallest(), targetMeta.getLargest(), targetMeta.getNumber(), corIsStable );
+            this.newFileMeta = new IndexFileMeta( meta.getId(), fileId, fileSize, targetMeta.getSmallest(), targetMeta.getLargest(), targetMeta.getNumber(), corIsStable,
+                                                  subTimeGroup );
         }
     }
 

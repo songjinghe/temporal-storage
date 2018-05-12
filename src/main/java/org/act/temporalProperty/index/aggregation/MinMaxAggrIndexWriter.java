@@ -3,10 +3,8 @@ package org.act.temporalProperty.index.aggregation;
 import org.act.temporalProperty.impl.Options;
 import org.act.temporalProperty.index.IndexType;
 import org.act.temporalProperty.query.aggr.AggregationIndexKey;
-import org.act.temporalProperty.query.aggr.IndexAggregationQuery;
-import org.act.temporalProperty.query.aggr.IndexAggregationQuery.MinMax;
+import org.act.temporalProperty.query.aggr.AggregationQuery;
 import org.act.temporalProperty.table.TableBuilder;
-import org.act.temporalProperty.table.TableComparator;
 import org.act.temporalProperty.util.Slice;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
@@ -82,6 +80,6 @@ public class MinMaxAggrIndexWriter {
     {
         long entityId = key.getLeft();
         int timeGroupId = key.getRight();
-        return new AggregationIndexKey( entityId, timeGroupId, isMin ? MinMax.MIN : MinMax.MAX ).encode();
+        return new AggregationIndexKey( entityId, timeGroupId, isMin ? AggregationQuery.MIN : AggregationQuery.MAX ).encode();
     }
 }

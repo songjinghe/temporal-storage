@@ -334,21 +334,22 @@ public class SinglePropertyStore
     }
 
     // boolean stand for: isStable.
+    // do not build index for unstable files.
     List<Triple<Boolean, FileMetaData, SearchableIterator>> buildIndexIterator( int startTime, int endTime ) {
         List<FileMetaData> stList = propertyMeta.overlappedStable(startTime, endTime);
-        List<FileMetaData> unList = propertyMeta.unFloorTime(endTime);
+//        List<FileMetaData> unList = propertyMeta.unFloorTime(endTime);
         stList.sort(Comparator.comparingInt(FileMetaData::getSmallest));
-        unList.sort(Comparator.comparingInt(FileMetaData::getSmallest));
+//        unList.sort(Comparator.comparingInt(FileMetaData::getSmallest));
 
         List<Triple<Boolean, FileMetaData, SearchableIterator>> results = new ArrayList<>();
         for(FileMetaData meta : stList){
             SearchableIterator fileIterator = this.cache.newIterator(Filename.stPath(proDir, meta.getNumber()));
             results.add(Triple.of( true, meta, fileIterator));
         }
-        for( FileMetaData meta : unList ){
-            SearchableIterator fileIterator = this.cache.newIterator(Filename.unPath(proDir, meta.getNumber()));
-            results.add(Triple.of( false, meta, fileIterator));
-        }
+//        for( FileMetaData meta : unList ){
+//            SearchableIterator fileIterator = this.cache.newIterator(Filename.unPath(proDir, meta.getNumber()));
+//            results.add(Triple.of( false, meta, fileIterator));
+//        }
         return results;
     }
 

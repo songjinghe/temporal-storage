@@ -215,7 +215,7 @@ public class IndexMetaData {
 
     /**
      * @param start inclusive
-     * @param end non-inclusive
+     * @param end   inclusive
      * @return file which time overlaps this range.
      */
     public Collection<IndexFileMeta> getFilesByTime( int start, int end )
@@ -223,15 +223,15 @@ public class IndexMetaData {
         Entry<Integer,IndexFileMeta> floorKey = fileByTime.floorEntry( start );
         if ( floorKey == null )
         {
-            return fileByTime.subMap( start, true, end, false ).values();
+            return fileByTime.subMap( start, true, end, true ).values();
         }
         else if ( floorKey.getKey() == start )
         {
-            return fileByTime.subMap( start, true, end, false ).values();
+            return fileByTime.subMap( start, true, end, true ).values();
         }else{
             List<IndexFileMeta> result = new ArrayList<>();
             result.add(floorKey.getValue());
-            result.addAll(fileByTime.subMap( start, true, end, false ).values());
+            result.addAll(fileByTime.subMap( start, true, end, true ).values());
             return result;
         }
     }

@@ -25,7 +25,7 @@ public class AggregationFileReader
         String indexDir = "/tmp/temporal.property.test/index/";
 //        for(int i=0; i<=3; i++){
         int i=0;
-        AggregationIndexKey search = new AggregationIndexKey( 5, 0, 0 );
+        AggregationIndexKey search = new AggregationIndexKey( 0 , 0, 0 );
         read(indexDir+ Filename.aggrIndexFileName(i), search);
 //            break;
 //        }

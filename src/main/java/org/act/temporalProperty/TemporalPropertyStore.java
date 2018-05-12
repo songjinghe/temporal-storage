@@ -8,7 +8,6 @@ import org.act.temporalProperty.index.value.rtree.IndexEntry;
 import org.act.temporalProperty.meta.ValueContentType;
 import org.act.temporalProperty.query.TimeIntervalKey;
 import org.act.temporalProperty.query.aggr.AggregationIndexQueryResult;
-import org.act.temporalProperty.query.aggr.IndexAggregationQuery;
 import org.act.temporalProperty.query.aggr.ValueGroupingMap;
 import org.act.temporalProperty.query.range.InternalEntryRangeQueryCallBack;
 import org.act.temporalProperty.util.Slice;
@@ -47,7 +46,7 @@ public interface TemporalPropertyStore
 	 * @param startTime 需要查询的时间的起始时间
 	 * @param endTime 需要查询的时间的结束时间
 	 * @param callback 时间段查询所采用的聚集类型
-	 * @return @{Slice} 查询的结果
+	 * @return 用户在callback的onReturn函数中返回的结果，若callback为Aggregation的MIN或MAX函数，则结果集, get(MinMax.MIN)得到最小值, get(MinMax.MAX)得最大值. 若index中只定义了MIN,查询MAX为null
 	 */
     Object getRangeValue( long id, int proId, int startTime, int endTime, InternalEntryRangeQueryCallBack callback );
 

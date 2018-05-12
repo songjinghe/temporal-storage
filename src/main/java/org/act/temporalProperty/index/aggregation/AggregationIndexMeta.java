@@ -1,7 +1,7 @@
 package org.act.temporalProperty.index.aggregation;
 
 import com.google.common.collect.Lists;
-import org.act.temporalProperty.exception.TPSRuntimeException;
+import org.act.temporalProperty.index.IndexFileMeta;
 import org.act.temporalProperty.index.IndexValueType;
 import org.act.temporalProperty.index.value.IndexMetaData;
 import org.act.temporalProperty.index.IndexType;
@@ -10,16 +10,14 @@ import org.act.temporalProperty.util.DynamicSliceOutput;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.SliceInput;
 import org.act.temporalProperty.util.SliceOutput;
-import org.apache.commons.lang3.time.DateUtils;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.HashSet;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 /**
  * Created by song on 2018-04-06.
@@ -119,5 +117,14 @@ public class AggregationIndexMeta extends IndexMetaData {
         return decode(in.input());
     }
 
-
+    public TreeSet<Integer> getTimeGroupAvailable( int start, int end )
+    {
+        TreeSet<Integer> result = new TreeSet<>();
+        Collection<IndexFileMeta> files = this.getFilesByTime( start, end );
+        for ( IndexFileMeta f : files )
+        {
+            result.addAll( f.getTimeGroups() );
+        }
+        return result;
+    }
 }

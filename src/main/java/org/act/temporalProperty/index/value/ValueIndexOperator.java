@@ -193,7 +193,8 @@ public class ValueIndexOperator
                     }
                     writer.finish();
                     long fileSize = channel.size();
-                    IndexFileMeta fileMeta = new IndexFileMeta( iMeta.getId(), fileId, fileSize, dataFileMeta.getSmallest(), dataFileMeta.getLargest(), i.getMiddle().getNumber(), i.getLeft() );
+                    IndexFileMeta fileMeta = new IndexFileMeta( iMeta.getId(), fileId, fileSize, dataFileMeta.getSmallest(), dataFileMeta.getLargest(), i.getMiddle().getNumber(), i.getLeft(),
+                                                                Collections.emptyList() );
                     iMeta.addFile( fileMeta );
                 }
             }
@@ -262,7 +263,7 @@ public class ValueIndexOperator
                 }
                 writer.finish();
                 long fileSize = channel.size();
-                IndexFileMeta fileMeta = new IndexFileMeta( iMeta.getId(), fileId, fileSize, iMeta.getTimeStart(), iMeta.getTimeEnd(), 0, false );
+                IndexFileMeta fileMeta = new IndexFileMeta( iMeta.getId(), fileId, fileSize, iMeta.getTimeStart(), iMeta.getTimeEnd(), 0, false, Collections.emptyList() );
                 iMeta.addFile( fileMeta );
             }
         }

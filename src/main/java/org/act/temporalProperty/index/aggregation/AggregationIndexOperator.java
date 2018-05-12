@@ -13,7 +13,6 @@ import org.act.temporalProperty.index.PropertyFilterIterator;
 import org.act.temporalProperty.index.SimplePoint2IntervalIterator;
 import org.act.temporalProperty.meta.PropertyMetaData;
 import org.act.temporalProperty.query.aggr.*;
-import org.act.temporalProperty.query.aggr.IndexAggregationQuery.MinMax;
 import org.act.temporalProperty.util.Slice;
 import org.apache.commons.lang3.tuple.Triple;
 
@@ -152,7 +151,8 @@ public class AggregationIndexOperator
             int startTimeGroup = status.getTimeStartGroup();
             int endTimeGroup = status.getTimeEndGroup();
             Map<Integer,Integer> result = new TreeMap<>();
-            for ( IndexFileMeta fMeta : meta.getFilesByTime( startTimeGroup, endTimeGroup ) )
+            Collection<IndexFileMeta> fileShouldSearch = meta.getFilesByTime( startTimeGroup, endTimeGroup );
+            for ( IndexFileMeta fMeta : fileShouldSearch)
             {
                 queryOneFile( result, fMeta.getFileId(), entityId, startTimeGroup, endTimeGroup, status );
             }
@@ -260,7 +260,7 @@ public class AggregationIndexOperator
             for ( Entry<Integer,Slice> entry : smaller.entrySet() )
             {
                 int valGroupId = entry.getKey();//MIN(0) or MAX(1)
-                boolean isMin = valGroupId == MinMax.MIN;
+                boolean isMin = valGroupId == AggregationQuery.MIN;
                 Slice value = entry.getValue();
                 larger.merge( valGroupId, value, ( old, cur ) ->
                 {
@@ -294,7 +294,7 @@ public class AggregationIndexOperator
             String filePath = new File( indexDir, Filename.aggrIndexFileName( indexFileId ) ).getAbsolutePath();
             SeekingIterator<Slice,Slice> iterator = cache.getTable( filePath ).aggrIterator( filePath );
 
-            iterator.seek( new AggregationIndexKey( entityId, startTimeGroup, MinMax.MIN ).encode() );
+            iterator.seek( new AggregationIndexKey( entityId, startTimeGroup, AggregationQuery.MIN ).encode() );
             while ( iterator.hasNext() )
             {
                 Entry<Slice,Slice> entry = iterator.next();
@@ -305,13 +305,13 @@ public class AggregationIndexOperator
                     if ( status.isValid( timeGroupId ) )
                     {
                         Slice val = entry.getValue();
-                        if ( shouldAddMin && key.getValueGroupId() == MinMax.MIN )
+                        if ( shouldAddMin && key.getValueGroupId() == AggregationQuery.MIN )
                         {
-                            result.merge( MinMax.MIN, val, ( oldVal, newVal ) -> (cp.compare( newVal, oldVal ) < 0) ? newVal : oldVal );
+                            result.merge( AggregationQuery.MIN, val, ( oldVal, newVal ) -> (cp.compare( newVal, oldVal ) < 0) ? newVal : oldVal );
                         }
-                        if ( shouldAddMax && key.getValueGroupId() == MinMax.MAX )
+                        if ( shouldAddMax && key.getValueGroupId() == AggregationQuery.MAX )
                         {
-                            result.merge( MinMax.MAX, val, ( oldVal, newVal ) -> (cp.compare( newVal, oldVal ) > 0) ? newVal : oldVal );
+                            result.merge( AggregationQuery.MAX, val, ( oldVal, newVal ) -> (cp.compare( newVal, oldVal ) > 0) ? newVal : oldVal );
                         }
                     }//else: continue
                 }
@@ -361,8 +361,8 @@ public class AggregationIndexOperator
                 public Object onResult( Map<Integer,Slice> result )
                 {
                     result = new TreeMap<>();
-                    result.put( MinMax.MAX, max );
-                    result.put( MinMax.MIN, min );
+                    result.put( AggregationQuery.MAX, max );
+                    result.put( AggregationQuery.MIN, min );
                     return result;
                 }
             };
@@ -372,39 +372,30 @@ public class AggregationIndexOperator
     private IntervalStatus accelerateGroups( AggregationIndexMeta meta, int start, int end, long entityId, MemTable cache )
     {
         int proId = meta.getPropertyIdList().get( 0 );
-        NavigableSet<Integer> map = meta.getTimeGroupMap().groupAvailable( start, end + 1 );
+        List<Integer> time = Lists.newArrayList( meta.getTimeGroupAvailable( start, end + 1 ) );
         IntervalStatus status = new IntervalStatus();
-        if ( map.size() > 1 )
+        if ( time.size() > 1 )
         {
-            boolean firstLoop = true;
-            int iStart = 0;
-            for ( Integer time : map )
+            for ( int i = 1; i < time.size(); i++ )
             {
-                if ( firstLoop )
+                int iStart = time.get( i - 1 );
+                int iEnd = time.get( i );
+                if ( !tpStore.cacheOverlap( proId, entityId, iStart, iEnd - 1, cache ) )
                 {
-                    firstLoop = false;
+                    status.addValidTimeGroup( iStart, iStart, iEnd - 1 );
                 }
                 else
                 {
-                    int iEnd = time;
-                    if ( !tpStore.cacheOverlap( proId, entityId, iStart, iEnd - 1, cache ) )
-                    {
-                        status.addValidTimeGroup( iStart, iStart, iEnd - 1 );
-                    }
-                    else
-                    {
-                        status.addInvalidTimeRange( iStart, iEnd - 1 );
-                    }
+                    status.addInvalidTimeRange( iStart, iEnd - 1 );
                 }
-                iStart = time;
             }
-            if ( map.first() > start )
+            if ( time.get( 0 ) > start )
             {
-                status.addInvalidTimeRange( start, map.first() - 1 );
+                status.addInvalidTimeRange( start, time.get( 0 ) - 1 );
             }
-            if ( map.last() < end )
+            if ( time.get( time.size() - 1 ) < end )
             {
-                status.addInvalidTimeRange( map.last(), end );
+                status.addInvalidTimeRange( time.get( time.size() - 1 ), end );
             }
         }
         else
@@ -518,7 +509,15 @@ public class AggregationIndexOperator
                 File indexFile = new File( indexDir, Filename.aggrIndexFileName( fileId ) );
                 AggregationIndexFileWriter w = new AggregationIndexFileWriter( data, indexFile );
                 long fileSize = w.write();
-                IndexFileMeta fileMeta = new IndexFileMeta( meta.getId(), fileId, fileSize, dataFileMeta.getSmallest(), dataFileMeta.getLargest(), i.getMiddle().getNumber(), i.getLeft());
+                IndexFileMeta fileMeta = new IndexFileMeta(
+                        meta.getId(),
+                        fileId,
+                        fileSize,
+                        dataFileMeta.getSmallest(),
+                        dataFileMeta.getLargest(),
+                        i.getMiddle().getNumber(),
+                        i.getLeft(),
+                        subTimeGroup );
                 meta.addFile( fileMeta );
             }
         }
@@ -572,7 +571,15 @@ public class AggregationIndexOperator
                 File indexFile = new File( indexDir, Filename.aggrIndexFileName( fileId ) );
                 MinMaxAggrIndexWriter w = new MinMaxAggrIndexWriter( data, indexFile, ValueGroupingMap.getComparator( this.meta.getValueTypes().get( 0 ) ), this.meta.getType() );
                 long fileSize = w.write();
-                IndexFileMeta fileMeta = new IndexFileMeta( meta.getId(), fileId, fileSize, dataFileMeta.getSmallest(), dataFileMeta.getLargest(), i.getMiddle().getNumber(), i.getLeft());
+                IndexFileMeta fileMeta = new IndexFileMeta(
+                        meta.getId(),
+                        fileId,
+                        fileSize,
+                        dataFileMeta.getSmallest(),
+                        dataFileMeta.getLargest(),
+                        i.getMiddle().getNumber(),
+                        i.getLeft(),
+                        subTimeGroup );
                 meta.addFile( fileMeta );
             }
         }

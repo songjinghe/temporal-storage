@@ -147,8 +147,10 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
         meta.lock.lockShared();
         try
         {
-            Slice idSlice = toSlice( proId, entityId );
+            PropertyMetaData pMeta = meta.getProperties().get( proId );
+            callback.setValueType( pMeta.getType() );
 
+            Slice idSlice = toSlice( proId, entityId );
             SearchableIterator memIter = new EPEntryIterator( idSlice, memTable.iterator() );
             if ( this.stableMemTable != null )
             {
