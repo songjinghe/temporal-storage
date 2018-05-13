@@ -1,15 +1,11 @@
 package org.act.temporalProperty.util;
 
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.Map.Entry;
-
-import com.google.common.collect.AbstractIterator;
+import org.act.temporalProperty.helper.AbstractSearchableIterator;
 import org.act.temporalProperty.impl.InternalEntry;
 import org.act.temporalProperty.impl.InternalKey;
 import org.act.temporalProperty.impl.SearchableIterator;
-import org.act.temporalProperty.impl.SeekingIterator;
-import org.act.temporalProperty.table.BlockEntry;
+
+import java.util.NoSuchElementException;
 
 /**
  * 在生成新的StableFile的时候，需要把上一个tableFile的每个动态属性的最新的值加入到新的文件中，这个类就是提取StableFile中每个动态属性的最近值的工具
@@ -118,7 +114,7 @@ public class TableLatestValueIterator implements SearchableIterator
     /**
      * By Sjh 2018
      */
-    private static class ChangeTimeIterator extends AbstractIterator<InternalEntry> implements SearchableIterator{
+    private static class ChangeTimeIterator extends AbstractSearchableIterator{
         private final SearchableIterator input;
         private final int startTime;
 

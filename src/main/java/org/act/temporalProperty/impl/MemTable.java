@@ -4,8 +4,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.PeekingIterator;
-import org.act.temporalProperty.exception.TPSNHException;
 import org.act.temporalProperty.exception.ValueUnknownException;
+import org.act.temporalProperty.helper.AbstractSearchableIterator;
 import org.act.temporalProperty.query.TemporalValue;
 import org.act.temporalProperty.query.TimeInterval;
 import org.act.temporalProperty.query.TimeIntervalKey;
@@ -17,16 +17,12 @@ import org.act.temporalProperty.util.SliceInput;
 import org.act.temporalProperty.util.Slices;
 import org.apache.commons.lang3.tuple.Triple;
 
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.NavigableMap;
 import java.util.Set;
 import java.util.TreeMap;
-
-import static org.act.temporalProperty.TemporalPropertyStore.NOW;
 
 /**
  * Modified MemTable, which stores time interval only.
@@ -250,12 +246,11 @@ public class MemTable
         }
     }
 
-    public static class MemTableIterator extends AbstractIterator<InternalEntry> implements SearchableIterator
+    public static class MemTableIterator extends AbstractSearchableIterator
     {
         private final TreeMap<Slice,TemporalValue<Value>> table;
         private PeekingIterator<Entry<Slice,TemporalValue<Value>>> iterator;
         private PeekingIterator<Triple<TimePointL,Boolean,Value>> entryIter;
-        private boolean allowSeek = true;
         private boolean seekHasNext = true;
         private Triple<TimePointL,Boolean,Value> lastEntry = null;
         private TemporalValue<Value> tpValue;
@@ -269,7 +264,6 @@ public class MemTable
         @Override
         protected InternalEntry computeNext()
         {
-            allowSeek = false;
             if ( !seekHasNext )
             {
                 return endOfData();
@@ -331,10 +325,7 @@ public class MemTable
         @Override
         public void seekToFirst()
         {
-            if ( !allowSeek )
-            {
-                throw new TPSNHException( "should call seek before call hasNext" );
-            }
+            super.resetState();
             iterator = Iterators.peekingIterator( table.entrySet().iterator() );
             entryIter = null;
         }
@@ -342,10 +333,7 @@ public class MemTable
         @Override
         public void seek( InternalKey targetKey )
         {
-            if ( !allowSeek )
-            {
-                throw new TPSNHException( "should call seek before call hasNext" );
-            }
+            super.resetState();
             iterator = Iterators.peekingIterator( table.entrySet().iterator() );
             while ( iterator.hasNext() )
             {

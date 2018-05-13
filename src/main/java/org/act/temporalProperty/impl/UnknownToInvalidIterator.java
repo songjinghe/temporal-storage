@@ -1,11 +1,11 @@
 package org.act.temporalProperty.impl;
 
-import com.google.common.collect.AbstractIterator;
+import org.act.temporalProperty.helper.AbstractSearchableIterator;
 
 /**
  * Created by song on 2018-05-09.
  */
-public class UnknownToInvalidIterator extends AbstractIterator<InternalEntry> implements SearchableIterator
+public class UnknownToInvalidIterator extends AbstractSearchableIterator
 {
 
     private final SearchableIterator in;
@@ -35,12 +35,14 @@ public class UnknownToInvalidIterator extends AbstractIterator<InternalEntry> im
     @Override
     public void seekToFirst()
     {
+        super.resetState();
         in.seekToFirst();
     }
 
     @Override
     public void seek( InternalKey targetKey )
     {
+        super.resetState();
         in.seek( targetKey );
     }
 }

@@ -15,7 +15,7 @@ import java.util.Map.Entry;
 /**
  * Created by song on 2018-03-28.
  */
-public class DebugIterator extends AbstractIterator<InternalEntry> implements SearchableIterator
+public class DebugIterator extends AbstractSearchableIterator
 {
 
     private final SearchableIterator in;
@@ -100,12 +100,14 @@ public class DebugIterator extends AbstractIterator<InternalEntry> implements Se
 
     @Override
     public void seekToFirst() {
+        super.resetState();
         in.seekToFirst();
     }
 
     @Override
     public void seek( InternalKey targetKey )
     {
+        super.resetState();
         in.seek(targetKey);
     }
 

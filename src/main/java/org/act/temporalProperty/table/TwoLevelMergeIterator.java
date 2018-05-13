@@ -1,9 +1,14 @@
 package org.act.temporalProperty.table;
 
-import com.google.common.collect.AbstractIterator;
+import org.act.temporalProperty.helper.AbstractSearchableIterator;
 import org.act.temporalProperty.helper.EqualValFilterIterator;
 import org.act.temporalProperty.helper.InvalidEntityFilterIterator;
-import org.act.temporalProperty.impl.*;
+import org.act.temporalProperty.impl.InternalEntry;
+import org.act.temporalProperty.impl.InternalKey;
+import org.act.temporalProperty.impl.PackInternalKeyIterator;
+import org.act.temporalProperty.impl.SearchableIterator;
+import org.act.temporalProperty.impl.SeekingIterator;
+import org.act.temporalProperty.impl.ValueType;
 import org.act.temporalProperty.util.Slice;
 
 /**
@@ -11,7 +16,7 @@ import org.act.temporalProperty.util.Slice;
  * 注意：不会删除有delete标记的record
  * rewrite by sjh at 2018-3-27
  */
-public class TwoLevelMergeIterator extends AbstractIterator<InternalEntry> implements SearchableIterator
+public class TwoLevelMergeIterator extends AbstractSearchableIterator
 {
     private final SearchableIterator latest;
     private final SearchableIterator old;
@@ -78,6 +83,7 @@ public class TwoLevelMergeIterator extends AbstractIterator<InternalEntry> imple
     @Override
     public void seekToFirst()
     {
+        super.resetState();
         this.latest.seekToFirst();
         this.old.seekToFirst();
     }
@@ -85,6 +91,7 @@ public class TwoLevelMergeIterator extends AbstractIterator<InternalEntry> imple
     @Override
     public void seek( InternalKey targetKey )
     {
+        super.resetState();
         this.latest.seek( targetKey );
         this.old.seek( targetKey );
     }

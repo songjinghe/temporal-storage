@@ -1,5 +1,6 @@
 package org.act.temporalProperty.index;
 
+import org.act.temporalProperty.helper.AbstractSearchableIterator;
 import org.act.temporalProperty.impl.*;
 
 import java.util.HashSet;
@@ -9,12 +10,14 @@ import java.util.Set;
 /**
  * Created by song on 2018-01-25.
  */
-public class PropertyFilterIterator extends AbstractSearchableIterator implements SearchableIterator{
+public class PropertyFilterIterator extends AbstractSearchableIterator
+{
 
     private final Set<Integer> idSet;
+    private final SearchableIterator in;
 
     public PropertyFilterIterator(List<Integer> proIds, SearchableIterator iterator){
-        super(iterator);
+        this.in = iterator;
         this.idSet = new HashSet<>(proIds);
     }
 
@@ -24,12 +27,26 @@ public class PropertyFilterIterator extends AbstractSearchableIterator implement
 
     @Override
     protected InternalEntry computeNext() {
-        while(iterator.hasNext()){
-            InternalEntry entry = iterator.next();
+        while(in.hasNext()){
+            InternalEntry entry = in.next();
             if(isValidProId(entry)){
                 return entry;
             }
         }
         return endOfData();
+    }
+
+    @Override
+    public void seekToFirst()
+    {
+        super.resetState();
+        in.seekToFirst();
+    }
+
+    @Override
+    public void seek( InternalKey targetKey )
+    {
+        super.resetState();
+        in.seek( targetKey );
     }
 }

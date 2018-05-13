@@ -1,6 +1,5 @@
 package org.act.temporalProperty.helper;
 
-import com.google.common.collect.AbstractIterator;
 import org.act.temporalProperty.exception.TPSNHException;
 import org.act.temporalProperty.impl.InternalEntry;
 import org.act.temporalProperty.impl.InternalKey;
@@ -9,7 +8,6 @@ import org.act.temporalProperty.table.TwoLevelMergeIterator;
 
 import java.util.Comparator;
 import java.util.List;
-import java.util.PriorityQueue;
 
 /**
  * Used in merge process.
@@ -18,7 +16,8 @@ import java.util.PriorityQueue;
  *
  * Created by song on 2018-03-28.
  */
-public class SameLevelMergeIterator extends AbstractIterator<InternalEntry> implements SearchableIterator {
+public class SameLevelMergeIterator extends AbstractSearchableIterator
+{
     private static Comparator<SearchableIterator> cp = ( o1, o2 ) ->
     {
         if(o1.hasNext() && o2.hasNext()){
@@ -74,11 +73,13 @@ public class SameLevelMergeIterator extends AbstractIterator<InternalEntry> impl
 
     @Override
     public void seekToFirst() {
+        super.resetState();
         in.seekToFirst();
     }
 
     @Override
     public void seek(InternalKey targetKey) {
+        super.resetState();
         in.seek( targetKey );
     }
 }

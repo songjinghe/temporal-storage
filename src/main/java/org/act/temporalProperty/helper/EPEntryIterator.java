@@ -1,12 +1,10 @@
 package org.act.temporalProperty.helper;
 
-import com.google.common.collect.AbstractIterator;
-import org.act.temporalProperty.impl.*;
-import org.act.temporalProperty.util.AbstractSeekingIterator;
+import org.act.temporalProperty.exception.TPSRuntimeException;
+import org.act.temporalProperty.impl.InternalEntry;
+import org.act.temporalProperty.impl.InternalKey;
+import org.act.temporalProperty.impl.SearchableIterator;
 import org.act.temporalProperty.util.Slice;
-
-import java.util.Map;
-import java.util.Map.Entry;
 
 /**
  * Created by song on 2018-01-24.
@@ -17,7 +15,6 @@ public class EPEntryIterator extends AbstractSearchableIterator {
     private final Slice id;
 
     public EPEntryIterator(Slice entityPropertyId, SearchableIterator iterator){
-        super(iterator);
         this.id = entityPropertyId;
         this.iter = iterator;
         this.seekToFirst();
@@ -27,6 +24,19 @@ public class EPEntryIterator extends AbstractSearchableIterator {
     public void seekToFirst() {
         InternalKey earliestKey = new InternalKey(id, 0);
         iter.seek(earliestKey);
+        super.resetState();
+    }
+
+    @Override
+    public void seek( InternalKey targetKey )
+    {
+        if(targetKey.getId().equals( id ))
+        {
+            super.resetState();
+            iter.seek( targetKey );
+        }else{
+            throw new TPSRuntimeException( "id not match!" );
+        }
     }
 
     private boolean validId(InternalEntry entry) {
