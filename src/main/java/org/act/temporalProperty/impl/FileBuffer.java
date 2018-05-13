@@ -37,8 +37,10 @@ public class FileBuffer implements Closeable
         this.discTable = new UnSortedTable(unSortedTableFile);
     }
 
-    public void init(File unSortedTableFile ) throws IOException{
-        this.discTable = new UnSortedTable(unSortedTableFile);
+    public void init(File bufLogFile ) throws IOException{
+        this.fName = bufLogFile.getAbsolutePath();
+        this.memTable = new MemTable();
+        this.discTable = new UnSortedTable(bufLogFile);
         this.discTable.initFromFile( this.memTable );
     }
 
@@ -50,7 +52,9 @@ public class FileBuffer implements Closeable
      * @throws IOException
      */
     public void add( TimeIntervalKey key, Slice value ) throws IOException{
-        if(discTable==null || memTable==null ) throw new IOException("should init first!");
+        if(discTable==null || memTable==null ){
+            throw new IOException("should init first!");
+        }
         discTable.add( key, value );
         this.memTable.addInterval( key, value );
     }
@@ -91,6 +95,7 @@ public class FileBuffer implements Closeable
         return "FileBuffer{" +
                 "number=" + number +
                 ", fName='" + fName + '\'' +
+                ", memtable=" + memTable +
                 '}';
     }
 

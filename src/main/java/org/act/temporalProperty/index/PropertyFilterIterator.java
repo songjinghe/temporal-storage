@@ -1,14 +1,9 @@
 package org.act.temporalProperty.index;
 
-import com.google.common.collect.AbstractIterator;
 import org.act.temporalProperty.impl.*;
-import org.act.temporalProperty.util.AbstractSeekingIterator;
-import org.act.temporalProperty.util.Slice;
 
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 
 /**

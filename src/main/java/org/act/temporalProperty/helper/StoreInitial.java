@@ -2,10 +2,12 @@ package org.act.temporalProperty.helper;
 
 import org.act.temporalProperty.exception.TPSMetaLoadFailedException;
 import org.act.temporalProperty.exception.TPSRuntimeException;
+import org.act.temporalProperty.impl.FileBuffer;
 import org.act.temporalProperty.impl.Filename;
 import org.act.temporalProperty.impl.LogReader;
 import org.act.temporalProperty.impl.MemTable;
 import org.act.temporalProperty.index.IndexStore;
+import org.act.temporalProperty.meta.PropertyMetaData;
 import org.act.temporalProperty.meta.SystemMeta;
 import org.act.temporalProperty.meta.SystemMetaController;
 import org.act.temporalProperty.meta.SystemMetaFile;
@@ -36,11 +38,13 @@ public class StoreInitial {
         if(!rootDir.exists()) Files.createDirectory(rootDir.toPath());
         File runLockFile = new File(rootDir, Filename.lockFileName());
         if(runLockFile.exists()){
-            throw new IOException("is.running.lock exist, may be another storage instance running on "+rootDir.getAbsolutePath()+"?");
-        }else{
-            Files.createFile(runLockFile.toPath());
-            return new FileReader(runLockFile);
+            if ( !runLockFile.delete() )
+            {
+                throw new IOException( "is.running.lock is locked, may be another storage instance running on " + rootDir.getAbsolutePath() + "?" );
+            }
         }
+        Files.createFile(runLockFile.toPath());
+        return new FileReader(runLockFile);
     }
 
     private SystemMeta findAndLoadMeta(File rootDir) throws TPSMetaLoadFailedException {
@@ -82,6 +86,7 @@ public class StoreInitial {
         if(meta==null){
             return new SystemMeta();
         }else{
+
             return meta;
         }
     }

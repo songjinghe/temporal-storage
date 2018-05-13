@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.util.*;
 import java.util.Map.Entry;
 
+import org.act.temporalProperty.helper.DebugIterator;
 import org.act.temporalProperty.helper.SameLevelMergeIterator;
 import org.act.temporalProperty.impl.*;
 import org.act.temporalProperty.index.IndexStore;
@@ -297,7 +298,7 @@ public class MergeProcess extends Thread
                 }
                 SearchableIterator diskDataIter;
                 if (createStableFile() && pMeta.hasStable()) {
-                    diskDataIter = TwoLevelMergeIterator.merge(unstableIter, stableLatestValIter(mergeParticipantsMinTime));
+                    diskDataIter = TwoLevelMergeIterator.merge( unstableIter, stableLatestValIter(mergeParticipantsMinTime));
                 } else {
                     diskDataIter = unstableIter;
                 }

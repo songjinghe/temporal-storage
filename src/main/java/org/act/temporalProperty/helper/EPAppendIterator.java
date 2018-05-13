@@ -2,12 +2,10 @@ package org.act.temporalProperty.helper;
 
 import com.google.common.collect.AbstractIterator;
 import org.act.temporalProperty.impl.*;
-import org.act.temporalProperty.util.AbstractSeekingIterator;
 import org.act.temporalProperty.util.Slice;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Created by song on 2018-01-24.
@@ -17,10 +15,8 @@ import java.util.Map;
  * 注意：不同文件的时间虽然无overlap，但内部Key(entity id, pro Id, time)是有overlap的
  * should call seek() or seekToFirst() to initialize all sub-iterators.
  */
-public class EPAppendIterator extends AbstractIterator<InternalEntry> implements SearchableIterator {
+public class EPAppendIterator extends SameLevelMergeIterator {
     // each sub iterator's time should be inc (e.g. 0 is the earliest time)
-    private List<SearchableIterator> iterators = new ArrayList<>();
-    private int cur = 0;
     private Slice id;
 
     public EPAppendIterator(Slice idSlice) {
@@ -29,9 +25,9 @@ public class EPAppendIterator extends AbstractIterator<InternalEntry> implements
 
     public void append(SearchableIterator iterator) {
         if(isEP(iterator)){
-            iterators.add(iterator);
+            add(iterator);
         }else {
-            iterators.add(new EPEntryIterator(id, iterator));
+            add(new EPEntryIterator(id, iterator));
         }
     }
 
@@ -42,25 +38,9 @@ public class EPAppendIterator extends AbstractIterator<InternalEntry> implements
     }
 
     @Override
-    public void seekToFirst() {
-        for(SearchableIterator iterator : iterators) {
-            iterator.seekToFirst();
-        }
-    }
-
-    @Override
     public void seek(InternalKey targetKey) {
         checkIfValidKey(targetKey);
-        cur=0;
-        while(cur<iterators.size()){
-            SearchableIterator iterator = iterators.get(cur);
-            iterator.seek(targetKey);
-            if(iterator.hasNext()){
-                return;
-            }else{
-                cur++;
-            }
-        }
+        super.seek( targetKey );
     }
 
     private void checkIfValidKey(InternalKey target) {
@@ -69,18 +49,7 @@ public class EPAppendIterator extends AbstractIterator<InternalEntry> implements
 
 
     public int size() {
-        return iterators.size();
+        return super.size();
     }
 
-    @Override
-    protected InternalEntry computeNext() {
-        while(cur<iterators.size()){
-            if(iterators.get(cur).hasNext()){
-                return iterators.get(cur).next();
-            }else{
-                cur++;
-            }
-        }
-        return endOfData();
-    }
 }

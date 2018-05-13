@@ -54,4 +54,10 @@ public class TimePointL implements TPoint<TimePointL>
     {
         return Long.compare( time, o.time );
     }
+
+    @Override
+    public String toString()
+    {
+        return isNow()?"NOW":String.valueOf( time );
+    }
 }

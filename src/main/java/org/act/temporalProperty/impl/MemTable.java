@@ -18,6 +18,7 @@ import org.act.temporalProperty.util.Slices;
 import org.apache.commons.lang3.tuple.Triple;
 
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -134,6 +135,33 @@ public class MemTable
         len = in.readInt();
         Slice value = in.readSlice( len );
         return new TimeIntervalValueEntry( new TimeIntervalKey( start, endTime ), value );
+    }
+
+    public String toString()
+    {
+        Map<Integer,TemporalValue<Boolean>> result = new HashMap<>();
+        StringBuilder sb = new StringBuilder();
+        for ( Entry<Slice,TemporalValue<Value>> entityEntry : table.entrySet() )
+        {
+            int proId = InternalKey.idSliceProId( entityEntry.getKey() );
+            result.putIfAbsent( proId, new TemporalValue<>() );
+            TemporalValue<Boolean> tMap = result.get( proId );
+            TemporalValue<Value> entityMap = entityEntry.getValue();
+            Iterator<Entry<TimeInterval,Value>> it = entityMap.intervalEntries();
+            while ( it.hasNext() )
+            {
+                Entry<TimeInterval,Value> entry = it.next();
+                tMap.put( entry.getKey(), true );
+            }
+        }
+        sb.append( "propertyCount(" ).append( result.size() ).append( ")" );
+        for ( Entry<Integer,TemporalValue<Boolean>> entry : result.entrySet() )
+        {
+            sb.append( '[' ).append( entry.getKey() ).append( ']' );
+            TimeInterval interval = entry.getValue().covered();
+            sb.append( '(' ).append( interval.start() ).append( '~' ).append( interval.end() ).append( ") " );
+        }
+        return sb.toString();
     }
 
     public MemTableIterator iterator()
