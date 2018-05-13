@@ -3,6 +3,7 @@ package org.act.temporalProperty.impl;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.PeekingIterator;
 import org.act.temporalProperty.TemporalPropertyStore;
+import org.act.temporalProperty.exception.TPSException;
 import org.act.temporalProperty.exception.TPSRuntimeException;
 import org.act.temporalProperty.exception.ValueUnknownException;
 import org.act.temporalProperty.helper.StoreInitial;
@@ -202,6 +203,19 @@ public class TemporalPropertyStoreImpl implements TemporalPropertyStore
         finally
         {
             meta.lock.unlockShared();
+        }
+    }
+
+    public ValueContentType getPropertyValueType( int propertyId )
+    {
+        PropertyMetaData pMeta = meta.getProperties().get( propertyId );
+        if ( pMeta != null )
+        {
+            return pMeta.getType();
+        }
+        else
+        {
+            return null;
         }
     }
 

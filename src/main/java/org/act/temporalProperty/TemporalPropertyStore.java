@@ -53,6 +53,8 @@ public interface TemporalPropertyStore
     // query together with cache data
 	Object getRangeValue( long entityId, int proId, int start, int end, InternalEntryRangeQueryCallBack callBack, MemTable cache );
 
+	ValueContentType getPropertyValueType( int propertyId );
+
 	/**
 	 * 创建某个时态属性
 	 * @param propertyId 时态属性的id
