@@ -8,6 +8,7 @@ matrix:
 
 addons:
   apt:
+    update: true
     packages:
     - debhelper
     - devscripts
@@ -29,4 +30,4 @@ install:
   - mvn install  -DskipTests=true  -Dlicense.skip=true  -Dlicensing.skip=true  -Dmaven.javadoc.skip=true  -B
 
 script:
-  - echo "tests are skipped" # mvn test -B
+  - mvn test -B #echo "tests are skipped" #
