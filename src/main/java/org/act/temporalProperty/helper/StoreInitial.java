@@ -1,17 +1,17 @@
 package org.act.temporalProperty.helper;
 
 import org.act.temporalProperty.exception.TPSMetaLoadFailedException;
-import org.act.temporalProperty.exception.TPSNHException;
 import org.act.temporalProperty.exception.TPSRuntimeException;
+import org.act.temporalProperty.impl.FileBuffer;
 import org.act.temporalProperty.impl.Filename;
 import org.act.temporalProperty.impl.LogReader;
 import org.act.temporalProperty.impl.MemTable;
 import org.act.temporalProperty.index.IndexStore;
+import org.act.temporalProperty.meta.PropertyMetaData;
 import org.act.temporalProperty.meta.SystemMeta;
 import org.act.temporalProperty.meta.SystemMetaController;
 import org.act.temporalProperty.meta.SystemMetaFile;
 import org.act.temporalProperty.table.*;
-import org.act.temporalProperty.util.DynamicSliceOutput;
 import org.act.temporalProperty.util.Slice;
 
 import java.io.*;
@@ -38,11 +38,13 @@ public class StoreInitial {
         if(!rootDir.exists()) Files.createDirectory(rootDir.toPath());
         File runLockFile = new File(rootDir, Filename.lockFileName());
         if(runLockFile.exists()){
-            throw new IOException("is.running.lock exist, may be another storage instance running on "+rootDir.getAbsolutePath()+"?");
-        }else{
-            Files.createFile(runLockFile.toPath());
-            return new FileReader(runLockFile);
+            if ( !runLockFile.delete() )
+            {
+                throw new IOException( "is.running.lock is locked, may be another storage instance running on " + rootDir.getAbsolutePath() + "?" );
+            }
         }
+        Files.createFile(runLockFile.toPath());
+        return new FileReader(runLockFile);
     }
 
     private SystemMeta findAndLoadMeta(File rootDir) throws TPSMetaLoadFailedException {
@@ -84,6 +86,7 @@ public class StoreInitial {
         if(meta==null){
             return new SystemMeta();
         }else{
+
             return meta;
         }
     }
@@ -93,24 +96,17 @@ public class StoreInitial {
             String tempFileName = Filename.tempFileName(0);
             File tempFile = new File( this.rootDir + "/" + tempFileName );
 
-            MemTable memTable = new MemTable(TableComparator.instance());
+            MemTable memTable = new MemTable();
             if( tempFile.exists()){
                 if((tempFile.length() >= Footer.ENCODED_LENGTH)) {
                     FileInputStream inputStream = new FileInputStream(tempFile);
                     FileChannel channel = inputStream.getChannel();
-                    Table table;
-                    try {
-                        table = new FileChannelTable(tempFileName, channel, TableComparator.instance(), false);
-                    } catch (IllegalArgumentException e) {
-                        throw new TPSRuntimeException(tempFileName+" file size larger than Integer.MAX_VALUE bytes. Should not happen.", e);
-                    }
-
-                    TableIterator iterator = table.iterator();
-                    if (iterator.hasNext()) {
-                        while (iterator.hasNext()) {
-                            Map.Entry<Slice, Slice> entry = iterator.next();
-                            memTable.add(entry.getKey(), entry.getValue());
-                        }
+                    LogReader reader = new LogReader(channel, null, false, 0);
+                    Slice rawEntry;
+                    while((rawEntry = reader.readRecord())!=null)
+                    {
+                        MemTable.TimeIntervalValueEntry entry = MemTable.decode( rawEntry.input() );
+                        memTable.addInterval( entry.getKey(), entry.getValue() );
                     }
                     channel.close();
                     inputStream.close();
@@ -123,8 +119,4 @@ public class StoreInitial {
         }
     }
 
-    public IndexStore initIndex() {
-
-        return null;
-    }
 }

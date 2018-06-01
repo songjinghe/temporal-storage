@@ -80,11 +80,11 @@ public class PropertyMetaData {
         return stableFileBuffers.get(number);
     }
 
-    public SortedMap<Long, FileBuffer> getUnstableBuffers() {
+    public TreeMap<Long, FileBuffer> getUnstableBuffers() {
         return unStableFileBuffers;
     }
 
-    public SortedMap<Long, FileBuffer> getStableBuffers() {
+    public TreeMap<Long, FileBuffer> getStableBuffers() {
         return stableFileBuffers;
     }
 
@@ -205,5 +205,27 @@ public class PropertyMetaData {
                 ", unStableFiles=" + unStableFiles +
                 ", unStableFileBuffers=" + unStableFileBuffers +
                 '}';
+    }
+
+    public Collection<FileBuffer> overlappedBuffers( int startTime, int endTime )
+    {
+        List<FileBuffer> result = new ArrayList<>();
+        if(hasStable())
+        {
+            for(Entry<Integer, FileMetaData> entry : stableByTime.tailMap(startTime, true).entrySet())
+            {
+                FileBuffer buffer = getStableBuffers( entry.getValue().getNumber() );
+                if(buffer!=null) result.add(buffer);
+            }
+        }
+        if(hasUnstable())
+        {
+            for(Entry<Integer, FileMetaData> entry : unstableByTime.headMap(endTime, true).entrySet())
+            {
+                FileBuffer buffer = getUnstableBuffers( entry.getValue().getNumber() );
+                if(buffer!=null) result.add(buffer);
+            }
+        }
+        return result;
     }
 }

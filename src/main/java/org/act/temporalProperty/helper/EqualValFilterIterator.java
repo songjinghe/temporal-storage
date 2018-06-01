@@ -20,7 +20,9 @@ public class EqualValFilterIterator extends CompareLastReturnedIterator<Internal
         if(lastReturned!=null){
             InternalKey preKey = lastReturned.getKey();
             InternalKey curKey = cur.getKey();
-            if (curKey.getId().equals(preKey.getId()) && cur.getValue().equals(lastReturned.getValue())) {
+            if (curKey.getId().equals(preKey.getId()) &&
+                    curKey.getValueType() == preKey.getValueType() &&
+                    cur.getValue().equals(lastReturned.getValue())) {
                 return false;
             } else {
                 return true;

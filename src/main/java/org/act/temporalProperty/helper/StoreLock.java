@@ -57,15 +57,29 @@ public class StoreLock{
     }
 
     public void memTableSubmitted(){
-        memTableSubmitted.signal();
+        memTableSubmitted.signalAll();
     }
 
-    public void waitMergeDone() throws InterruptedException {
+    public void waitMergeDoneRegardlessShutDown() throws InterruptedException {
         mergeDone.await();
     }
 
-    public void mergeDone(){
-        mergeDone.signal();
+    public void waitMergeDone() throws InterruptedException {
+        if(systemDown){
+            throw new StoreShutdownException();
+        }
+        mergeDone.await();
+        if(systemDown){
+            throw new StoreShutdownException();
+        }
     }
 
+    public void mergeDone(){
+        mergeDone.signalAll();
+    }
+
+    public void shutdownLockExclusive()
+    {
+        lock.writeLock().lock();
+    }
 }

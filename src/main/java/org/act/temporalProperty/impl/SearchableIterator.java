@@ -4,6 +4,7 @@ import com.google.common.collect.PeekingIterator;
 import org.act.temporalProperty.util.Slice;
 
 /**
+ * Note that after call seek() seekToFirst(), the hasNext() and peek() return value may change.
  * Created by song on 2018-03-29.
  */
 public interface SearchableIterator extends PeekingIterator<InternalEntry> {

@@ -1,46 +1,45 @@
 package org.act.temporalProperty.index;
 
+import com.google.common.collect.PeekingIterator;
 import org.act.temporalProperty.impl.*;
 import org.act.temporalProperty.index.aggregation.*;
 import org.act.temporalProperty.index.value.*;
 import org.act.temporalProperty.index.value.rtree.IndexEntry;
 import org.act.temporalProperty.meta.PropertyMetaData;
-import org.act.temporalProperty.query.aggr.IndexAggregationQuery;
+import org.act.temporalProperty.query.TimeIntervalKey;
+import org.act.temporalProperty.query.aggr.AggregationIndexQueryResult;
 import org.act.temporalProperty.query.aggr.ValueGroupingMap;
+import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.SliceOutput;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicLong;
+
+import static org.act.temporalProperty.index.IndexType.AGGR_DURATION;
+import static org.act.temporalProperty.index.IndexType.SINGLE_VALUE;
+import static org.act.temporalProperty.index.IndexUpdater.*;
 
 /**
  * Created by song on 2018-03-19.
  */
 public class IndexStore {
     private final TemporalPropertyStoreImpl tpStore;
+    private final File indexDir;
     private IndexTableCache cache;
-    private File indexDir;
-    private AtomicLong nextId;
 
-    private AggregationIndexManager aggr;
-    private ValueIndexManager value;
+    private AggregationIndexOperator aggr;
+    private ValueIndexOperator value;
+    private IndexMetaManager meta;
 
-    public IndexStore(File indexDir, TemporalPropertyStoreImpl store, Set<IndexMetaData> indexes, long nextId) throws IOException {
+    public IndexStore(File indexDir, TemporalPropertyStoreImpl store, Set<IndexMetaData> indexes, long nextId, long nextFileId) throws IOException {
         if(!indexDir.exists() && !indexDir.mkdir()) throw new IOException("unable to create index dir");
-        this.indexDir = indexDir;
         this.tpStore = store;
+        this.indexDir = indexDir;
         this.cache = new IndexTableCache(indexDir, 4);
-        this.nextId = new AtomicLong(nextId);
-        this.aggr = new AggregationIndexManager(indexDir, store, cache, this.nextId);
-        this.value = new ValueIndexManager(indexDir, store, cache, this.nextId);
-        for(IndexMetaData meta : indexes){
-            if(meta.getType().isValueIndex()){
-                value.addMeta(meta);
-            }else{
-                aggr.addMeta((AggregationIndexMeta) meta);
-            }
-        }
+        this.meta = new IndexMetaManager( indexes, nextId, nextFileId );
+        this.aggr = new AggregationIndexOperator( indexDir, store, cache, meta );
+        this.value = new ValueIndexOperator( indexDir, store, cache, meta );
     }
 
     public void close(){
@@ -82,20 +81,149 @@ public class IndexStore {
         return aggr.createMinMax(pMeta, start, end, every, timeUnit, type);
     }
 
-    public List<IndexEntry> queryValueIndex(IndexQueryRegion condition) throws IOException {
-        return value.query(condition);
+    public List<IndexEntry> queryValueIndex( IndexQueryRegion condition, MemTable cache ) throws IOException {
+        return value.query(condition, cache);
     }
 
-    public Object queryAggrIndex(long entityId, PropertyMetaData meta, int start, int end, long indexId, IndexAggregationQuery query) throws IOException {
-        return aggr.query(entityId, meta.getPropertyId(), start, end, indexId, query);
+    public AggregationIndexQueryResult queryAggrIndex( long entityId, PropertyMetaData meta, int start, int end, long indexId, MemTable cache ) throws IOException {
+        return aggr.query(entityId, meta.getPropertyId(), start, end, indexId, cache);
     }
 
     public void deleteIndex(int propertyId) {
         //Fixme TODO
     }
 
-    public void updateEntry(InternalEntry entry) {
-        InternalKey key = entry.getKey();
+    /**
+     * update index if needed.
+     */
+    public List<BackgroundTask> createNewIndexTasks()
+    {
+        List<BackgroundTask> result = new ArrayList<>();
+        result.addAll( this.value.createIndexTasks() );
+        result.addAll( this.aggr.createIndexTasks() );
+        return result;
     }
 
+    public boolean isOnline( long indexId )
+    {
+        return meta.isOnline( indexId );
+    }
+
+    public IndexUpdater onBufferDelUpdate( int propertyId, boolean isStable, FileMetaData fMeta, MemTable mem )
+    {
+        IndexUpdater.AllIndexUpdater indexUpdater = new IndexUpdater.AllIndexUpdater();
+        List<IndexMetaData> indexes = meta.getByProId( propertyId );
+        for ( IndexMetaData i : indexes )
+        {
+            if ( i.getType() == IndexType.MULTI_VALUE )
+            {
+                for(IndexFileMeta fileMeta : i.allFiles())
+                {
+                    if(mem.overlap( propertyId, fileMeta.getStartTime(), fileMeta.getEndTime() ))
+                    {
+                        indexUpdater.add( new MultiPropertyValueBufferMergeUpdater( meta, indexDir, i, fMeta.getNumber(), isStable ) );
+                    }
+                }
+            }
+            else
+            {
+                IndexFileMeta fileMeta = i.getByCorFileId( fMeta.getNumber(), isStable );
+                if ( fileMeta != null )
+                {
+                    if(mem.overlap( propertyId, fileMeta.getStartTime(), fileMeta.getEndTime() ))
+                    {
+                        if ( i.getType() == SINGLE_VALUE )
+                        {
+                            indexUpdater.add( new SinglePropertyValueBufferMergeUpdater(meta, indexDir, i, fMeta.getNumber(), isStable ) );
+                        }
+                        else if ( i.getType() == AGGR_DURATION )
+                        {
+                            indexUpdater.add( new DurationBufferMergeUpdater( meta, indexDir, i, fMeta.getNumber(), isStable) );
+                        }
+                        else
+                        {
+                            indexUpdater.add( new MinMaxBufferMergeUpdater( meta, indexDir, i, fMeta.getNumber(), isStable ));
+                        }
+                    }
+                }
+            }
+        }
+        if ( indexUpdater.isEmpty() )
+        {
+            return emptyUpdate();
+        }
+        return indexUpdater;
+    }
+
+    public IndexUpdater onMergeUpdate( int propertyId, MemTable mem, List<Long> mergeParticipants )
+    {
+        IndexUpdater.AllIndexUpdater indexUpdater = new IndexUpdater.AllIndexUpdater();
+        List<IndexMetaData> indexes = meta.getByProId( propertyId );
+        for ( IndexMetaData i : indexes )
+        {
+            if ( i.getType() == IndexType.MULTI_VALUE )
+            {
+                for(IndexFileMeta fileMeta : i.allFiles())
+                {
+                    if(mem.overlap( propertyId, fileMeta.getStartTime(), fileMeta.getEndTime() ))
+                    {
+                        indexUpdater.add(new MultiPropertyValueIndexFileUpdater(meta, indexDir, i, mergeParticipants, propertyId) );
+                    }
+                }
+            }
+            else
+            {
+                if ( i.getByCorFileId( propertyId, true ) != null )
+                {
+                    if ( i.getType() == SINGLE_VALUE )
+                    {
+                        indexUpdater.add( new SinglePropertyValueIndexFileUpdater(meta, indexDir, i, mergeParticipants, true ) );
+                    }
+                    else if ( i.getType() == AGGR_DURATION )
+                    {
+                        indexUpdater.add( new DurationMergeUpgradeUpdater( meta, indexDir, i, mergeParticipants, true ) );
+                    }
+                    else
+                    {
+                        indexUpdater.add( new MinMaxFileUpgradeUpdater( meta, indexDir, i, mergeParticipants, true ) );
+                    }
+                }
+            }
+        }
+        if ( indexUpdater.isEmpty() )
+        {
+            return emptyUpdate();
+        }
+        else
+        {
+            return indexUpdater;
+        }
+    }
+
+    public IndexUpdater emptyUpdate()
+    {
+        return new IndexUpdater()
+        {
+            public void update( InternalEntry entry )
+            {
+            }
+
+            public void finish( FileMetaData targetMeta ) throws IOException
+            {
+            }
+
+            public void updateMeta()
+            {
+            }
+
+            public void cleanUp()
+            {
+            }
+        };
+    }
+
+    public List<IndexMetaData> list()
+    {
+        return meta.allIndexes();
+    }
 }

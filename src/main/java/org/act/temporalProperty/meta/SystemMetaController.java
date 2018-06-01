@@ -38,6 +38,7 @@ public class SystemMetaController {
             PropertyMetaDataController.encode(out, p);
         }
         out.writeLong(meta.indexNextId());
+        out.writeLong( meta.indexNextFileId() );
         Collection<IndexMetaData> indexes = meta.getIndexes();
         out.writeInt(indexes.size());
         for(IndexMetaData p: indexes){
@@ -53,6 +54,7 @@ public class SystemMetaController {
             meta.addProperty(pMeta);
         }
         meta.setIndexNextId(in.readLong());
+        meta.setIndexNextFileId(in.readLong());
         count = in.readInt();
         for(int i=0; i<count; i++){
             IndexMetaData iMeta = new IndexMetaData(in);

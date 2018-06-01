@@ -8,6 +8,8 @@ import org.act.temporalProperty.impl.InternalKey;
 import org.act.temporalProperty.impl.SearchableIterator;
 import org.act.temporalProperty.impl.ValueType;
 
+import java.util.Iterator;
+
 /**
  * Created by song on 2018-04-06.
  */
@@ -20,7 +22,7 @@ public class SimplePoint2IntervalIterator extends AbstractIterator<EntityTimeInt
      * @param tpIter  should only contains one property.
      * @param endTime
      */
-    public SimplePoint2IntervalIterator(SearchableIterator tpIter, int endTime) {
+    public SimplePoint2IntervalIterator( PeekingIterator<InternalEntry> tpIter, int endTime ) {
         this.tpIter = new OnePropertyChecker(tpIter);
         this.endTime = endTime;
         if (tpIter.hasNext()) {
@@ -38,6 +40,9 @@ public class SimplePoint2IntervalIterator extends AbstractIterator<EntityTimeInt
                 InternalKey lastKey = lastEntry.getKey();
                 InternalEntry e = tpIter.next();
                 InternalKey curKey = e.getKey();
+                if ( curKey.getStartTime() > endTime )
+                { continue; }
+
                 if(lastKey.getValueType()!=ValueType.INVALID) {
                     if (curKey.getEntityId() == lastKey.getEntityId()) {
                         newEntry = new EntityTimeIntervalEntry(lastKey.getEntityId(), lastKey.getStartTime(), curKey.getStartTime() - 1, lastEntry.getValue());
@@ -66,13 +71,13 @@ public class SimplePoint2IntervalIterator extends AbstractIterator<EntityTimeInt
     }
 
     private static class OnePropertyChecker extends AbstractIterator<InternalEntry> implements PeekingIterator<InternalEntry> {
-        private final SearchableIterator tpIter;
+        private final PeekingIterator<InternalEntry> tpIter;
         private int proId=-1;
 
         /**
          * @param tpIter  should only contains one property.
          */
-        OnePropertyChecker(SearchableIterator tpIter) {
+        OnePropertyChecker( PeekingIterator<InternalEntry> tpIter ) {
             this.tpIter = tpIter;
         }
 
@@ -82,7 +87,7 @@ public class SimplePoint2IntervalIterator extends AbstractIterator<EntityTimeInt
                 InternalKey curKey = tpIter.peek().getKey();
                 if(proId==-1){
                     proId = curKey.getPropertyId();
-                }else if (curKey.getEntityId() == proId) {
+                }else if (curKey.getPropertyId() == proId) {
                     return tpIter.next();
                 } else {
                     throw new TPSNHException("got more than one property.");

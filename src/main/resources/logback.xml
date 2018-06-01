@@ -28,7 +28,7 @@
             <!--<OnMatch>DENY</OnMatch>-->
         <!--</filter>-->
         <encoder>
-            <pattern>%d{MM-dd HH:mm:ss} [%thread{4}] %-5level %logger{36} - %msg%n</pattern>
+            <pattern>%d{MM-dd HH:mm:ss.SSS} [%thread{4}] %-5level %logger{36} - %msg%n</pattern>
             <!--<pattern>%d{HH:mm} %-25logger{0} - %msg%n</pattern>-->
         </encoder>
     </appender>

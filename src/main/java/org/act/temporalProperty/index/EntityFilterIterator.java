@@ -1,6 +1,6 @@
 package org.act.temporalProperty.index;
 
-import com.google.common.collect.AbstractIterator;
+import org.act.temporalProperty.helper.AbstractSearchableIterator;
 import org.act.temporalProperty.impl.InternalEntry;
 import org.act.temporalProperty.impl.InternalKey;
 import org.act.temporalProperty.impl.SearchableIterator;
@@ -10,7 +10,7 @@ import java.util.Set;
 /**
  * Created by song on 2018-04-05.
  */
-public class EntityFilterIterator extends AbstractIterator<InternalEntry> implements SearchableIterator {
+public class EntityFilterIterator extends AbstractSearchableIterator {
 
     private final Set<Long> entityIdSet;
     private final SearchableIterator in;
@@ -34,11 +34,13 @@ public class EntityFilterIterator extends AbstractIterator<InternalEntry> implem
 
     @Override
     public void seekToFirst() {
+        super.resetState();
         in.seekToFirst();
     }
 
     @Override
     public void seek(InternalKey targetKey) {
+        super.resetState();
         in.seek(targetKey);
     }
 }

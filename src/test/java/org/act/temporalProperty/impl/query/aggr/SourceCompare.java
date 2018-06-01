@@ -1,19 +1,20 @@
 package org.act.temporalProperty.impl.query.aggr;
 
 import org.act.temporalProperty.TemporalPropertyStore;
-import org.act.temporalProperty.impl.InternalEntry;
 import org.act.temporalProperty.index.IndexType;
 import org.act.temporalProperty.index.aggregation.TimeIntervalEntry;
 import org.act.temporalProperty.index.value.rtree.IndexEntry;
 import org.act.temporalProperty.meta.ValueContentType;
+import org.act.temporalProperty.query.aggr.AggregationIndexQueryResult;
+import org.act.temporalProperty.query.aggr.AggregationQuery;
 import org.act.temporalProperty.query.aggr.DurationStatisticAggregationQuery;
-import org.act.temporalProperty.query.aggr.IndexAggregationQuery;
 import org.act.temporalProperty.query.aggr.ValueGroupingMap;
 import org.act.temporalProperty.util.DataFileImporter;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.StoreBuilder;
-import org.act.temporalProperty.util.TrafficDataImporter;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.util.*;
@@ -24,6 +25,7 @@ import java.util.*;
  */
 public class SourceCompare
 {
+    private Logger log = LoggerFactory.getLogger( SourceCompare.class );
     public static final int NOW_TIME = 0x40000000; //2^30
     private static TemporalPropertyStore store;
     private static DataFileImporter dataFileImporter = new DataFileImporter();
@@ -41,22 +43,39 @@ public class SourceCompare
 */
     @Test
     public void test() throws Throwable {
-        this.inputFileCount = 10;
+        log.info("SOURCE: importing... ");
+        this.inputFileCount = 100;
         inputFileData();
         mergeEntryList(1);
-        IndexEntry maxEntry = aggregationMax(Long.valueOf(5), 1,1560, 2760);
-        IndexEntry minEntry = aggregationMin(Long.valueOf(5), 1,1560, 2760);
-        aggregationDuration(Long.valueOf(5), 1, 555, 2777, 20, 24);
+        log.info("SOURCE: import done");
+        IndexEntry maxEntry = aggregationMax(Long.valueOf(5), 1,1560, 27770);
+        log.info("SOURCE: max query done. MAX={}", maxEntry.getValue(0).getInt(0));
+        IndexEntry minEntry = aggregationMin(Long.valueOf(5), 1,1560, 27770);
+        log.info("SOURCE: min query done. MIN={}", minEntry.getValue(0).getInt(0));
+        aggregationDuration(Long.valueOf(5), 1, 555, 27770, 20, 24);
 
-        System.out.println("Min = " + minEntry.getValue(0).getInt(0) + ", " + "Max = " + maxEntry.getValue(0).getInt(0));
-
-        System.out.println("==============================");
+        log.info("SOURCE: duration query done");
+        log.info("TGRAPH: importing...");
 
         dataImporter();
-        rangeDuration(Long.valueOf(5), 1, 555, 2777, 20, 24);
+        log.info("TGRAPH: import done");
+        rangeDuration(Long.valueOf(5), 1, 555, 27770, 20, 24);
+        log.info("TGRAPH: duration query (range) done");
+        indexDuration(Long.valueOf(5), 1, 555, 27770, 20, 24);
+        log.info("TGRAPH: duration query (index) done");
+        indexMinMax(Long.valueOf(5), 1,1560, 27770);
+        log.info("TGRAPH: min max query (index) done");
+        rangeMinMax(5, 1, 1560, 27770);
+        log.info("TGRAPH: min max query (range) done");
+        store.shutDown();
+        log.info("TGRAPH: system shutdown");
+    }
 
-        indexDuration(Long.valueOf(5), 1, 555, 2777, 20, 24);
-        indexMinMax(Long.valueOf(5), 1,1560, 2760);
+    private void rangeMinMax( long entityId, int proId, int start, int end )
+    {
+        Object o = store.getRangeValue( entityId, proId, start, end, AggregationQuery.MinMax );
+        Map<Integer, Slice> val = (Map<Integer,Slice>) o;
+        log.info("min = {}, max = {}", val.get( AggregationQuery.MIN ).getInt( 0 ), val.get( AggregationQuery.MAX ).getInt( 0 ));
     }
 
     public void dataImporter() throws Throwable {
@@ -72,7 +91,7 @@ public class SourceCompare
         int fileNum = Math.min(dataFileList.size(), inputFileCount);
         for (int i = 0; i < fileNum; i++) {
             File file = dataFileList.get(i);
-            int sTime = timeStr2int(file.getName().substring(9, 21)) - 1288800000;
+            int sTime = timeStr2int(file.getName().substring(9, 21)) - 1288886400; // for 2010-11-05 data. //1288800000;for 2010-11-04
             try (BufferedReader br = new BufferedReader(new FileReader(file))) {
                 String line = br.readLine();
                 while ((line = br.readLine()) != null) {
@@ -94,7 +113,7 @@ public class SourceCompare
                 }
                 br.close();
             } catch (IOException e) {
-                System.out.println("inputFileData : NULLIOException.");
+                log.info("inputFileData : NULLIOException.");
             }
         }
     }
@@ -104,7 +123,7 @@ public class SourceCompare
         int fileNum = Math.min(dataFileList.size(), inputFileCount);
         for (int i = 0; i < fileNum; i++) {
             File file = dataFileList.get(i);
-            int sTime = timeStr2int(file.getName().substring(9, 21)) - 1288800000;
+            int sTime = timeStr2int(file.getName().substring(9, 21)) - 1288886400; // for 2010-11-05 data. //1288800000;for 2010-11-04
             try (BufferedReader br = new BufferedReader(new FileReader(file))) {
                 String line = br.readLine();
                 while ((line = br.readLine()) != null) {
@@ -127,7 +146,7 @@ public class SourceCompare
                 }
                 br.close();
             } catch (IOException e) {
-                System.out.println("inputFileData : NULLIOException.");
+                log.info("inputFileData : NULLIOException.");
             }
         }
 
@@ -272,7 +291,7 @@ public class SourceCompare
             result.put(2, interval[2]);
 
         for (Map.Entry<Integer, Integer> entry1 : result.entrySet()) {
-            System.out.println(entry1.getKey() + "," + entry1.getValue());
+            log.info(entry1.getKey() + "," + entry1.getValue());
         }
 
         return result;
@@ -280,12 +299,17 @@ public class SourceCompare
 
     public void rangeDuration(Long entityId, int propertyId, int start, int end, int minPValue, int maxPValue) {
 
-        Object object = store.aggregate(entityId, propertyId, start, end, new DurationStatisticAggregationQuery<Integer>(end) {
+        Object object = store.aggregate( entityId, propertyId, start, end, new DurationStatisticAggregationQuery<Integer>( start, end )
+        {
             @Override
             public Integer computeGroupId(TimeIntervalEntry entry) {
-                if (entry.value().getInt(0) < minPValue) {
+                int val = asInt( entry.value() );
+                if ( val < minPValue )
+                {
                     return 0;
-                } else if (entry.value().getInt(0) <= maxPValue) {
+                }
+                else if ( val <= maxPValue )
+                {
                     return 1;
                 } else {
                     return 2;
@@ -295,12 +319,27 @@ public class SourceCompare
             @Override
             public Object onResult(Map<Integer, Integer> result) {
                 for (Map.Entry<Integer, Integer> entry : result.entrySet()) {
-                    System.out.println(entry.getKey() + "," + entry.getValue());
+                    log.info(entry.getKey() + "," + entry.getValue());
                 }
 
                 return result;
             }
-        });
+        } );
+    }
+
+    private void waitUntilIndexReady(long indexId)
+    {
+        try
+        {
+            while ( store.listIndex().stream().filter( indexMetaData -> indexMetaData.getId() == indexId && indexMetaData.isOnline() ).count() == 0 )
+            {
+                Thread.sleep( 100 );
+            }
+        }
+        catch ( InterruptedException e )
+        {
+            e.printStackTrace();
+        }
     }
 
     public void indexDuration(Long entityId, int propertyId, int start, int end, int minPValue, int maxPValue) {
@@ -311,60 +350,26 @@ public class SourceCompare
         group.range2group(group.int2Slice(maxPValue + 1), group.int2Slice(0x40000000), 2);
 
         long indexId = store.createAggrDurationIndex(propertyId, start, end, group, 20, Calendar.MINUTE);
-        store.aggrWithIndex(indexId, entityId, propertyId, start, end, new IndexAggregationQuery.Duration() {
-            @Override
-            public Object onResult(Map<Integer, Integer> valueGroupMap, int indexQueryOverlap) {
+        waitUntilIndexReady( indexId );
+        log.info("build duration index done");
+        AggregationIndexQueryResult result = store.getByIndex( indexId, entityId, propertyId, start, end );
 
-                for (Map.Entry<Integer, Integer> entry : valueGroupMap.entrySet()) {
-                    System.out.println(entry.getKey() + "," + entry.getValue());
-                }
-
-                return null;
-            }
-
-            @Override
-            public void setValueType(ValueContentType valueType) {
-
-            }
-
-            @Override
-            public void onNewEntry(InternalEntry entry) {
-
-            }
-
-            @Override
-            public Object onReturn() {
-                return null;
-            }
-        });
+        for ( Map.Entry<Integer,Integer> entry : result.getDurationResult().entrySet() )
+        {
+            log.info( entry.getKey() + "," + entry.getValue() );
+        }
+        log.info("accelerate time: "+ result.getAccelerateTime());
     }
 
     public void indexMinMax(Long entityId, int propertyId, int start, int end) {
         long indexId = store.createAggrMinMaxIndex(propertyId, start, end, 20, Calendar.MINUTE, IndexType.AGGR_MIN_MAX);
-        store.aggrWithIndex(indexId, entityId, propertyId, start, end, new IndexAggregationQuery.MinMax() {
-            @Override
-            public Object onResult(Map<Integer, Slice> valueGroupMap, int indexQueryOverlap) {
-                for (Map.Entry<Integer, Slice> entry : valueGroupMap.entrySet()) {
-                    System.out.println(entry.getKey() + "," + entry.getValue().getInt(0));
-                }
-                return null;
-            }
-
-            @Override
-            public void setValueType(ValueContentType valueType) {
-
-            }
-
-            @Override
-            public void onNewEntry(InternalEntry entry) {
-
-            }
-
-            @Override
-            public Object onReturn() {
-                return null;
-            }
-        });
+        waitUntilIndexReady( indexId );
+        log.info("build min max index done");
+        AggregationIndexQueryResult result = store.getByIndex( indexId, entityId, propertyId, start, end );
+        for (Map.Entry<Integer, Slice> entry : result.getMinMaxResult().entrySet()) {
+            log.info(entry.getKey() + "," + entry.getValue().getInt(0));
+        }
+        log.info("accelerate time: "+ result.getAccelerateTime());
     }
 
     private Long getEntityId(String gridId, String chainId){
@@ -389,17 +394,17 @@ public class SourceCompare
         String dayStr = tStr.substring(6,8);
         String hourStr = tStr.substring(8,10);
         String minuteStr = tStr.substring(10, 12);
-//        System.out.println(yearStr+" "+monthStr+" "+dayStr+" "+hourStr+" "+minuteStr);
+//        log.info(yearStr+" "+monthStr+" "+dayStr+" "+hourStr+" "+minuteStr);
         int year = Integer.parseInt(yearStr);
         int month = Integer.parseInt(monthStr)-1;//month count from 0 to 11, no 12
         int day = Integer.parseInt(dayStr);
         int hour = Integer.parseInt(hourStr);
         int minute = Integer.parseInt(minuteStr);
-//        System.out.println(year+" "+month+" "+day+" "+hour+" "+minute);
+//        log.info(year+" "+month+" "+day+" "+hour+" "+minute);
         Calendar ca= Calendar.getInstance();
         ca.set(year, month, day, hour, minute, 0); //seconds set to 0
         long timestamp = ca.getTimeInMillis();
-//        System.out.println(timestamp);
+//        log.info(timestamp);
         if(timestamp/1000<Integer.MAX_VALUE){
             return (int) (timestamp/1000);
         }else {

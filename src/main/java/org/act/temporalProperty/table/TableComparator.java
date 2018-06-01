@@ -10,8 +10,7 @@ public class TableComparator implements UserComparator
 {
     
     private UserComparator userComparator;
-    private static TableComparator instence;
-    
+
     private TableComparator( UserComparator c )
     {
         this.userComparator = c;
@@ -19,20 +18,12 @@ public class TableComparator implements UserComparator
     
     public static synchronized TableComparator instance()
     {
-        if( null == instence )
-        {
-            instence = new TableComparator( new FixedIdComparator() );
-        }
-        return instence;
+        return new TableComparator( new FixedIdComparator() );
     }
 
     public static synchronized TableComparator forAggrIndex()
     {
-        if( null == instence )
-        {
-            instence = new TableComparator( AggregationIndexKey.sliceComparator );
-        }
-        return instence;
+        return new TableComparator( AggregationIndexKey.sliceComparator );
     }
 
     @Override

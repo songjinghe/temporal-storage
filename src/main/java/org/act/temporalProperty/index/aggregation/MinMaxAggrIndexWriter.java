@@ -2,8 +2,9 @@ package org.act.temporalProperty.index.aggregation;
 
 import org.act.temporalProperty.impl.Options;
 import org.act.temporalProperty.index.IndexType;
+import org.act.temporalProperty.query.aggr.AggregationIndexKey;
+import org.act.temporalProperty.query.aggr.AggregationQuery;
 import org.act.temporalProperty.table.TableBuilder;
-import org.act.temporalProperty.table.TableComparator;
 import org.act.temporalProperty.util.Slice;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
@@ -45,12 +46,15 @@ public class MinMaxAggrIndexWriter {
     public long write() throws IOException {
         try(FileOutputStream targetStream = new FileOutputStream(file)) {
             FileChannel targetChannel = targetStream.getChannel();
-            TableBuilder builder = new TableBuilder(new Options(), targetChannel, TableComparator.forAggrIndex());
+            TableBuilder builder = new TableBuilder( new Options(), targetChannel, AggregationIndexKey.sliceComparator );
             for(Map.Entry<Pair<Long,Integer>,Slice> entry : min.entrySet()){
                 Pair<Long,Integer> key = entry.getKey();
-                if(buildMin) builder.add(toSlice(key), entry.getValue());
-                if(buildMax) builder.add(toSlice(key), max.get(key));
+                if ( buildMin )
+                { builder.add( toSlice( key, true ), entry.getValue() ); }
+                if ( buildMax )
+                { builder.add( toSlice( key, false ), max.get( key ) ); }
             }
+            builder.finish();
             targetChannel.force(true);
             return targetChannel.size();
         }
@@ -72,12 +76,10 @@ public class MinMaxAggrIndexWriter {
         }
     }
 
-    private Slice toSlice(Pair<Long,Integer> key){
+    private Slice toSlice( Pair<Long,Integer> key, boolean isMin )
+    {
         long entityId = key.getLeft();
         int timeGroupId = key.getRight();
-        Slice s = new Slice(12);
-        s.setLong(0, entityId);
-        s.setInt(8, timeGroupId);
-        return s;
+        return new AggregationIndexKey( entityId, timeGroupId, isMin ? AggregationQuery.MIN : AggregationQuery.MAX ).encode();
     }
 }

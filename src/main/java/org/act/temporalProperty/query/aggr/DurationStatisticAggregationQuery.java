@@ -10,8 +10,8 @@ import java.util.*;
  */
 public abstract class DurationStatisticAggregationQuery<K> extends AbstractTimeIntervalAggrQuery<K,Integer> {
 
-    public DurationStatisticAggregationQuery(int endTime) {
-        super(endTime);
+    public DurationStatisticAggregationQuery(int startTime, int endTime) {
+        super(startTime, endTime);
     }
 
     @Override

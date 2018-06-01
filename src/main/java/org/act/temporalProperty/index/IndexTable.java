@@ -6,6 +6,7 @@ import org.act.temporalProperty.index.value.IndexTableIterator;
 import org.act.temporalProperty.index.value.PropertyValueInterval;
 import org.act.temporalProperty.index.value.rtree.IndexEntry;
 import org.act.temporalProperty.index.value.rtree.IndexEntryOperator;
+import org.act.temporalProperty.query.aggr.AggregationIndexKey;
 import org.act.temporalProperty.table.MMapTable;
 import org.act.temporalProperty.table.TableComparator;
 import org.act.temporalProperty.util.Slice;
@@ -40,6 +41,6 @@ public class IndexTable {
     }
 
     public SeekingIterator<Slice, Slice> aggrIterator(String filePath) throws IOException {
-        return new MMapTable(filePath, channel, TableComparator.forAggrIndex(), false).iterator();
+        return new MMapTable( filePath, channel, AggregationIndexKey.sliceComparator, false).iterator();
     }
 }

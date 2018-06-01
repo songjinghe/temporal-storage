@@ -33,33 +33,41 @@ public class InternalKey implements Comparable<InternalKey>
      */
     private final int startTime;
     /**
-     * 值的长度
-     */
-    private final int valueLength;
-    /**
-     * 此key对应的record类型
+     * 值类型：invalid or value or unknown
      */
     private final ValueType valueType;
+
     /**
      * 新建一个InternalKey，将相关信息传入，用于编码后生成一个Slice
      * @param Id
      * @param startTime
-     * @param valueLength
      * @param valueType
      */
-    public InternalKey(Slice Id, int startTime, int valueLength, ValueType valueType)
+    public InternalKey(Slice Id, int startTime, ValueType valueType)
     {
         Preconditions.checkNotNull(Id, "userKey is null");
         Preconditions.checkArgument(startTime >= 0, "sequenceNumber is negative");
         Preconditions.checkNotNull(valueType, "valueType is null");
-        Preconditions.checkArgument( valueLength >= 0 , "valueLength is nagative" );
 
         this.Id = Id;
         this.propertyId = Id.getInt(8);
         this.entityId = Id.getLong(0);
         this.startTime = startTime;
         this.valueType = valueType;
-        this.valueLength = valueLength;
+    }
+
+    public InternalKey(int propertyId, long entityId, int startTime, ValueType valueType)
+    {
+        Preconditions.checkArgument(startTime >= 0, "sequenceNumber is negative");
+        Preconditions.checkNotNull(valueType, "valueType is null");
+
+        this.Id = new Slice(12);
+        Id.setLong( 0, entityId );
+        Id.setInt(8, propertyId);
+        this.propertyId = propertyId;
+        this.entityId = entityId;
+        this.startTime = startTime;
+        this.valueType = valueType;
     }
     /**
      * 新建一个InternalKey，将相关信息传入，用于编码后生成一个Slice，通常用于查找
@@ -68,7 +76,7 @@ public class InternalKey implements Comparable<InternalKey>
      */
     public InternalKey(Slice Id, int startTime)
     {
-        this(Id, startTime, 0, ValueType.VALUE);
+        this(Id, startTime, ValueType.VALUE);
     }
 
     /**
@@ -83,19 +91,18 @@ public class InternalKey implements Comparable<InternalKey>
         this.propertyId = data.getInt(8);
         this.entityId = data.getLong(0);
         long packedSequenceAndType = data.getLong( data.length() - SIZE_OF_LONG );
-        this.startTime = (int)SequenceNumber.unpackTime(packedSequenceAndType);
+        this.startTime = SequenceNumber.unpackTime(packedSequenceAndType);
         this.valueType = SequenceNumber.unpackValueType(packedSequenceAndType);
-        this.valueLength = SequenceNumber.unpackValueLength( packedSequenceAndType );
     }
 
-    /**
-     * 新建一个InternalKey，将相关byte数组传入，可用于解码相关信息。如起始时间，record类型，id等
-     * @param data
-     */
-    public InternalKey(byte[] data)
-    {
-        this(Slices.wrappedBuffer(data));
-    }
+//    /**
+//     * 新建一个InternalKey，将相关byte数组传入，可用于解码相关信息。如起始时间，record类型，id等
+//     * @param data
+//     */
+//    public InternalKey(byte[] data)
+//    {
+//        this(Slices.wrappedBuffer(data));
+//    }
 
     /**
      * 返回唯一确定某个动态属性的标识，其中其点/边id保存在返回值的前8位，属性id保存在返回值的后4位。
@@ -115,15 +122,6 @@ public class InternalKey implements Comparable<InternalKey>
     {
         return entityId;
     }
-
-    /**
-     * 
-     * @return 返回此key对应的值的长度
-     */
-    public int getValueLength()
-    {
-        return valueLength;
-    }
     
     /**
      * @return 返回此key对应值的起始有效时间
@@ -141,6 +139,7 @@ public class InternalKey implements Comparable<InternalKey>
         return valueType;
     }
 
+
     /**
      * 用于将相关信息编码为一个Slice
      * @return 编码后的Slice
@@ -150,7 +149,7 @@ public class InternalKey implements Comparable<InternalKey>
         Slice slice = Slices.allocate(Id.length() + SIZE_OF_LONG );
         SliceOutput sliceOutput = slice.output();
         sliceOutput.writeBytes(Id);
-        sliceOutput.writeLong(SequenceNumber.packSequenceAndValueType(startTime, valueLength, valueType));
+        sliceOutput.writeLong(SequenceNumber.packTimeAndValueType( startTime, valueType ) );
         return slice;
     }
 
@@ -201,7 +200,7 @@ public class InternalKey implements Comparable<InternalKey>
     {
         StringBuilder sb = new StringBuilder();
         sb.append("InternalKey");
-        sb.append("{id=").append(getId().getLong( 0 ));
+        sb.append("{eid=").append(getId().getLong( 0 ));
         sb.append( " proId=" ).append( getId().getInt( 8 ) );
         sb.append(", time=").append(getStartTime());
         sb.append(", valueType=").append(getValueType());
@@ -222,5 +221,10 @@ public class InternalKey implements Comparable<InternalKey>
         }else {
             return Long.compare(this.getStartTime(), o.getStartTime());
         }
+    }
+
+    public static int idSliceProId( Slice idSlice )
+    {
+        return idSlice.getInt( 8 );
     }
 }

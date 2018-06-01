@@ -2,6 +2,7 @@ package org.act.temporalProperty.query.aggr;
 
 import com.google.common.base.Objects;
 import org.act.temporalProperty.exception.TPSNHException;
+import org.act.temporalProperty.index.IndexValueType;
 import org.act.temporalProperty.meta.ValueContentType;
 import org.act.temporalProperty.util.Slice;
 
@@ -16,9 +17,9 @@ import java.util.TreeMap;
 public class ValueGroupingMap {
     private final int UN_GROUPED_GID = -1;
     private final TreeMap<Slice, Integer> groupMap;
-    private final ValueContentType valueType;
+    private final IndexValueType valueType;
 
-    public ValueGroupingMap(Comparator<Slice> comparator, ValueContentType valueType) {
+    public ValueGroupingMap(Comparator<Slice> comparator, IndexValueType valueType) {
         this.groupMap = new TreeMap<>(comparator);
         this.valueType = valueType;
     }
@@ -47,7 +48,7 @@ public class ValueGroupingMap {
         }
     }
 
-    public ValueContentType valueType() {
+    public IndexValueType valueType() {
         return this.valueType;
     }
 
@@ -72,7 +73,7 @@ public class ValueGroupingMap {
 //        }
 //    }
 
-    private Slice int2Slice(int val){
+    public Slice int2Slice( int val ){
         Slice s = new Slice(4);
         s.setInt(0, val);
         return s;
@@ -108,7 +109,7 @@ public class ValueGroupingMap {
     public static Comparator<Slice> DOUBLE_CMP = FLOAT_CMP;
     public static Comparator<Slice> STR_CMP = Comparator.naturalOrder();
 
-    public static Comparator<Slice> getComparator(ValueContentType valueType) {
+    public static Comparator<Slice> getComparator(IndexValueType valueType) {
         switch(valueType){
             case INT: return INT_CMP;
             case LONG: return LONG_CMP;
@@ -124,31 +125,31 @@ public class ValueGroupingMap {
 
     public static class IntValueGroupMap extends ValueGroupingMap{
         public IntValueGroupMap() {
-            super(Comparator.naturalOrder(), ValueContentType.INT);
+            super(Comparator.naturalOrder(), IndexValueType.INT);
         }
     }
 
     public static class LongValueGroupMap extends ValueGroupingMap{
         public LongValueGroupMap() {
-            super(Comparator.naturalOrder(), ValueContentType.LONG);
+            super(Comparator.naturalOrder(), IndexValueType.LONG);
         }
     }
 
     public static class FloatValueGroupMap extends ValueGroupingMap{
         public FloatValueGroupMap() {
-            super(Comparator.naturalOrder(), ValueContentType.FLOAT);
+            super(Comparator.naturalOrder(), IndexValueType.FLOAT);
         }
     }
 
     public static class DoubleValueGroupMap extends ValueGroupingMap{
         public DoubleValueGroupMap() {
-            super(Comparator.naturalOrder(), ValueContentType.DOUBLE);
+            super(Comparator.naturalOrder(), IndexValueType.DOUBLE);
         }
     }
 
     public static class StringValueGroupMap extends ValueGroupingMap{
         public StringValueGroupMap() {
-            super(Comparator.naturalOrder(), ValueContentType.STRING);
+            super(Comparator.naturalOrder(), IndexValueType.STRING);
         }
     }
 }

@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 
 import org.act.temporalProperty.impl.MemTable.MemTableIterator;
+import org.act.temporalProperty.query.TimeIntervalKey;
 import org.act.temporalProperty.table.TableComparator;
 import org.act.temporalProperty.table.UnSortedTable;
 import org.act.temporalProperty.util.Slice;
@@ -30,14 +31,16 @@ public class FileBuffer implements Closeable
     public FileBuffer(File unSortedTableFile, long id) throws IOException{
         this(id);
         this.fName = unSortedTableFile.getAbsolutePath();
-        this.memTable = new MemTable( TableComparator.instance() );
+        this.memTable = new MemTable();
         Files.deleteIfExists(unSortedTableFile.toPath());
         Files.createFile(unSortedTableFile.toPath());
         this.discTable = new UnSortedTable(unSortedTableFile);
     }
 
-    public void init(File unSortedTableFile ) throws IOException{
-        this.discTable = new UnSortedTable(unSortedTableFile);
+    public void init(File bufLogFile ) throws IOException{
+        this.fName = bufLogFile.getAbsolutePath();
+        this.memTable = new MemTable();
+        this.discTable = new UnSortedTable(bufLogFile);
         this.discTable.initFromFile( this.memTable );
     }
 
@@ -48,10 +51,12 @@ public class FileBuffer implements Closeable
      * @param value 值
      * @throws IOException
      */
-    public void add( Slice key, Slice value ) throws IOException{
-        if(discTable==null || memTable==null ) throw new IOException("should init first!");
+    public void add( TimeIntervalKey key, Slice value ) throws IOException{
+        if(discTable==null || memTable==null ){
+            throw new IOException("should init first!");
+        }
         discTable.add( key, value );
-        this.memTable.add( key, value );
+        this.memTable.addInterval( key, value );
     }
 
     public void force() throws IOException{
@@ -90,6 +95,7 @@ public class FileBuffer implements Closeable
         return "FileBuffer{" +
                 "number=" + number +
                 ", fName='" + fName + '\'' +
+                ", memtable=" + memTable +
                 '}';
     }
 
@@ -100,5 +106,10 @@ public class FileBuffer implements Closeable
     public static FileBuffer decode(SliceInput in) {
         long id = in.readLong();
         return new FileBuffer(id);
+    }
+
+    public MemTable getMemTable()
+    {
+        return memTable;
     }
 }
