@@ -299,7 +299,11 @@ public class SinglePropertyStore
 
         String filePath = Filename.stPath(proDir, meta.getNumber());
         String bufferFileName = Filename.stbufferFileName(meta.getNumber());
+
+
         File tempFile = buffer2file(filePath, bufferFileName, buffer, indexUpdater);
+
+
         propertyMeta.delStableBuffer(meta.getNumber());
         if(!tempFile.renameTo(new File(filePath))) throw new IOException("rename failed!");
     }
@@ -313,6 +317,12 @@ public class SinglePropertyStore
         FileChannel channel = stream.getChannel();
         TableBuilder builder = new TableBuilder(new Options(), channel, TableComparator.instance());
         Table table = this.cache.getTable(filePath);
+
+        /**
+         * 写存储过程
+         * 会被stable file和unstable file的合并过程同时调用，鉴于只需测试stable file的合并过程（unstable file 没有索引文件）
+         * 使用bufferFileName做判断，若"st"开头则是合并stable file
+         */
         SearchableIterator iterator = TwoLevelMergeIterator.merge(buffer.iterator(), table.iterator());
         while (iterator.hasNext()) {
             InternalEntry entry = iterator.next();
@@ -323,6 +333,8 @@ public class SinglePropertyStore
         channel.close();
         stream.close();
         table.close();
+
+
         this.cache.evict(filePath);
         indexUpdater.updateMeta();
         indexUpdater.cleanUp();
