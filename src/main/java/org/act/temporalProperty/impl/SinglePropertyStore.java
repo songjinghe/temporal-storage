@@ -286,25 +286,25 @@ public class SinglePropertyStore
 
     private void unBufferToFile(FileMetaData meta, FileBuffer buffer) throws IOException {
         IndexUpdater indexUpdater = index.onBufferDelUpdate( propertyMeta.getPropertyId(), false, meta, buffer.getMemTable());
-
         String filePath = Filename.unPath(proDir, meta.getNumber());
         String bufferPath = Filename.unbufferFileName(meta.getNumber());
         File tempFile = buffer2file( filePath, bufferPath, buffer, indexUpdater );
         propertyMeta.delUnstableBuffer(meta.getNumber());
+        indexUpdater.finish(meta);
+        indexUpdater.updateMeta();
+        indexUpdater.cleanUp();
         if(!tempFile.renameTo(new File(filePath))) throw new IOException("rename failed!");
     }
 
     private void stBufferToFile(FileMetaData meta, FileBuffer buffer) throws IOException {
         IndexUpdater indexUpdater = index.onBufferDelUpdate( propertyMeta.getPropertyId(), true, meta, buffer.getMemTable());
-
         String filePath = Filename.stPath(proDir, meta.getNumber());
         String bufferFileName = Filename.stbufferFileName(meta.getNumber());
-
-
         File tempFile = buffer2file(filePath, bufferFileName, buffer, indexUpdater);
-
-
         propertyMeta.delStableBuffer(meta.getNumber());
+        indexUpdater.finish(meta);
+        indexUpdater.updateMeta();
+        indexUpdater.cleanUp();
         if(!tempFile.renameTo(new File(filePath))) throw new IOException("rename failed!");
     }
 
@@ -333,11 +333,7 @@ public class SinglePropertyStore
         channel.close();
         stream.close();
         table.close();
-
-
         this.cache.evict(filePath);
-        indexUpdater.updateMeta();
-        indexUpdater.cleanUp();
         File originFile = new File(filePath);
         Files.delete(originFile.toPath());
         buffer.close();
