@@ -45,7 +45,7 @@ public class BuildAndQueryTest {
 
     @BeforeClass
     public static void initDB() throws Throwable {
-        dataFileImporter = new DataFileImporter();
+        dataFileImporter = new DataFileImporter(280);
         dbDir = dataFileImporter.getDbDir();
         dataPath = dataFileImporter.getDataPath();
         dataFileList = dataFileImporter.getDataFileList();

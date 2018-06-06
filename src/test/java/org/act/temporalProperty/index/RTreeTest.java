@@ -41,9 +41,9 @@ public class RTreeTest {
     RTree tree;
 
     @Before
-    public void buildRTree(){
+    public void buildRTree() throws IOException {
 
-        dataFileImporter = new DataFileImporter();
+        dataFileImporter = new DataFileImporter(280);
         dbDir = dataFileImporter.getDbDir();
         dataPath = dataFileImporter.getDataPath();
         dataFileList = dataFileImporter.getDataFileList();

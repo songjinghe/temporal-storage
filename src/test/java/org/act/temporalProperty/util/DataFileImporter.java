@@ -1,5 +1,7 @@
 package org.act.temporalProperty.util;
 
+import org.act.temporalProperty.config.DataDownloader;
+import org.act.temporalProperty.config.TestConfiguration;
 import org.act.temporalProperty.impl.index.multival.BuildAndQueryTest;
 import org.apache.commons.lang3.SystemUtils;
 import org.slf4j.Logger;
@@ -16,12 +18,16 @@ public class DataFileImporter {
     private String dbDir;
     private File dataDir;
 
-    public DataFileImporter() {
-        setDataPath();
-        setDbDir();
+    public DataFileImporter(int fileCount) throws IOException {
+        this.dataPath = TestConfiguration.get().testDataDir();
+        this.dbDir = TestConfiguration.get().dbDir();
         this.dataFileList = new ArrayList<>();
         this.dataDir = new File(dataPath);
         importDataFiles(dataDir);
+        if(dataFileList.isEmpty()){
+            DataDownloader down = new DataDownloader();
+            dataFileList = down.download(fileCount);
+        }
         dataFileList.sort(Comparator.comparing(File::getName));
     }
 
@@ -35,23 +41,7 @@ public class DataFileImporter {
                 importDataFiles(file);
             }
         }
-    }
 
-    private void setDataPath() {
-        if(SystemUtils.IS_OS_WINDOWS){
-//            this.dataPath = "C:\\Users\\Administrator\\Desktop\\TGraph-source\\20101104.tar\\20101104";
-            dataPath = "D:\\songjh\\projects\\TGraph\\test-traffic-data\\20101105";
-        }else{
-            this.dataPath = "/media/song/G680/songjh/projects/TGraph/test-traffic-data/20101105";
-        }
-    }
-
-    private void setDbDir() {
-        if(SystemUtils.IS_OS_WINDOWS){
-            this.dbDir = "temporal.property.test";
-        }else{
-            this.dbDir = "/tmp/temporal.property.test";
-        }
     }
 
     public String getDataPath() {return this.dataPath; }

@@ -28,7 +28,15 @@ public class SourceCompare
     private Logger log = LoggerFactory.getLogger( SourceCompare.class );
     public static final int NOW_TIME = 0x40000000; //2^30
     private static TemporalPropertyStore store;
-    private static DataFileImporter dataFileImporter = new DataFileImporter();
+    private static DataFileImporter dataFileImporter;
+
+    static {
+        try {
+            dataFileImporter = new DataFileImporter(280);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
     private static List<File> dataFileList = dataFileImporter.getDataFileList();
     private Map<String, Long> entityIdMap = new HashMap<>();

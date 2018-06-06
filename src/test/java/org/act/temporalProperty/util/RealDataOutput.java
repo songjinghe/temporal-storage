@@ -1,40 +1,25 @@
 package org.act.temporalProperty.util;
 
-import org.act.temporalProperty.TemporalPropertyStore;
-import org.act.temporalProperty.meta.ValueContentType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
 import java.util.*;
 
-import static org.act.temporalProperty.util.StoreBuilder.setIntProperty;
+public class RealDataOutput {
 
-/**
- * Created by song on 2018-01-23.
- */
-public class TrafficDataImporter {
     private static Logger log = LoggerFactory.getLogger(TrafficDataImporter.class);
 
     private List<File> dataFileList;
     private final Map<String, Long> roadIdMap = new HashMap<>();
     private int minTime;
     private int maxTime;
-    private TemporalPropertyStore store;
 
     private long writeTime = 0;
     private long writeCount = 0;
 
-    public TrafficDataImporter(TemporalPropertyStore store, List<File> dataFileList, int inputFileCount) throws IOException {
-        this.store = store;
+    public RealDataOutput( List<File> dataFileList, int inputFileCount) throws IOException {
         this.dataFileList = dataFileList;
-        store.createProperty(1, ValueContentType.INT);
-        store.createProperty(2, ValueContentType.INT);
-        store.createProperty(3, ValueContentType.INT);
-        store.createProperty(4, ValueContentType.INT);
         this.inputData(inputFileCount);
     }
 
@@ -55,27 +40,31 @@ public class TrafficDataImporter {
     public long getWriteCount() { return writeCount; }
 
     private void inputData(int inputFileCount) throws IOException {
+        Random random = new Random();
+        try(BufferedWriter w = new BufferedWriter(new FileWriter("temporal.csv"))) {
+            for (int i = 0; i < dataFileList.size() && i < inputFileCount; i++) {
+                File file = dataFileList.get(i);
+                int time = timeStr2int(file.getName().substring(9, 21)) - 1288800000;
+                if (minTime > time) minTime = time;
+                if (maxTime < time) maxTime = time;
 
-        for (int i = 0; i < dataFileList.size() && i < inputFileCount; i++) {
-            File file = dataFileList.get(i);
-            int time = timeStr2int(file.getName().substring(9, 21)) - 1288800000;
-            if(minTime>time) minTime = time;
-            if(maxTime<time) maxTime = time;
-            try(BufferedReader br = new BufferedReader(new FileReader(file))) {
-                String line = br.readLine();
-                while ((line = br.readLine()) != null) {
-
-                    input(time, line);
-                    writeCount++;
+                try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+                    String line = br.readLine();
+                    while ((line = br.readLine()) != null) {
+                        if(random.nextInt(100)<6) {
+                            w.write(input(time, line));
+                            writeCount++;
+                        }
+                    }
+                    br.close();
                 }
-                br.close();
+                // if(i%10==0) log.info("input {} files, current {}, time {}", i, file.getName(), time);
             }
-           // if(i%10==0) log.info("input {} files, current {}, time {}", i, file.getName(), time);
+            //  log.info("input files done, {} roads", this.roadIdMap.size());
         }
-      //  log.info("input files done, {} roads", this.roadIdMap.size());
     }
 
-    private void input(int time, String line) {
+    private String input(int time, String line) {
         String[] fields = line.split(",");
 //        int index = Integer.valueOf(fields[0]);
 
@@ -93,13 +82,15 @@ public class TrafficDataImporter {
 
         long roadId = getId(gridId, chainId);
 //        log.debug("eid({}), time({}), travelTime({})", roadId, time, travelTime);
-        setIntProperty(store, time, roadId, 1, travelTime);
-        setIntProperty(store, time, roadId, 2, fullStatus);
-        setIntProperty(store, time, roadId, 3, vehicleCount);
-        setIntProperty(store, time, roadId, 4, segmentCount);
+
+//        setIntProperty(store, time, roadId, 1, travelTime);
+//        setIntProperty(store, time, roadId, 2, fullStatus);
+//        setIntProperty(store, time, roadId, 3, vehicleCount);
+//        setIntProperty(store, time, roadId, 4, segmentCount);
 
         long endTime = System.currentTimeMillis();
         writeTime += endTime - startTime;
+        return time+","+travelTime+","+fullStatus+"\n";
     }
 
 
@@ -136,5 +127,10 @@ public class TrafficDataImporter {
         }else {
             throw new RuntimeException("timestamp larger than Integer.MAX_VALUE, this should not happen");
         }
+    }
+    public static void main(String[] args) throws IOException {
+        DataFileImporter d = new DataFileImporter(280);
+        RealDataOutput r = new RealDataOutput(d.getDataFileList(), 400);
+
     }
 }
