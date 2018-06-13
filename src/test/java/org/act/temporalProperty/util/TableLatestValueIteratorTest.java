@@ -2,6 +2,7 @@ package org.act.temporalProperty.util;
 
 import org.act.temporalProperty.impl.InternalKey;
 import org.act.temporalProperty.impl.MemTable;
+import org.act.temporalProperty.impl.PackInternalKeyIterator;
 import org.act.temporalProperty.impl.ValueType;
 import org.act.temporalProperty.table.TableComparator;
 import org.junit.Before;
@@ -9,7 +10,7 @@ import org.junit.Test;
 
 public class TableLatestValueIteratorTest
 {
-    private MemTable table = new MemTable( TableComparator.instence() );
+    private MemTable table = new MemTable();
     private final int ID_NUM = 20;
     private final int PRO_NUM = 10;
     private final int TIME_NUM = 10;
@@ -24,8 +25,8 @@ public class TableLatestValueIteratorTest
                     Slice idSlice = new Slice( 12 );
                     idSlice.setLong( 0, i );
                     idSlice.setInt( 8, p );
-                    InternalKey key = new InternalKey( idSlice, t, 20, ValueType.VALUE );
-                    table.add( key.encode(), key.encode() );
+                    InternalKey key = new InternalKey( idSlice, t, ValueType.VALUE );
+                    table.addToNow( key, key.encode() );
                 }
     }
     
@@ -35,7 +36,7 @@ public class TableLatestValueIteratorTest
         TableLatestValueIterator iterator = new TableLatestValueIterator( table.iterator() );
         while( iterator.hasNext() )
         {
-            InternalKey key = new InternalKey( iterator.next().getKey() );
+            InternalKey key = iterator.next().getKey();
             System.out.println( key );
         }
     }

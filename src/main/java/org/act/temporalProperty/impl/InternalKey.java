@@ -1,6 +1,7 @@
 
 package org.act.temporalProperty.impl;
 
+import org.act.temporalProperty.table.FixedIdComparator;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.SliceOutput;
 import org.act.temporalProperty.util.Slices;
@@ -13,8 +14,16 @@ import static org.act.temporalProperty.util.SizeOf.SIZE_OF_LONG;
  * InternalKey是将一个动态属性的点/边id，属性id，某个时间以及相关控制位编码为一个键值对中的键的机制。在设计文档中，我们将一个动态属性的数据分为多个record，而InternalKey就
  * 是一个record的key
  */
-public class InternalKey
+public class InternalKey implements Comparable<InternalKey>
 {
+    /**
+     * 属性id
+     */
+    private final int propertyId;
+    /**
+     * 点/边id
+     */
+    private final long entityId;
 	/**
 	 * 点/边id，和属性id的编码，用于确定一个动态属性
 	 */
@@ -24,33 +33,50 @@ public class InternalKey
      */
     private final int startTime;
     /**
-     * 值的长度
-     */
-    private final int valueLength;
-    /**
-     * 此key对应的record类型
+     * 值类型：invalid or value or unknown
      */
     private final ValueType valueType;
 
-    
     /**
      * 新建一个InternalKey，将相关信息传入，用于编码后生成一个Slice
      * @param Id
      * @param startTime
-     * @param valueLength
      * @param valueType
      */
-    public InternalKey(Slice Id, int startTime, int valueLength, ValueType valueType)
+    public InternalKey(Slice Id, int startTime, ValueType valueType)
     {
         Preconditions.checkNotNull(Id, "userKey is null");
         Preconditions.checkArgument(startTime >= 0, "sequenceNumber is negative");
         Preconditions.checkNotNull(valueType, "valueType is null");
-        Preconditions.checkArgument( valueLength >= 0 , "valueLength is nagative" );
 
         this.Id = Id;
+        this.propertyId = Id.getInt(8);
+        this.entityId = Id.getLong(0);
         this.startTime = startTime;
         this.valueType = valueType;
-        this.valueLength = valueLength;
+    }
+
+    public InternalKey(int propertyId, long entityId, int startTime, ValueType valueType)
+    {
+        Preconditions.checkArgument(startTime >= 0, "sequenceNumber is negative");
+        Preconditions.checkNotNull(valueType, "valueType is null");
+
+        this.Id = new Slice(12);
+        Id.setLong( 0, entityId );
+        Id.setInt(8, propertyId);
+        this.propertyId = propertyId;
+        this.entityId = entityId;
+        this.startTime = startTime;
+        this.valueType = valueType;
+    }
+    /**
+     * 新建一个InternalKey，将相关信息传入，用于编码后生成一个Slice，通常用于查找
+     * @param Id
+     * @param startTime
+     */
+    public InternalKey(Slice Id, int startTime)
+    {
+        this(Id, startTime, ValueType.VALUE);
     }
 
     /**
@@ -62,20 +88,21 @@ public class InternalKey
         Preconditions.checkNotNull(data, "data is null");
         Preconditions.checkArgument(data.length() >= SIZE_OF_LONG, "data must be at least %s bytes", SIZE_OF_LONG);
         this.Id = getId( data );
+        this.propertyId = data.getInt(8);
+        this.entityId = data.getLong(0);
         long packedSequenceAndType = data.getLong( data.length() - SIZE_OF_LONG );
-        this.startTime = (int)SequenceNumber.unpackTime(packedSequenceAndType);
+        this.startTime = SequenceNumber.unpackTime(packedSequenceAndType);
         this.valueType = SequenceNumber.unpackValueType(packedSequenceAndType);
-        this.valueLength = SequenceNumber.unpackValueLength( packedSequenceAndType );
     }
 
-    /**
-     * 新建一个InternalKey，将相关byte数组传入，可用于解码相关信息。如起始时间，record类型，id等
-     * @param data
-     */
-    public InternalKey(byte[] data)
-    {
-        this(Slices.wrappedBuffer(data));
-    }
+//    /**
+//     * 新建一个InternalKey，将相关byte数组传入，可用于解码相关信息。如起始时间，record类型，id等
+//     * @param data
+//     */
+//    public InternalKey(byte[] data)
+//    {
+//        this(Slices.wrappedBuffer(data));
+//    }
 
     /**
      * 返回唯一确定某个动态属性的标识，其中其点/边id保存在返回值的前8位，属性id保存在返回值的后4位。
@@ -86,13 +113,14 @@ public class InternalKey
         return Id;
     }
 
-    /**
-     * 
-     * @return 返回此key对应的值的长度
-     */
-    public int getValueLength()
+    public int getPropertyId()
     {
-        return valueLength;
+        return propertyId;
+    }
+
+    public long getEntityId()
+    {
+        return entityId;
     }
     
     /**
@@ -111,6 +139,7 @@ public class InternalKey
         return valueType;
     }
 
+
     /**
      * 用于将相关信息编码为一个Slice
      * @return 编码后的Slice
@@ -120,7 +149,7 @@ public class InternalKey
         Slice slice = Slices.allocate(Id.length() + SIZE_OF_LONG );
         SliceOutput sliceOutput = slice.output();
         sliceOutput.writeBytes(Id);
-        sliceOutput.writeLong(SequenceNumber.packSequenceAndValueType(startTime, valueLength, valueType));
+        sliceOutput.writeLong(SequenceNumber.packTimeAndValueType( startTime, valueType ) );
         return slice;
     }
 
@@ -171,7 +200,7 @@ public class InternalKey
     {
         StringBuilder sb = new StringBuilder();
         sb.append("InternalKey");
-        sb.append("{id=").append(getId().getLong( 0 ));
+        sb.append("{eid=").append(getId().getLong( 0 ));
         sb.append( " proId=" ).append( getId().getInt( 8 ) );
         sb.append(", time=").append(getStartTime());
         sb.append(", valueType=").append(getValueType());
@@ -182,5 +211,20 @@ public class InternalKey
     private static Slice getId(Slice data)
     {
         return data.slice(0, 12);
+    }
+
+    @Override
+    public int compareTo(InternalKey o) {
+        int result = FixedIdComparator.compareId( this.getId(), o.getId() );
+        if( 0 != result ) {
+            return result;
+        }else {
+            return Long.compare(this.getStartTime(), o.getStartTime());
+        }
+    }
+
+    public static int idSliceProId( Slice idSlice )
+    {
+        return idSlice.getInt( 8 );
     }
 }

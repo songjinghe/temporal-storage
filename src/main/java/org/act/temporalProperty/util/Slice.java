@@ -31,12 +31,10 @@ import java.nio.charset.Charset;
 import java.util.Arrays;
 
 import org.act.temporalProperty.impl.SequenceNumber;
+import org.act.temporalProperty.query.TimeIntervalKey;
 
 import static java.nio.ByteOrder.LITTLE_ENDIAN;
-import static org.act.temporalProperty.util.SizeOf.SIZE_OF_BYTE;
-import static org.act.temporalProperty.util.SizeOf.SIZE_OF_INT;
-import static org.act.temporalProperty.util.SizeOf.SIZE_OF_LONG;
-import static org.act.temporalProperty.util.SizeOf.SIZE_OF_SHORT;
+import static org.act.temporalProperty.util.SizeOf.*;
 
 /**
  * 可以理解为bytebuffer，使用小端法保存各种数据如int，long等。并提供基本的写入和读取函数
@@ -725,5 +723,15 @@ public final class Slice
             s = " Id = " + id + "," + "ProId = " + proid + "," + "Time = " + time + ",";
         }
         return toret + s + ")";
+    }
+
+    public float getFloat(int index) {
+        Preconditions.checkPositionIndexes(index, index + SIZE_OF_FLOAT, this.length);
+        return this.toByteBuffer().getFloat(index);
+    }
+
+    public double getDouble(int index) {
+        Preconditions.checkPositionIndexes(index, index + SIZE_OF_DOUBLE, this.length);
+        return this.toByteBuffer().getDouble(index);
     }
 }

@@ -35,14 +35,14 @@ public final class Filename
         INFO_LOG  // Either the current one, or an old one
     }
 
-    public static String stbufferFileName( long number )
+    public static String stbufferFileName( long number)
     {
-        return makeFileName( number, "stbuf" );
+        return makeFileName( number, "st", "buffer" );
     }
     
-    public static String bufferFileName(long number)
+    public static String unbufferFileName(long number)
     {
-        return makeFileName( number, "buf" );
+        return makeFileName( number, "un", "buffer" );
     }
     
     /**
@@ -58,7 +58,16 @@ public final class Filename
      */
     public static String stableFileName(long number)
     {
-        return makeFileName(number, "st");
+        return makeFileName(number, "st", "table");
+    }
+
+    public static String stableFileName(int propertyId, long number)
+    {
+        return propertyId+"/"+makeFileName(number, "st", "table");
+    }
+
+    public static String stPath(File proDir, long fileNumber) {
+        return new File(proDir, stableFileName(fileNumber)).getAbsolutePath();
     }
     
     /**
@@ -66,8 +75,27 @@ public final class Filename
      */
     public static String unStableFileName(long number)
     {
-        return makeFileName( number, "un" );
+        return makeFileName( number, "un", "table" );
     }
+
+    public static String unStableFileName(int propertyId, long number)
+    {
+        return propertyId+"/"+makeFileName( number, "un", "table" );
+    }
+
+    public static String unPath(File proDir, long fileNumber) {
+        return new File(proDir, unStableFileName(fileNumber)).getAbsolutePath();
+    }
+
+    public static String valIndexFileName(long fileId) {
+        return makeFileName(fileId, "value", "index");
+    }
+
+    public static String aggrIndexFileName(long fileId) {
+        return makeFileName(fileId, "aggr", "index");
+    }
+
+
 
     /**
      * 返回对应编号的描述文件的名称，目前还没有用到。
@@ -93,7 +121,7 @@ public final class Filename
      */
     public static String lockFileName()
     {
-        return "LOCK";
+        return "IS.RUNNING.LOCK";
     }
 
     /**
@@ -112,7 +140,7 @@ public final class Filename
     {
         return "LOG";
     }
-    
+
     public static String oldInfoLogFileName()
     {
         return "LOG.old";
@@ -215,6 +243,13 @@ public final class Filename
         Preconditions.checkArgument(number >= 0, "number is negative");
         Preconditions.checkNotNull(suffix, "suffix is null");
         return String.format("%06d.%s", number, suffix);
+    }
+
+    private static String makeFileName(long number, String prefix, String suffix)
+    {
+        Preconditions.checkArgument(number >= 0, "number is negative");
+        Preconditions.checkNotNull(suffix, "suffix is null");
+        return String.format("%s.%06d.%s", prefix, number, suffix);
     }
 
     private static String removePrefix(String value, String prefix)

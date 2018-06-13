@@ -22,8 +22,7 @@ import java.util.Comparator;
 import org.act.temporalProperty.util.Slice;
 
 // todo this interface needs more thought
-public interface UserComparator
-        extends Comparator<Slice>
+public interface UserComparator extends Comparator<Slice>
 {
     String name();
 

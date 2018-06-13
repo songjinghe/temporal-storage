@@ -3,17 +3,13 @@ package org.act.temporalProperty.util;
 import java.io.File;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map.Entry;
 
 import junit.framework.Assert;
 
-import org.act.temporalProperty.impl.FileBuffer;
-import org.act.temporalProperty.impl.MemTable;
-import org.act.temporalProperty.impl.Options;
-import org.act.temporalProperty.impl.SeekingIterator;
-import org.act.temporalProperty.table.BufferFileAndTableIterator;
+import org.act.temporalProperty.helper.SameLevelMergeIterator;
+import org.act.temporalProperty.impl.*;
+import org.act.temporalProperty.query.TimeIntervalKey;
+import org.act.temporalProperty.table.TwoLevelMergeIterator;
 import org.act.temporalProperty.table.MMapTable;
 import org.act.temporalProperty.table.Table;
 import org.act.temporalProperty.table.TableBuilder;
@@ -30,65 +26,64 @@ public class BufferFileAndTableIteratorTest
     private static FileBuffer buffer;
     private static Table table;
     private static MemTable memTable;
-    
-    @BeforeClass
-    public static void setUp()
-    {
-        TableBuilder builder;
-        try
-        {
-            File bufferFile = new File( dbDir + bufferfileName );
-            File tableFile = new File( dbDir + tablefileName );
-            if( bufferFile.exists() )
-                bufferFile.delete();
-            bufferFile.createNewFile();
-            if( tableFile.exists() )
-                tableFile.delete();
-            tableFile.createNewFile();
-            FileChannel bufferChannel = new RandomAccessFile( bufferFile, "rw" ).getChannel();
-            FileChannel tableChannel = new RandomAccessFile( tableFile,"rw").getChannel();
-            buffer = new FileBuffer( bufferfileName, dbDir + tablefileName );
-            builder = new TableBuilder( new Options(), tableChannel, TableComparator.instence() );
-            memTable = new MemTable( TableComparator.instence() );
-            for( int i = 0; i<DATA_SIZE; i++ )
-            {
-                Slice key = new Slice(20);
-                key.setInt( 0, i );
-                Slice value = new Slice(4);
-                value.setInt(0,i);
-                if( i % 3 == 0 )
-                {
-                    buffer.add( key, value );
-                }
-                else if( i % 3 == 1)
-                {
-                    builder.add( key, value );
-                }
-                else
-                    memTable.add( key, value );
-            }
-            builder.finish();
-            table = new MMapTable( tablefileName, tableChannel, TableComparator.instence(), false );
-        }
-        catch( Exception e)
-        {
-            e.printStackTrace();
-        }
-    }
+
+//    Fixme: need rethink here.
+//    @BeforeClass
+//    public static void setUp()
+//    {
+//        TableBuilder builder;
+//        try
+//        {
+//            File bufferFile = new File( dbDir + bufferfileName );
+//            File tableFile = new File( dbDir + tablefileName );
+//            if( bufferFile.exists() )
+//                bufferFile.delete();
+//            bufferFile.createNewFile();
+//            if( tableFile.exists() )
+//                tableFile.delete();
+//            tableFile.createNewFile();
+//            FileChannel bufferChannel = new RandomAccessFile( bufferFile, "rw" ).getChannel();
+//            FileChannel tableChannel = new RandomAccessFile( tableFile,"rw").getChannel();
+//            buffer = new FileBuffer( tableFile, 0 );
+//            builder = new TableBuilder( new Options(), tableChannel, TableComparator.instance() );
+//            memTable = new MemTable( TableComparator.instance() );
+//            for( int i = 0; i<DATA_SIZE; i++ )
+//            {
+//                TimeIntervalKey key = new TimeIntervalKey( new InternalKey( i, i, i, ValueType.VALUE ), i + 3 );
+//                Slice value = new Slice(4);
+//                value.setInt(0,i);
+//                if( i % 3 == 0 )
+//                {
+//                    buffer.add( key, value );
+//                }
+//                else if( i % 3 == 1)
+//                {
+//                    builder.add( key, value );
+//                }
+//                else
+//                    memTable.addToNow( key, value );
+//            }
+//            builder.finish();
+//            table = new MMapTable( tablefileName, tableChannel, TableComparator.instance(), false );
+//        }
+//        catch( Exception e)
+//        {
+//            e.printStackTrace();
+//        }
+//    }
     
     @Test
     public void test()
     {
-        List<SeekingIterator<Slice,Slice>> list = new LinkedList<SeekingIterator<Slice,Slice>>(); 
-        BufferFileAndTableIterator iterator = new BufferFileAndTableIterator( buffer.iterator(), table.iterator(), TableComparator.instence() );
+        SameLevelMergeIterator list = new SameLevelMergeIterator();
+        TwoLevelMergeIterator iterator = TwoLevelMergeIterator.merge( buffer.iterator(), table.iterator());
         list.add( iterator );
         list.add( memTable.iterator() );
-        MergingIterator merge = new MergingIterator( list, TableComparator.instence() );
         int expected = 0;
-        while( merge.hasNext() )
+        while( list.hasNext() )
         {
-            Entry<Slice,Slice> entry = merge.next();
-            Assert.assertEquals( expected, entry.getKey().getInt( 0 ) );
+            InternalEntry entry = list.next();
+            Assert.assertEquals( expected, entry.getKey().encode().getInt( 0 ) );
             Assert.assertEquals( expected, entry.getValue().getInt( 0 ) );
             expected++;
         }

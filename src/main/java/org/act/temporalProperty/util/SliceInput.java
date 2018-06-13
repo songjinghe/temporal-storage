@@ -82,7 +82,6 @@ public final class SliceInput
 
     @Override
     public boolean readBoolean()
-            throws IOException
     {
         return readByte() != 0;
     }

@@ -18,6 +18,7 @@
 package org.act.temporalProperty.impl;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 
 import org.act.temporalProperty.util.PureJavaCrc32C;
@@ -52,6 +53,9 @@ public final class Logs
         else {
             return new FileChannelLogWriter(file, 0);
         }
+    }
+    public static LogWriter createMetaWriter(File file) throws FileNotFoundException {
+        return new FileChannelLogWriter(file, 0);
     }
 
     public static int getChunkChecksum(int chunkTypeId, Slice slice)
