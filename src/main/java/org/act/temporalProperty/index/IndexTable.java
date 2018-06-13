@@ -1,7 +1,15 @@
 package org.act.temporalProperty.index;
 
-import org.act.temporalProperty.index.rtree.IndexEntry;
-import org.act.temporalProperty.index.rtree.IndexEntryOperator;
+import org.act.temporalProperty.impl.SeekingIterator;
+import org.act.temporalProperty.index.value.IndexQueryRegion;
+import org.act.temporalProperty.index.value.IndexTableIterator;
+import org.act.temporalProperty.index.value.PropertyValueInterval;
+import org.act.temporalProperty.index.value.rtree.IndexEntry;
+import org.act.temporalProperty.index.value.rtree.IndexEntryOperator;
+import org.act.temporalProperty.query.aggr.AggregationIndexKey;
+import org.act.temporalProperty.table.MMapTable;
+import org.act.temporalProperty.table.TableComparator;
+import org.act.temporalProperty.util.Slice;
 
 import java.io.IOException;
 import java.nio.channels.FileChannel;
@@ -30,5 +38,9 @@ public class IndexTable {
             types.add(p.getType());
         }
         return new IndexEntryOperator(types, 4096);
+    }
+
+    public SeekingIterator<Slice, Slice> aggrIterator(String filePath) throws IOException {
+        return new MMapTable( filePath, channel, AggregationIndexKey.sliceComparator, false).iterator();
     }
 }

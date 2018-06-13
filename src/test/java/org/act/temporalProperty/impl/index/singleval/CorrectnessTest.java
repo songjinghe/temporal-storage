@@ -2,21 +2,24 @@ package org.act.temporalProperty.impl.index.singleval;
 
 import com.google.common.collect.Table;
 import org.act.temporalProperty.TemporalPropertyStore;
-import org.act.temporalProperty.impl.RangeQueryCallBack;
-import org.act.temporalProperty.index.IndexQueryRegion;
+import org.act.temporalProperty.impl.InternalEntry;
 import org.act.temporalProperty.index.IndexValueType;
-import org.act.temporalProperty.index.PropertyValueInterval;
-import org.act.temporalProperty.index.rtree.IndexEntry;
+import org.act.temporalProperty.index.value.IndexQueryRegion;
+import org.act.temporalProperty.index.value.PropertyValueInterval;
+import org.act.temporalProperty.index.value.rtree.IndexEntry;
+import org.act.temporalProperty.meta.ValueContentType;
+import org.act.temporalProperty.query.range.InternalEntryRangeQueryCallBack;
+import org.act.temporalProperty.util.DataFileImporter;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.StoreBuilder;
 import org.act.temporalProperty.util.TrafficDataImporter;
-import org.apache.commons.lang3.SystemUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.util.*;
 
 /**
@@ -25,41 +28,38 @@ import java.util.*;
 public class CorrectnessTest {
     private static Logger log = LoggerFactory.getLogger(CorrectnessTest.class);
 
-    private static String dataPath(){
-         if(SystemUtils.IS_OS_WINDOWS){
-             return "C:\\Users\\Administrator\\Desktop\\TGraph-source\\20101104.tar\\20101104";
-         }else{
-             return "/home/song/tmp/road data/20101104";
-         }
-    }
-    private static String dbDir(){
-        if(SystemUtils.IS_OS_WINDOWS){
-            return "temporal.property.test";
-        }else{
-            return "/tmp/temporal.property.test";
-        }
-    }
-
+    private static DataFileImporter dataFileImporter;
     private TemporalPropertyStore store;
     private StoreBuilder stBuilder;
     private TrafficDataImporter importer;
     private SourceCompare sourceEntry;
 
+    private static String dbDir;
+    private static String dataPath;
+    private static List<File> dataFileList;
+
+    List<Integer> proIds = new ArrayList<>(); // the list of the proIds which will be indexed and queried
+
     @Before
     public void initDB() throws Throwable {
-        stBuilder = new StoreBuilder(dbDir(), true);
-        importer = new TrafficDataImporter(stBuilder.store(), dataPath(), 1000);
-        sourceEntry = new SourceCompare(dataPath(), 1000); //fileCount = 10; no entry in timeRange, but query results can be found in Index and Range? --- endTime (<=endTime --> < endTime?)
+
+        dataFileImporter = new DataFileImporter(280);
+        dbDir = dataFileImporter.getDbDir();
+        dataPath = dataFileImporter.getDataPath();
+        dataFileList = dataFileImporter.getDataFileList();
+
+        stBuilder = new StoreBuilder(dbDir, true);
+        importer = new TrafficDataImporter(stBuilder.store(), dataFileList, 1000);
+        sourceEntry = new SourceCompare(dataPath, dataFileList, 1000);
         log.info("time: {} - {}", importer.getMinTime(), importer.getMaxTime());
         store = stBuilder.store();
+
         buildIndex();
     }
 
     private void buildIndex(){
-        List<Integer> proIds = new ArrayList<>();
+
         proIds.add(1);
-//        store.createValueIndex(1288803660, 1288824660, proIds, types);
-//        store.createValueIndex(1288800300, 1288802460, proIds, types);
         store.createValueIndex(1560, 27360, proIds);
         log.info("create index done");
     }
@@ -72,9 +72,16 @@ public class CorrectnessTest {
 
     private void compare(int startTime, int endTime, int valMin, int valMax){
 
-        List<IndexEntry> rangeResult = sourceEntry.queryBySource(startTime, endTime, valMin, valMax);
+        proIds.add(1);
+
+        int proNum = proIds.size();
+        int[][] pValueIntervals = new int[proNum][2];
+        //pId = 1, valueMin = 0, valueMax = 200
+        pValueIntervals[0][0] = valMin;
+        pValueIntervals[0][1] = valMax;
+
+        List<IndexEntry> rangeResult = sourceEntry.queryBySource(startTime, endTime, proIds, pValueIntervals);
         rangeResult.sort(cmp);
-        log.info("range query complete");
 
         List<IndexEntry> indexResult = queryByIndex(startTime, endTime, valMin, valMax);//27000
         indexResult.sort(cmp);
@@ -85,9 +92,9 @@ public class CorrectnessTest {
 //        rangeResult.sort(cmp);
 //        log.info("range query complete");
 
-        log.info("size: range({}) vs index({})", rangeResult.size(), indexResult.size());
+   //     log.info("size: range({}) vs index({})", rangeResult.size(), indexResult.size());
 //
-        sameEntities(rangeResult, indexResult);
+    //    sameEntities(rangeResult, indexResult);
 
 //        for(int i=0; i<rangeResult.size() && i<indexResult.size(); i++){
 //            IndexEntry rangeE = rangeResult.get(i);
@@ -162,7 +169,7 @@ public class CorrectnessTest {
 
     private boolean smallTest() {
         store.getRangeValue(62254, 1, 0, 999999, new CustomCallBack(62254){
-            public void onCall(int time, Slice value) { log.info("{} {}", time, value.getInt(0));}
+            public void onNewValue(int time, Slice value) { log.info("{} {}", time, value.getInt(0));}
             public Object onReturn() { log.info("onReturn of test"); return null;}
         });
         return true;
@@ -189,7 +196,7 @@ public class CorrectnessTest {
                         private boolean first = true;
                         private int lastTime = -1;
                         private Slice lastVal;
-                        public void onCall(int time, Slice value) {
+                        public void onNewValue(int time, Slice value) {
                             if (first) {
                                 first = false;
                             } else if (overlap(lastTime, time-1, timeMin, timeMax)) {
@@ -225,7 +232,7 @@ public class CorrectnessTest {
                 private boolean first = true;
                 private int lastTime = -1;
                 private Slice lastVal;
-                public void onCall(int time, Slice value0) {
+                public void onNewValue(int time, Slice value0) {
                     if (first) {
                         first = false;
                         if(time>timeMin) throw new StopLoopException("start time("+time+") later than timeMin");
@@ -261,7 +268,7 @@ public class CorrectnessTest {
 
         store.getRangeValue(entityId, 1, timeMin, timeMax,
                 new CustomCallBack(entityId){
-                    public void onCall(int time, Slice value) {
+                    public void onNewValue(int time, Slice value) {
                         log.debug("time({}) val({})", time, value.getInt(0));
                     }
                     public Object onReturn() {
@@ -277,14 +284,12 @@ public class CorrectnessTest {
 
     private static boolean overlap(int t1min, int t1max, int t2min, int t2max){return (t1min<=t2max && t2min<=t1max);}
 
-    private class CustomCallBack extends RangeQueryCallBack {
+    private class CustomCallBack implements InternalEntryRangeQueryCallBack {
         private long entityId;
         public CustomCallBack(long entityId){this.entityId=entityId;}
-        public void onCall(int time, Slice value) {}
-        public void setValueType(String valueType) {}
-        public void onCallBatch(Slice batchValue) {}
+        public void setValueType(ValueContentType valueType) {}
+        public void onNewEntry(InternalEntry entry) {}
         public Object onReturn() {return null;}
-        public CallBackType getType() {return null;}
     }
 
     private class StopLoopException extends RuntimeException {
@@ -309,7 +314,7 @@ public class CorrectnessTest {
     };
 
     @After
-    public void closeDB(){
+    public void closeDB() throws Throwable {
         if(store!=null) store.shutDown();
     }
 

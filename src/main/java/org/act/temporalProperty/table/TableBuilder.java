@@ -27,6 +27,7 @@ import java.nio.channels.FileChannel;
 import org.act.temporalProperty.impl.CompressionType;
 import org.act.temporalProperty.impl.InternalKey;
 import org.act.temporalProperty.impl.Options;
+import org.act.temporalProperty.query.aggr.AggregationIndexKey;
 import org.act.temporalProperty.util.PureJavaCrc32C;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.Slices;
@@ -143,7 +144,8 @@ public class TableBuilder
         if (entryCount > 0) {
 //            assert (userComparator.compare(key, lastKey) > 0) : "key must be greater than last key";
             if(userComparator.compare(key, lastKey) <= 0){
-                throw new AssertionError("key must be greater than last key, "+new InternalKey(lastKey)+" "+new InternalKey(key));
+//                throw new AssertionError("key must be greater than last key, "+new AggregationIndexKey( lastKey)+" "+new AggregationIndexKey( key));
+                throw new AssertionError("key must be greater than last key, "+new InternalKey( lastKey )+" "+new InternalKey( key ));
             }
         }
 

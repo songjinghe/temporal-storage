@@ -1,9 +1,6 @@
 package org.act.temporalProperty.helper;
 
 import org.act.temporalProperty.impl.*;
-import org.act.temporalProperty.util.Slice;
-
-import java.util.Map.Entry;
 
 /**
  * If an entity only contains one entry and the entry is INVALID, then remove such entries.

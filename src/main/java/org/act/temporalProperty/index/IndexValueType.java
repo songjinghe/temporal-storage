@@ -140,7 +140,7 @@ public enum IndexValueType {
     IndexValueType(int id){
         this.id = id;
     }
-    int getId(){
+    public int getId(){
         return id;
     }
 
@@ -169,4 +169,9 @@ public enum IndexValueType {
     public abstract int compareRange(Slice min1, Slice max1, Slice min2, Slice max2);
 
     public abstract String toString(Slice field);
+
+    public ValueContentType toValueContentType()
+    {
+        return ValueContentType.decode( id + 1 );
+    }
 }

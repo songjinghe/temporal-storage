@@ -1,12 +1,15 @@
 package org.act.temporalProperty.impl.index.singleval;
 
 import org.act.temporalProperty.TemporalPropertyStore;
-import org.act.temporalProperty.impl.RangeQueryCallBack;
-import org.act.temporalProperty.index.IndexQueryRegion;
-import org.act.temporalProperty.index.IndexTableIterator;
+import org.act.temporalProperty.impl.InternalEntry;
 import org.act.temporalProperty.index.IndexValueType;
-import org.act.temporalProperty.index.PropertyValueInterval;
-import org.act.temporalProperty.index.rtree.IndexEntry;
+import org.act.temporalProperty.index.value.IndexQueryRegion;
+import org.act.temporalProperty.index.value.IndexTableIterator;
+import org.act.temporalProperty.index.value.PropertyValueInterval;
+import org.act.temporalProperty.index.value.rtree.IndexEntry;
+import org.act.temporalProperty.meta.ValueContentType;
+import org.act.temporalProperty.query.range.InternalEntryRangeQueryCallBack;
+import org.act.temporalProperty.util.DataFileImporter;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.StoreBuilder;
 import org.act.temporalProperty.util.TrafficDataImporter;
@@ -16,7 +19,11 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 
 /**
  * Created by song on 2018-01-28.
@@ -24,26 +31,38 @@ import java.util.*;
 public class PerformanceTest {
     public static LinkedList<Integer> nodeAccessList;
 
-    private static Logger log = LoggerFactory.getLogger(BuildAndQueryTest.class);
+    private static Logger log = LoggerFactory.getLogger(PerformanceTest.class);
 
-    private static String dataPath = "/home/song/tmp/road data";
-    private static String dbDir = "/media/song/G680/songjh/projects/TGraph/runtime/test/performance";
-
+    private static DataFileImporter dataFileImporter;
     private TemporalPropertyStore store;
     private StoreBuilder stBuilder;
     private TrafficDataImporter importer;
+    private SourceCompare sourceEntry;
+
+    private static String dbDir;
+    private static String dataPath;
+    private static List<File> dataFileList;
+
+    List<Integer> proIds = new ArrayList<>(); // the list of the proIds which will be indexed and queried
 
     @Before
     public void initDB() throws Throwable {
+        dataFileImporter = new DataFileImporter(280);
+        dbDir = dataFileImporter.getDbDir();
+        dataPath = dataFileImporter.getDataPath();
+        dataFileList = dataFileImporter.getDataFileList();
+
         stBuilder = new StoreBuilder(dbDir, true);
-        importer = new TrafficDataImporter(stBuilder.store(), dataPath, 100);
+        importer = new TrafficDataImporter(stBuilder.store(), dataFileList, 1000);
+        sourceEntry = new SourceCompare(dataPath, dataFileList, 1000);
         log.info("time: {} - {}", importer.getMinTime(), importer.getMaxTime());
         store = stBuilder.store();
+
         buildIndex();
     }
 
     private void buildIndex(){
-        List<Integer> proIds = new ArrayList<>();
+
         proIds.add(1);
 //        store.createValueIndex(1288803660, 1288824660, proIds, types);
 //        store.createValueIndex(1288800300, 1288802460, proIds, types);
@@ -128,7 +147,7 @@ public class PerformanceTest {
                         private boolean first = true;
                         private int lastTime = -1;
                         private Slice lastVal;
-                        public void onCall(int time, Slice value) {
+                        public void onNewValue(int time, Slice value) {
                             if (first) {
                                 first = false;
                             } else if (overlap(lastTime, time-1, timeMin, timeMax)) {
@@ -165,7 +184,7 @@ public class PerformanceTest {
                 private boolean first = true;
                 private int lastTime = -1;
                 private Slice lastVal;
-                public void onCall(int time, Slice value0) {
+                public void onNewValue(int time, Slice value0) {
                     if (first) {
                         first = false;
                         if(time>timeMin) throw new StopLoopException("start time("+time+") later than timeMin");
@@ -196,14 +215,12 @@ public class PerformanceTest {
 
     private static boolean overlap(int t1min, int t1max, int t2min, int t2max){return (t1min<=t2max && t2min<=t1max);}
 
-    private class CustomCallBack extends RangeQueryCallBack {
+    private class CustomCallBack implements InternalEntryRangeQueryCallBack {
         private long entityId;
         public CustomCallBack(long entityId){this.entityId=entityId;}
-        public void onCall(int time, Slice value) {}
-        public void setValueType(String valueType) {}
-        public void onCallBatch(Slice batchValue) {}
+        public void setValueType(ValueContentType valueType) {}
+        public void onNewEntry(InternalEntry entry) {}
         public Object onReturn() {return null;}
-        public CallBackType getType() {return null;}
     }
 
     private class StopLoopException extends RuntimeException {
@@ -222,7 +239,7 @@ public class PerformanceTest {
     }
 
     @After
-    public void closeDB(){
+    public void closeDB() throws Throwable {
         if(store!=null) store.shutDown();
     }
 

@@ -4,8 +4,7 @@ import org.act.temporalProperty.exception.TPSNHException;
 import org.act.temporalProperty.impl.LogReader;
 import org.act.temporalProperty.impl.LogWriter;
 import org.act.temporalProperty.impl.Logs;
-import org.act.temporalProperty.index.IndexMetaData;
-import org.act.temporalProperty.index.IndexMetaDataController;
+import org.act.temporalProperty.index.value.IndexMetaData;
 import org.act.temporalProperty.util.DynamicSliceOutput;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.SliceInput;
@@ -38,10 +37,12 @@ public class SystemMetaController {
         for(PropertyMetaData p: props){
             PropertyMetaDataController.encode(out, p);
         }
+        out.writeLong(meta.indexNextId());
+        out.writeLong( meta.indexNextFileId() );
         Collection<IndexMetaData> indexes = meta.getIndexes();
         out.writeInt(indexes.size());
         for(IndexMetaData p: indexes){
-            IndexMetaDataController.encode(out, p);
+            p.encode(out);
         }
     }
 
@@ -52,9 +53,11 @@ public class SystemMetaController {
             PropertyMetaData pMeta = PropertyMetaDataController.decode(in);
             meta.addProperty(pMeta);
         }
+        meta.setIndexNextId(in.readLong());
+        meta.setIndexNextFileId(in.readLong());
         count = in.readInt();
         for(int i=0; i<count; i++){
-            IndexMetaData iMeta = IndexMetaDataController.decode(in);
+            IndexMetaData iMeta = new IndexMetaData(in);
             meta.addIndex(iMeta);
         }
         return meta;

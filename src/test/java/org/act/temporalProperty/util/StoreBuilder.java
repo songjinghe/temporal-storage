@@ -4,6 +4,7 @@ import org.act.temporalProperty.TemporalPropertyStore;
 import org.act.temporalProperty.TemporalPropertyStoreFactory;
 import org.act.temporalProperty.impl.InternalKey;
 import org.act.temporalProperty.impl.ValueType;
+import org.act.temporalProperty.query.TimeIntervalKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,6 +15,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.*;
+
+import static org.act.temporalProperty.TemporalPropertyStore.NOW;
 
 /**
  * Created by song on 2018-01-23.
@@ -42,9 +45,10 @@ public class StoreBuilder {
     }
 
     public static void setIntProperty(TemporalPropertyStore store, int time, long entityId, int propertyId, int value) {
-        Slice id = getIdSlice(entityId, propertyId);
-        InternalKey key = new InternalKey(id, time, 4, ValueType.VALUE);
-        store.setProperty(key.encode(), ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(value).array());
+        InternalKey key = new InternalKey(propertyId, entityId, time, ValueType.INT);
+        Slice val = new Slice(4);
+        val.setInt( 0, value );
+        store.setProperty( new TimeIntervalKey( key, NOW ), val );
     }
 
     private static Slice getIdSlice(long entityId, int propertyId) {

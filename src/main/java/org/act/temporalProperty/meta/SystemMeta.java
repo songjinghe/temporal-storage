@@ -1,8 +1,10 @@
 package org.act.temporalProperty.meta;
 
 import org.act.temporalProperty.exception.TPSRuntimeException;
+import org.act.temporalProperty.helper.StoreLock;
 import org.act.temporalProperty.impl.*;
-import org.act.temporalProperty.index.IndexMetaData;
+import org.act.temporalProperty.index.IndexStore;
+import org.act.temporalProperty.index.value.IndexMetaData;
 
 import java.io.File;
 import java.io.IOException;
@@ -14,12 +16,12 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * Created by song on 2018-01-17.
  */
 public class SystemMeta {
-    private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock( false );
-    public final Condition waitWriteCondition = lock.writeLock().newCondition();
-    public final Condition writeDiskComplete = lock.writeLock().newCondition();
+    public final StoreLock lock = new StoreLock();
 
     private final Map<Integer, PropertyMetaData> properties = new HashMap<>();
     private final Set<IndexMetaData> indexes = new HashSet<>();
+    private long indexNextId;
+    private long indexNextFileId;
     private final Map<Integer, SinglePropertyStore> propertyStores = new HashMap<>();
     private TableCache cache;
     private File dbDir;
@@ -58,31 +60,15 @@ public class SystemMeta {
         properties.put(pMeta.getPropertyId(), pMeta);
     }
 
-    public void lockShared(){
-        lock.readLock().lock();
-    }
-
-    public void unLockShared(){
-        lock.readLock().unlock();
-    }
-
-    public void lockExclusive(){
-        lock.writeLock().lock();
-    }
-
-    public void unLockExclusive(){
-        lock.writeLock().unlock();
-    }
-
     public void force(File dir) throws IOException {
         SystemMetaController.forceToDisk(dir, this);
     }
 
-    public void initStore(File storeDir, TableCache cache) throws Throwable {
+    public void initStore(File storeDir, TableCache cache, IndexStore indexStore ) throws Throwable {
         this.dbDir = storeDir;
         this.cache = cache;
         for( PropertyMetaData pMeta : properties.values()){
-            SinglePropertyStore onePropStore = new SinglePropertyStore(pMeta, storeDir, cache);
+            SinglePropertyStore onePropStore = new SinglePropertyStore(pMeta, storeDir, cache, indexStore);
             propertyStores.put(pMeta.getPropertyId(), onePropStore);
         }
     }
@@ -94,5 +80,23 @@ public class SystemMeta {
                 ", indexes=" + indexes +
                 ", dbDir=" + dbDir +
                 '}';
+    }
+
+    public long indexNextId() {
+        return this.indexNextId;
+    }
+
+    public void setIndexNextId(long indexNextId) {
+        this.indexNextId = indexNextId;
+    }
+
+    public long indexNextFileId()
+    {
+        return this.indexNextFileId;
+    }
+
+    public void setIndexNextFileId( long nextFileId )
+    {
+        this.indexNextFileId = nextFileId;
     }
 }

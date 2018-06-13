@@ -1,11 +1,14 @@
 package org.act.temporalProperty.impl.query.range;
 
 import org.act.temporalProperty.TemporalPropertyStore;
-import org.act.temporalProperty.impl.RangeQueryCallBack;
+import org.act.temporalProperty.impl.InternalEntry;
 import org.act.temporalProperty.meta.ValueContentType;
+import org.act.temporalProperty.query.aggr.AggregationQuery;
+import org.act.temporalProperty.query.range.InternalEntryRangeQueryCallBack;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.StoreBuilder;
 import org.apache.commons.lang3.SystemUtils;
+import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,35 +39,51 @@ public class CorrectnessTest {
             StoreBuilder.setIntProperty(store, (int)i, 2, 0, (int)i);
         }
         Slice val = store.getPointValue(1,0, sep*2-10);
-        log.debug("point query result {}", val.getInt(0));
-        log.debug("if you see next line, then means no bug.");
-        Object result = store.getRangeValue(1, 0, sep*2-10, sep*2, new RangeQueryCallBack(){
-
-            @Override
-            public void setValueType(String valueType) {
-                //
+        Assert.assertEquals( sep - 1, val.getInt( 0 ) );
+        Object result = store.getRangeValue(1, 0, sep*2-10, sep*2, new InternalEntryRangeQueryCallBack(){
+            public void setValueType(ValueContentType valueType) {}
+            public void onNewEntry(InternalEntry entry) {
+                Assert.assertEquals( entry.getValue().getInt( 0 ), entry.getKey().getStartTime() );
             }
-
-            @Override
-            public void onCall(int time, Slice value) {
-                log.debug("if you see this line, then means no bug. val={}", value.getInt(0));
-            }
-
-            @Override
-            public void onCallBatch(Slice batchValue) {}
-
-            @Override
             public Object onReturn() {
-                return null;
-            }
-
-            @Override
-            public CallBackType getType() {
                 return null;
             }
         });
 
         store.shutDown();
+    }
+
+    @Test
+    public void simple() throws Throwable
+    {
+        StoreBuilder stBuilder = new StoreBuilder( dbDir(), false );
+        TemporalPropertyStore store = stBuilder.store();
+        try
+        {
+            store.getRangeValue( 5, 1, 0, Integer.MAX_VALUE - 10, new AggregationQuery()
+            {
+                @Override
+                public void setValueType( ValueContentType valueType )
+                {
+                }
+
+                @Override
+                public void onNewEntry( InternalEntry entry )
+                {
+                    System.out.println( entry );
+                }
+
+                @Override
+                public Object onReturn()
+                {
+                    return null;
+                }
+            } );
+        }
+        finally
+        {
+            store.shutDown();
+        }
     }
 
 }

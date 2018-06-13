@@ -1,11 +1,13 @@
 package org.act.temporalProperty.impl.index.singleval;
 
 import org.act.temporalProperty.TemporalPropertyStore;
-import org.act.temporalProperty.impl.RangeQueryCallBack;
-import org.act.temporalProperty.index.IndexQueryRegion;
+import org.act.temporalProperty.impl.InternalEntry;
 import org.act.temporalProperty.index.IndexValueType;
-import org.act.temporalProperty.index.PropertyValueInterval;
+import org.act.temporalProperty.index.value.IndexQueryRegion;
+import org.act.temporalProperty.index.value.PropertyValueInterval;
 import org.act.temporalProperty.meta.ValueContentType;
+import org.act.temporalProperty.query.range.InternalEntryRangeQueryCallBack;
+import org.act.temporalProperty.util.DataFileImporter;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.StoreBuilder;
 import org.act.temporalProperty.util.TrafficDataImporter;
@@ -16,7 +18,9 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Created by song on 2018-01-22.
@@ -24,23 +28,36 @@ import java.util.*;
 public class BuildAndQueryTest {
     private static Logger log = LoggerFactory.getLogger(BuildAndQueryTest.class);
 
-    private static String dataPath = "/home/song/tmp/road data";
-    private static String dbDir = "/tmp/temporal.property.test";
-    private static TemporalPropertyStore store;
-    private static StoreBuilder stBuilder;
-    private static TrafficDataImporter importer;
+    private static DataFileImporter dataFileImporter;
+    private TemporalPropertyStore store;
+    private StoreBuilder stBuilder;
+    private TrafficDataImporter importer;
+    private SourceCompare sourceEntry;
+
+    private static String dbDir;
+    private static String dataPath;
+    private static List<File> dataFileList;
+
+    List<Integer> proIds = new ArrayList<>(); // the list of the proIds which will be indexed and queried
 
     @BeforeClass
-    public static void initDB() throws Throwable {
+    public void initDB() throws Throwable {
+
+        dataFileImporter = new DataFileImporter(280);
+        dbDir = dataFileImporter.getDbDir();
+        dataPath = dataFileImporter.getDataPath();
+        dataFileList = dataFileImporter.getDataFileList();
+
         stBuilder = new StoreBuilder(dbDir, true);
-        importer = new TrafficDataImporter(stBuilder.store(), dataPath, 100);
+        importer = new TrafficDataImporter(stBuilder.store(), dataFileList, 1000);
+        sourceEntry = new SourceCompare(dataPath, dataFileList, 1000);
         log.info("time: {} - {}", importer.getMinTime(), importer.getMaxTime());
         store = stBuilder.store();
     }
 
     @Before
     public void buildIndex(){
-        List<Integer> proIds = new ArrayList<>();
+
         proIds.add(1);
 //        store.createProperty(1, ValueContentType.INT);
         store.createValueIndex(20, 200, proIds);
@@ -94,27 +111,25 @@ public class BuildAndQueryTest {
     }
 
     @After
-    public void closeDB(){
+    public void closeDB() throws Throwable {
         if(store!=null) store.shutDown();
     }
 
 
 
     private static void testRangeQuery(TemporalPropertyStore store) {
-        store.getRangeValue(2, 1, 1560, 27000, new RangeQueryCallBack() {
-            public void setValueType(String valueType) {}
-            public void onCall(int time, Slice value) {
-                log.info("{} {}", time, value.getInt(0));
+        store.getRangeValue(2, 1, 1560, 27000, new InternalEntryRangeQueryCallBack() {
+            public void setValueType(ValueContentType valueType) {}
+            public void onNewEntry(InternalEntry entry) {
+                log.info("{} {}", entry.getKey().getStartTime(), entry.getValue().getInt(0));
             }
-            public void onCallBatch(Slice batchValue){}
-            public Object onReturn(){return null;}
-            public CallBackType getType(){return null;}
+            public Object onReturn() {return null;}
         });
     }
 
 
 
-    private class EntityIdCallBack extends RangeQueryCallBack {
+    private class EntityIdCallBack implements InternalEntryRangeQueryCallBack {
         private int timeMin, timeMax, valueMin, valueMax, lastTime = -1;
         private boolean first = true;
 
@@ -129,7 +144,9 @@ public class BuildAndQueryTest {
             return (t1min<=t2max && t2min<=t1max);
         }
 
-        public void onCall(int time, Slice value) {
+        public void onNewEntry(InternalEntry entry) {
+            int time = entry.getKey().getStartTime();
+            Slice value = entry.getValue();
             int val = value.getInt(0);
             if(first){
                 first=false;
@@ -145,10 +162,8 @@ public class BuildAndQueryTest {
             }
             lastTime = time;
         }
-        public void setValueType(String valueType) {}
-        public void onCallBatch(Slice batchValue) {}
+        public void setValueType(ValueContentType valueType) {}
         public Object onReturn() {return null;}
-        public CallBackType getType() {return null;}
     };
 
     private class StopLoopException extends RuntimeException {

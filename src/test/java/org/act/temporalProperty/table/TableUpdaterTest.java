@@ -4,9 +4,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
-import java.util.Map.Entry;
-
-import junit.framework.Assert;
 
 import org.act.temporalProperty.impl.Filename;
 import org.act.temporalProperty.impl.InternalKey;
@@ -15,7 +12,6 @@ import org.act.temporalProperty.impl.SequenceNumber;
 import org.act.temporalProperty.impl.ValueType;
 import org.act.temporalProperty.util.Slice;
 import org.junit.BeforeClass;
-import org.junit.Test;
 
 public class TableUpdaterTest
 {
@@ -51,9 +47,9 @@ public class TableUpdaterTest
                         Slice value = new Slice( 20 );
                         value.setLong( 0, i );
                         value.setInt( 8, p );
-                        long sequence = SequenceNumber.packSequenceAndValueType( t, 20, ValueType.VALUE );
+                        long sequence = SequenceNumber.packTimeAndValueType( t, ValueType.VALUE );
                         value.setLong( 12, sequence );
-                        InternalKey key = new InternalKey( idSlice, t, 20, ValueType.VALUE );
+                        InternalKey key = new InternalKey( idSlice, t, ValueType.VALUE );
                         builder.add( key.encode(), value );
                     }
                 }
@@ -82,7 +78,7 @@ public class TableUpdaterTest
 //                      Slice newvalue = new Slice( 20 );
 //                      newvalue.setLong( 0, i+1 );
 //                      newvalue.setInt( 8, p+1 );
-//                      long sequnence = SequenceNumber.packSequenceAndValueType( t, 20, ValueType.DELETION );
+//                      long sequnence = SequenceNumber.packTimeAndValueType( t, 20, ValueType.DELETION );
 //                      newvalue.setLong( 12, sequnence );
 //                      updater.update( idSlice, t, 20, ValueType.INVALID, newvalue );
 //                  }
@@ -125,7 +121,7 @@ public class TableUpdaterTest
 //                      Slice newvalue = new Slice( 20 );
 //                      newvalue.setLong( 0, i+1 );
 //                      newvalue.setInt( 8, p+1 );
-//                      long sequnence = SequenceNumber.packSequenceAndValueType( t, 20, ValueType.DELETION );
+//                      long sequnence = SequenceNumber.packTimeAndValueType( t, 20, ValueType.DELETION );
 //                      newvalue.setLong( 12, sequnence );
 //                      updater.update( idSlice, t, 20, ValueType.DELETION, newvalue );
 //                  }
@@ -168,7 +164,7 @@ public class TableUpdaterTest
 //                    Slice newvalue = new Slice( 20 );
 //                    newvalue.setLong( 0, i+1 );
 //                    newvalue.setInt( 8, p+1 );
-//                    long sequnence = SequenceNumber.packSequenceAndValueType( t, 20, ValueType.DELETION );
+//                    long sequnence = SequenceNumber.packTimeAndValueType( t, 20, ValueType.DELETION );
 //                    newvalue.setLong( 12, sequnence );
 //                    updater.update( idSlice, t, 20, ValueType.VALUE, newvalue );
 //                }

@@ -1,200 +1,229 @@
 package org.act.temporalProperty.index;
 
-import com.google.common.collect.Lists;
 import com.google.common.collect.PeekingIterator;
-import org.act.temporalProperty.exception.TPSException;
-import org.act.temporalProperty.exception.TPSRuntimeException;
 import org.act.temporalProperty.impl.*;
-import org.act.temporalProperty.index.rtree.IndexEntry;
-import org.act.temporalProperty.index.rtree.IndexEntryOperator;
-import org.act.temporalProperty.util.TimeIntervalUtil;
+import org.act.temporalProperty.index.aggregation.*;
+import org.act.temporalProperty.index.value.*;
+import org.act.temporalProperty.index.value.rtree.IndexEntry;
+import org.act.temporalProperty.meta.PropertyMetaData;
+import org.act.temporalProperty.query.TimeIntervalKey;
+import org.act.temporalProperty.query.aggr.AggregationIndexQueryResult;
+import org.act.temporalProperty.query.aggr.ValueGroupingMap;
+import org.act.temporalProperty.util.Slice;
+import org.act.temporalProperty.util.SliceOutput;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.channels.FileChannel;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
-import static org.act.temporalProperty.index.IndexType.MULTI_VALUE;
+import static org.act.temporalProperty.index.IndexType.AGGR_DURATION;
 import static org.act.temporalProperty.index.IndexType.SINGLE_VALUE;
+import static org.act.temporalProperty.index.IndexUpdater.*;
 
 /**
  * Created by song on 2018-03-19.
  */
 public class IndexStore {
     private final TemporalPropertyStoreImpl tpStore;
+    private final File indexDir;
     private IndexTableCache cache;
-    private File indexDir;
-    private AtomicLong nextId = new AtomicLong(0);
-    //meta
-    private Map<Integer, TreeMap<Integer, IndexMetaData>> singleVal = new HashMap<>(); // proId, time
-    private TreeMap<Integer, List<IndexMetaData>> multiVal = new TreeMap<>(); // time
-    private Map<Integer, TreeMap<Integer, IndexMetaData>> aggr = new HashMap<>(); // proId, time
 
-    public IndexStore(File indexDir, TemporalPropertyStoreImpl store, Set<IndexMetaData> indexes) throws IOException {
+    private AggregationIndexOperator aggr;
+    private ValueIndexOperator value;
+    private IndexMetaManager meta;
+
+    public IndexStore(File indexDir, TemporalPropertyStoreImpl store, Set<IndexMetaData> indexes, long nextId, long nextFileId) throws IOException {
         if(!indexDir.exists() && !indexDir.mkdir()) throw new IOException("unable to create index dir");
-        this.indexDir = indexDir;
         this.tpStore = store;
-        for(IndexMetaData meta : indexes){
-            if(meta.getType()==SINGLE_VALUE){
-                addSingleValIndex(meta);
-            }else if(meta.getType()==MULTI_VALUE){
-                addMultiValIndex(meta);
-            }else{
-                addAggrIndex(meta);
-            }
-        }
+        this.indexDir = indexDir;
         this.cache = new IndexTableCache(indexDir, 4);
+        this.meta = new IndexMetaManager( indexes, nextId, nextFileId );
+        this.aggr = new AggregationIndexOperator( indexDir, store, cache, meta );
+        this.value = new ValueIndexOperator( indexDir, store, cache, meta );
     }
 
-
-    public List<IndexMetaData> availableSingleValIndexes(int proId, int start, int end){
-        TreeMap<Integer, IndexMetaData> map = singleVal.get(proId);
-        if(map==null){
-            return Collections.emptyList();
-        }else{
-            return new ArrayList<>(map.subMap(start, true, end, true).values());
-        }
+    public void close(){
+        this.cache.close();
     }
 
-    public List<IndexMetaData> availableMultiValIndexes(List<Integer> proIds, int start, int end){
-        proIds.sort(Integer::compareTo);
-        Collection<List<IndexMetaData>> list = multiVal.subMap(start, true, end, true).values();
-        List<IndexMetaData> result = new ArrayList<>();
-        for(List<IndexMetaData> lst : list) {
-            result.addAll(lst);
-        }
-        return result;
+    public void encode(SliceOutput out){
+        //TODO fixme
     }
 
-    public void createValueIndex(int start, int end, List<Integer> proIds, List<IndexValueType> types) throws IOException {
-        long fileId = nextId.getAndIncrement();
-        long fileSize = createValIndex(start, end, proIds, types, fileId);
-        if (proIds.size() == 1) {
-            addSingleValIndex(new IndexMetaData(fileId, SINGLE_VALUE, proIds, start, end, fileSize));
-        } else {
-            addMultiValIndex(new IndexMetaData(fileId, MULTI_VALUE, proIds, start, end, fileSize));
-        }
+//    public List<IndexMetaData> availableSingleValIndexes(int proId, int start, int end){
+//        TreeMap<Integer, IndexMetaData> map = singleVal.get(proId);
+//        if(map==null){
+//            return Collections.emptyList();
+//        }else{
+//            return new ArrayList<>(map.subMap(start, true, end, true).values());
+//        }
+//    }
+//
+//    public List<IndexMetaData> availableMultiValIndexes(List<Integer> proIds, int start, int end){
+//        proIds.sort(Integer::compareTo);
+//        Collection<List<IndexMetaData>> list = multiVal.subMap(start, true, end, true).values();
+//        List<IndexMetaData> result = new ArrayList<>();
+//        for(List<IndexMetaData> lst : list) {
+//            result.addAll(lst);
+//        }
+//        return result;
+//    }
+
+    public long createValueIndex(int start, int end, List<Integer> proIds, List<IndexValueType> types) throws IOException {
+        return value.create(start, end, proIds, types);
     }
 
-    private long createValIndex(int start, int end, List<Integer> proIds, List<IndexValueType> types, long fileId) throws IOException {
-        IndexEntryOperator op = new IndexEntryOperator(Lists.newArrayList(types),4096);
-        SearchableIterator iterator = tpStore.buildIndexIterator(start, end, proIds);
-        IndexBuilderCallback dataCollector = new IndexBuilderCallback(proIds, op);
-        while(iterator.hasNext()){
-            InternalEntry entry = iterator.next();
-            InternalKey key = entry.getKey();
-            if(key.getValueType()== ValueType.INVALID) {
-                dataCollector.onCall(key.getPropertyId(), key.getEntityId(), key.getStartTime(), null);
-            }else{
-                dataCollector.onCall(key.getPropertyId(), key.getEntityId(), key.getStartTime(), entry.getValue());
-            }
-        }
-        PeekingIterator<IndexEntry> data = dataCollector.getIterator(start, end);
-
-        String indexFilePath = Filename.valIndexFileName(fileId);
-        try(FileChannel channel = new FileOutputStream(new File(this.indexDir, indexFilePath)).getChannel()) {
-            IndexTableWriter writer = new IndexTableWriter(channel, op);
-            while (data.hasNext()) {
-                writer.add(data.next());
-            }
-            writer.finish();
-            return channel.size();
-        }
+    public long createAggrDurationIndex(PropertyMetaData pMeta, int start, int end, ValueGroupingMap valueGrouping, int every, int timeUnit) throws IOException {
+        return aggr.createDuration(pMeta, start, end, valueGrouping, every, timeUnit);
     }
 
-    private void addSingleValIndex(IndexMetaData indexMeta) {
-        int pid = indexMeta.getPropertyIdList().get(0);
-        singleVal.computeIfAbsent(pid, k -> new TreeMap<>());
-        singleVal.get(pid).put(indexMeta.getTimeStart(), indexMeta);
+    public long createAggrMinMaxIndex(PropertyMetaData pMeta, int start, int end, int every, int timeUnit, IndexType type) throws IOException {
+        return aggr.createMinMax(pMeta, start, end, every, timeUnit, type);
     }
 
-    private void addMultiValIndex(IndexMetaData meta) {
-        multiVal.computeIfAbsent(meta.getTimeStart(), k -> new ArrayList<>());
-        multiVal.get(meta.getTimeStart()).add(meta);
+    public List<IndexEntry> queryValueIndex( IndexQueryRegion condition, MemTable cache ) throws IOException {
+        return value.query(condition, cache);
     }
 
-    private void addAggrIndex(IndexMetaData indexMeta) {
-        int pid = indexMeta.getPropertyIdList().get(0);
-        aggr.computeIfAbsent(pid, k -> new TreeMap<>());
-        aggr.get(pid).put(indexMeta.getTimeStart(), indexMeta);
+    public AggregationIndexQueryResult queryAggrIndex( long entityId, PropertyMetaData meta, int start, int end, long indexId, MemTable cache ) throws IOException {
+        return aggr.query(entityId, meta.getPropertyId(), start, end, indexId, cache);
     }
 
-    public List<IndexEntry> valueIndexQuery(IndexQueryRegion condition) throws IOException {
-        IndexMetaData meta = valIndexCoverRegion(condition);
-        Iterator<IndexEntry> iter = this.getQueryIterator(condition, meta);
-        List<IndexEntry> result = new ArrayList<>();
-        while(iter.hasNext()){
-            result.add(iter.next());
-        }
-        return result;
-    }
-
-    private IndexMetaData valIndexCoverRegion(IndexQueryRegion condition) {
-        List<PropertyValueInterval> proIntervals = condition.getPropertyValueIntervals();
-        if(proIntervals.size()==1){
-            int pid = proIntervals.get(0).getProId();
-            TreeMap<Integer, IndexMetaData> tmap = singleVal.get(pid);
-            if(tmap!=null && !tmap.isEmpty()) {
-                Map.Entry<Integer, IndexMetaData> meta = tmap.floorEntry(condition.getTimeMin());
-                if(meta != null){
-                    int indexStart = meta.getValue().getTimeStart();
-                    int indexEnd = meta.getValue().getTimeEnd();
-                    if(TimeIntervalUtil.contains( indexStart, indexEnd, condition.getTimeMin(), condition.getTimeMax())){
-                        return meta.getValue();
-                    }else{
-                        throw new TPSRuntimeException(
-                                "property {} index range {}-{} not fully cover query region {}-{}!",
-                                pid, indexStart, indexEnd, condition.getTimeMin(), condition.getTimeMax());
-                    }
-                }else{
-                    throw new TPSRuntimeException(
-                            "property {} has no index fully cover query region {}-{}!",
-                            pid, condition.getTimeMin(), condition.getTimeMax());
-                }
-            }else{
-                throw new TPSRuntimeException("property {} has no index!", pid);
-            }
-        }else if(!proIntervals.isEmpty()){
-            Integer t = multiVal.floorKey(condition.getTimeMin());
-            if(t!=null) {
-                Set<Integer> conditionPidSet = new HashSet<>();
-                for(PropertyValueInterval p : proIntervals){
-                    conditionPidSet.add(p.getProId());
-                }
-                List<IndexMetaData> metaList = multiVal.get(t);
-                for(IndexMetaData meta : metaList){
-                    int s = meta.getTimeStart();
-                    int e = meta.getTimeEnd();
-                    if(TimeIntervalUtil.contains( s, e, condition.getTimeMin(), condition.getTimeMax())){
-                        Set<Integer> pSetMeta = new HashSet<>(meta.getPropertyIdList());
-                        if(pSetMeta.size()==conditionPidSet.size() && !pSetMeta.retainAll(conditionPidSet)) {
-                            return meta;
-                        }
-                    }
-                }
-                throw new TPSRuntimeException("no valid index for query!");
-            }else{
-                throw new TPSRuntimeException("no valid index for query!");
-            }
-        }else {
-            throw new TPSRuntimeException("no valid index for query!");
-        }
-    }
-
-    private Iterator<IndexEntry> getQueryIterator(IndexQueryRegion condition, IndexMetaData meta) throws IOException {
-        String fileName = Filename.valIndexFileName(meta.getId());
-        return cache.getTable(new File(this.indexDir, fileName).getAbsolutePath()).iterator(condition);
-    }
-
-    public void deleteProperty(int propertyId) {
+    public void deleteIndex(int propertyId) {
         //Fixme TODO
     }
 
-    public void updateEntry(InternalEntry entry) {
-        InternalKey key = entry.getKey();
+    /**
+     * update index if needed.
+     */
+    public List<BackgroundTask> createNewIndexTasks()
+    {
+        List<BackgroundTask> result = new ArrayList<>();
+        result.addAll( this.value.createIndexTasks() );
+        result.addAll( this.aggr.createIndexTasks() );
+        return result;
+    }
 
+    public boolean isOnline( long indexId )
+    {
+        return meta.isOnline( indexId );
+    }
+
+    public IndexUpdater onBufferDelUpdate( int propertyId, boolean isStable, FileMetaData fMeta, MemTable mem )
+    {
+        IndexUpdater.AllIndexUpdater indexUpdater = new IndexUpdater.AllIndexUpdater();
+        List<IndexMetaData> indexes = meta.getByProId( propertyId );
+        for ( IndexMetaData i : indexes )
+        {
+            if ( i.getType() == IndexType.MULTI_VALUE )
+            {
+                for(IndexFileMeta fileMeta : i.allFiles())
+                {
+                    if(mem.overlap( propertyId, fileMeta.getStartTime(), fileMeta.getEndTime() ))
+                    {
+                        indexUpdater.add( new MultiPropertyValueBufferMergeUpdater( meta, indexDir, i, fMeta.getNumber(), isStable ) );
+                    }
+                }
+            }
+            else
+            {
+                IndexFileMeta fileMeta = i.getByCorFileId( fMeta.getNumber(), isStable );
+                if ( fileMeta != null )
+                {
+                    if(mem.overlap( propertyId, fileMeta.getStartTime(), fileMeta.getEndTime() ))
+                    {
+                        if ( i.getType() == SINGLE_VALUE )
+                        {
+                            indexUpdater.add( new SinglePropertyValueBufferMergeUpdater(meta, indexDir, i, fMeta.getNumber(), isStable ) );
+                        }
+                        else if ( i.getType() == AGGR_DURATION )
+                        {
+                            indexUpdater.add( new DurationBufferMergeUpdater( meta, indexDir, i, fMeta.getNumber(), isStable) );
+                        }
+                        else
+                        {
+                            indexUpdater.add( new MinMaxBufferMergeUpdater( meta, indexDir, i, fMeta.getNumber(), isStable ));
+                        }
+                    }
+                }
+            }
+        }
+        if ( indexUpdater.isEmpty() )
+        {
+            return emptyUpdate();
+        }
+        return indexUpdater;
+    }
+
+    public IndexUpdater onMergeUpdate( int propertyId, MemTable mem, List<Long> mergeParticipants )
+    {
+        IndexUpdater.AllIndexUpdater indexUpdater = new IndexUpdater.AllIndexUpdater();
+        List<IndexMetaData> indexes = meta.getByProId( propertyId );
+        for ( IndexMetaData i : indexes )
+        {
+            if ( i.getType() == IndexType.MULTI_VALUE )
+            {
+                for(IndexFileMeta fileMeta : i.allFiles())
+                {
+                    if(mem.overlap( propertyId, fileMeta.getStartTime(), fileMeta.getEndTime() ))
+                    {
+                        indexUpdater.add(new MultiPropertyValueIndexFileUpdater(meta, indexDir, i, mergeParticipants, propertyId) );
+                    }
+                }
+            }
+            else
+            {
+                if ( i.getByCorFileId( propertyId, true ) != null )
+                {
+                    if ( i.getType() == SINGLE_VALUE )
+                    {
+                        indexUpdater.add( new SinglePropertyValueIndexFileUpdater(meta, indexDir, i, mergeParticipants, true ) );
+                    }
+                    else if ( i.getType() == AGGR_DURATION )
+                    {
+                        indexUpdater.add( new DurationMergeUpgradeUpdater( meta, indexDir, i, mergeParticipants, true ) );
+                    }
+                    else
+                    {
+                        indexUpdater.add( new MinMaxFileUpgradeUpdater( meta, indexDir, i, mergeParticipants, true ) );
+                    }
+                }
+            }
+        }
+        if ( indexUpdater.isEmpty() )
+        {
+            return emptyUpdate();
+        }
+        else
+        {
+            return indexUpdater;
+        }
+    }
+
+    public IndexUpdater emptyUpdate()
+    {
+        return new IndexUpdater()
+        {
+            public void update( InternalEntry entry )
+            {
+            }
+
+            public void finish( FileMetaData targetMeta ) throws IOException
+            {
+            }
+
+            public void updateMeta()
+            {
+            }
+
+            public void cleanUp()
+            {
+            }
+        };
+    }
+
+    public List<IndexMetaData> list()
+    {
+        return meta.allIndexes();
     }
 }

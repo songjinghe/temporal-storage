@@ -2,14 +2,13 @@ package org.act.temporalProperty.impl.index.singleval;
 
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.Table;
-import org.act.temporalProperty.impl.InternalKey;
-import org.act.temporalProperty.index.rtree.IndexEntry;
+import org.act.temporalProperty.index.value.rtree.IndexEntry;
 import org.act.temporalProperty.util.Slice;
 import org.apache.commons.lang3.SystemUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.*;
 /*
 * edit by yf
@@ -28,101 +27,169 @@ import java.util.*;
 public class SourceCompare {
 
     public static final int NOW_TIME = 0x40000000; //2^30
-
-    // traffic data dir path
-    private String dataPath;
-    private final File dataDir;
-
-    // ---%--the files filtered by (startTime, endTime)
-    //private List<File> dataFileList;
-    private List<File> totalFileList;
-
-    private Map<String, Long> entityIdMap;
-
-    //private Map<Integer, ArrayList<IndexEntry>> entryMap;
+    private static Logger log = LoggerFactory.getLogger(SourceCompare.class);
 
     private final int inputFileCount;
+    private String dataPath;
+    private List<File> dataFileList;
+    private Map<String, Long> entityIdMap;
+    private List<IndexEntry> entryList;
 
-    List<IndexEntry> entryList;
-
-    public SourceCompare(String dataPath, int inputFileCount) {
-        this.dataPath = dataPath;
-        this.dataDir = new File(dataPath);
-        //this.dataFileList = new ArrayList<File>();
-        //this.entryMap = new HashMap<Integer, ArrayList<IndexEntry>>();
-        this.entityIdMap = new HashMap<String, Long>();
-        this.totalFileList = new ArrayList<File>();
+    public SourceCompare(String dataPath, List<File> dataFileList, int inputFileCount) {
         this.inputFileCount = inputFileCount;
+        this.dataPath = dataPath;
+        this.dataFileList = dataFileList;
+        this.entityIdMap = new HashMap<String, Long>();
         this.entryList = new ArrayList<IndexEntry>();
     }
 
-    public List<IndexEntry> queryBySource(int timeMin, int timeMax, int valueMin, int valueMax) {
+    public List<IndexEntry> queryBySource(int timeMin, int timeMax, List<Integer> proIds, int[][] pValueIntervals) {
 
-        int ret1 = importFiles();
-        if(ret1 < 0)
-            return null;
-
-        return filterEntry(timeMin, timeMax, valueMin, valueMax);
-    }
-
-    // According to the (startTime, endTime; inputFileCount) to filter files in dataDir
-    /* Read (startTime, endTime, [propertyId]; entityId, propertyValue) into a array (iterator); List<List<entry>()> --- each file one list;
-     *  use propertyValue to filter; HashMap<travelTime, EntryList>
-     */
-
-    private int importFiles() {
-
-        if (!this.dataDir.isDirectory()) {
-            System.out.println("SoureCompare-importFiles: dataDir = %s is not a Directory.");
-            return -1;
-        }
-
-        for (File file : this.dataDir.listFiles()) {
-            if (file.isFile() && file.getName().startsWith("TJamData_201") && file.getName().endsWith(".csv")) {
-                totalFileList.add(file);
-            }
-        }
-        totalFileList.sort(Comparator.comparing(File::getName));
-
-        return 0;
-    }
-
-    private List<IndexEntry> filterEntry(int startTime, int endTime, int valueMin, int valueMax){
-
-        int fileCount = Math.min(totalFileList.size(), inputFileCount);
-
-        for (int i = 0; i < fileCount; i++) {
-            File file = totalFileList.get(i);
+        int fileNum = Math.min(dataFileList.size(), inputFileCount);
+        for (int i = 0; i < fileNum; i++) {
+            File file = dataFileList.get(i);
             int sTime = timeStr2int(file.getName().substring(9, 21)) - 1288800000;
 
-            try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+            inputFileData(file, sTime);
 
-                String line = br.readLine();
-                while ((line = br.readLine()) != null) {
-                    String[] fields = line.split(",");
+            if(i%10==0) log.info("input {} files, current {}", i, file.getName());
+        }
 
-                    String gridId = fields[1];
-                    String chainId = fields[2];
-                    Long entityId = getEntityId(gridId, chainId);
+        return filterEntry(timeMin, timeMax, proIds, pValueIntervals);
+    }
 
-                    int travelTime = Integer.valueOf(fields[6]);
+    private void inputFileData(File file, int sTime) {
+        try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+            String line = br.readLine();
+            while ((line = br.readLine()) != null) {
+                readDataLine(line, sTime);
+            }
+        } catch (IOException e) {
+            System.out.println("FileReader: NullIOException.");
+        }
+    }
 
-                   // if((travelTime >= valueMin) && (travelTime <= valueMax)) {
+    public void readDataLine(String line, int sTime) {
+        String[] fields = line.split(",");
 
-                        //int eTime = getEndTime(i + 1, endTime);
-                        Slice value = new Slice(ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(travelTime).array());
+        String gridId = fields[1];
+        String chainId = fields[2];
+        Long entityId = getEntityId(gridId, chainId);
 
-                        entryList.add(new IndexEntry(entityId, sTime, NOW_TIME, new Slice[]{value}));
+        Slice travelTime = new Slice(4);
+        travelTime.setInt(0, Integer.valueOf(fields[6]));
 
-                   // }
+        Slice fullStatus = new Slice(4);
+        fullStatus.setInt(0, Integer.valueOf(fields[7]));
 
+        Slice vehicleCount = new Slice(4);
+        vehicleCount.setInt(0, Integer.valueOf(fields[8]));
+
+        Slice segmentCount = new Slice(4);
+        segmentCount.setInt(0, Integer.valueOf(fields[9]));
+
+        entryList.add(new IndexEntry(entityId, sTime, NOW_TIME,
+                new Slice[]{travelTime, fullStatus, vehicleCount, segmentCount}));
+    }
+
+    private List<IndexEntry> filterEntry(int startTime, int endTime, List<Integer> proIds, int[][] pValueIntervals){
+
+        List<IndexEntry> mergeList = new ArrayList<>();
+
+        entryList.sort(Comparator.comparing(IndexEntry::getEntityId));
+
+        List<IndexEntry> entityIdList = new ArrayList<>();
+        for (int i = 0; i < entryList.size(); i++) {
+
+            IndexEntry entry = entryList.get(i);
+            entityIdList.add(entry);
+
+            if ((i + 1 == entryList.size()) || !entryList.get(i + 1).getEntityId().equals(entry.getEntityId())) {
+
+                entityIdList.sort(Comparator.comparing(IndexEntry::getStart));
+
+                for(int j = 0; j < entityIdList.size(); ) {
+
+                    IndexEntry entity = entityIdList.get(j);
+                    Long entityId = entity.getEntityId();
+                    int sTime = entity.getStart();
+                    int eTime = 0;
+                    Slice value = entity.getValue(0);
+                    int travelTime = value.getInt(0);
+
+                    while(j < entityIdList.size()) {
+
+                        if(j + 1 == entityIdList.size()) {
+                            //eTime = entity.getEnd();
+                            eTime = endTime;
+
+                            if((sTime <= endTime) && (eTime >= startTime)) {
+                                int k = 0;
+                                Slice[] pValues = new Slice[4];
+                                for(k = 0; k < proIds.size(); k++) {
+                                    int proId = proIds.get(k);
+                                    Slice pValue = entity.getValue(proId - 1);
+                                    pValues[proId - 1] = pValue;
+                                    if(pValue.getInt(0) < pValueIntervals[k][0] || pValue.getInt(0) > pValueIntervals[k][1]) {
+                                        break;
+                                    }
+                                }
+                                if(k == proIds.size()) {
+                                    entity = new IndexEntry(entityId, sTime, eTime, pValues);
+                                    mergeList.add(entity);
+                                }
+                            }
+
+                            j++;
+                            break;
+
+                        } else if(comparePValues(entityIdList.get(j), entityIdList.get(j + 1), proIds) == false){
+                            eTime = entityIdList.get(j + 1).getStart() - 1;
+
+                            if((sTime <= endTime) && (eTime >= startTime)) {
+                                int k = 0;
+                                Slice[] pValues = new Slice[4];
+                                for(k = 0; k < proIds.size(); k++) {
+                                    int proId = proIds.get(k);
+                                    Slice pValue = entity.getValue(proId - 1);
+                                    pValues[proId - 1] = pValue;
+                                    if(pValue.getInt(0) < pValueIntervals[k][0] || pValue.getInt(0) > pValueIntervals[k][1]) {
+                                        break;
+                                    }
+                                }
+                                if(k == proIds.size()) {
+                                    entity = new IndexEntry(entityId, sTime, eTime, pValues);
+                                    mergeList.add(entity);
+                                }
+                            }
+
+                            j++;
+                            break;
+                        }
+
+                        j++;
+                    }
                 }
-            } catch (IOException e) {
-                System.out.println("FileReader: NullIOException.");
+
+                entityIdList.clear();
             }
         }
 
-        return mergeEntryList(startTime, endTime, valueMin, valueMax);
+        entityIdList.clear();
+        entityIdList = null;
+
+        return mergeList;
+    }
+
+    private boolean comparePValues(IndexEntry entrySrc, IndexEntry entryDest, List<Integer> proIds) {
+
+        for(int i = 0; i < proIds.size(); i++) {
+            int proId = proIds.get(i);
+            if(!entrySrc.getValue(proId - 1).equals(entryDest.getValue(proId - 1))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public List<IndexEntry> mergeIndexResult(List<IndexEntry> indexResult) {
@@ -173,75 +240,7 @@ public class SourceCompare {
         return mergeList;
     }
 
-    private List<IndexEntry> mergeEntryList(int startTime, int endTime, int valueMin, int valueMax) {
 
-        List<IndexEntry> mergeList = new ArrayList<>();
-
-        entryList.sort(Comparator.comparing(IndexEntry::getEntityId));
-
-        List<IndexEntry> entityIdList = new ArrayList<>();
-        for (int i = 0; i < entryList.size(); i++) {
-
-            IndexEntry entry = entryList.get(i);
-            entityIdList.add(entry);
-
-            if ((i + 1 == entryList.size()) || !entryList.get(i + 1).getEntityId().equals(entry.getEntityId())) {
-
-                entityIdList.sort(Comparator.comparing(IndexEntry::getStart));
-
-                for(int j = 0; j < entityIdList.size(); ) {
-
-                    IndexEntry entity = entityIdList.get(j);
-                    Long entityId = entity.getEntityId();
-                    int sTime = entity.getStart();
-                    Slice value = entity.getValue(0);
-                    int eTime = 0;
-                    int travelTime = value.getInt(0);
-
-                    while(j < entityIdList.size()) {
-
-                        if(j + 1 == entityIdList.size()) {
-                            //eTime = entity.getEnd();
-                            eTime = endTime;
-
-                            if((travelTime >= valueMin) && (travelTime <= valueMax) &&
-                                    (sTime <= endTime) && (eTime >= startTime)) {
-                                entity = new IndexEntry(entityId, sTime, eTime, new Slice[]{value});
-                                mergeList.add(entity);
-                            }
-
-                            j++;
-                            break;
-
-                        } else if(!entityIdList.get(j).getValue(0).equals(entityIdList.get(j + 1).getValue(0))){
-                            eTime = entityIdList.get(j + 1).getStart() - 1;
-
-                            if((travelTime >= valueMin) && (travelTime <= valueMax) &&
-                                    (sTime <= endTime) && (eTime >= startTime)) {
-                                entity = new IndexEntry(entityId, sTime, eTime, new Slice[]{value});
-                                mergeList.add(entity);
-                            }
-
-                            j++;
-                            break;
-                        }
-
-                        j++;
-                    }
-                }
-
-                entityIdList.clear();
-            }
-        }
-
-        entityIdList.clear();
-        entityIdList = null;
-
-       // entryList.clear();
-       // entryList = null;
-
-        return mergeList;
-    }
 
     public List<Table<IndexEntry, String, String>> listDiffer(Set<Long> entities, List<IndexEntry> rangequeries){
 
@@ -331,6 +330,8 @@ public class SourceCompare {
 
             }
 
+            br.close();
+
         } catch (IOException e) {
             System.out.println("SourceCompare -- queryByFileName");
         }
@@ -339,8 +340,8 @@ public class SourceCompare {
     }
 
     private int getEndTime(int fileNum, int endTime){
-        if(fileNum < totalFileList.size()) {
-            File file = totalFileList.get(fileNum);
+        if(fileNum < dataFileList.size()) {
+            File file = dataFileList.get(fileNum);
             return (timeStr2int(file.getName().substring(9, 21)) - 1288800000);
         } else {
             return endTime;

@@ -7,7 +7,8 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import org.act.temporalProperty.exception.TPSNHException;
 import org.act.temporalProperty.impl.index.singleval.SourceCompare;
-import org.act.temporalProperty.index.rtree.*;
+import org.act.temporalProperty.index.value.rtree.*;
+import org.act.temporalProperty.util.DataFileImporter;
 import org.act.temporalProperty.util.Slice;
 import org.junit.Before;
 import org.junit.Test;
@@ -28,13 +29,27 @@ import java.util.List;
 public class RTreeTest {
     private static Logger log = LoggerFactory.getLogger(RTreeTest.class);
 
+    private static DataFileImporter dataFileImporter;
+    private SourceCompare sourceEntry;
+
+    private static String dbDir;
+    private static String dataPath;
+    private static List<File> dataFileList;
+
+    List<Integer> proIds = new ArrayList<>(); // the list of the proIds which will be indexed and queried
+
     RTree tree;
-    SourceCompare sourceCompare;
 
     @Before
-    public void buildRTree(){
-        sourceCompare = new SourceCompare("/home/song/tmp/road data/20101104", 100);
-//        List<IndexEntry> tmp = sourceCompare.queryBySource(300, 320, 200, 300);
+    public void buildRTree() throws IOException {
+
+        dataFileImporter = new DataFileImporter(280);
+        dbDir = dataFileImporter.getDbDir();
+        dataPath = dataFileImporter.getDataPath();
+        dataFileList = dataFileImporter.getDataFileList();
+        sourceEntry = new SourceCompare(dataPath, dataFileList, 100);
+
+        //List<IndexEntry> tmp = sourceCompare.queryBySource(300, 320, 200, 300);
         List<IndexEntry> tmp = querySource(30, 3200, 100, 300);
         log.info("{}", tmp.size());
 //        log.info("{}", tmp);
@@ -44,7 +59,12 @@ public class RTreeTest {
     }
 
     private List<IndexEntry> querySource(int timeMin, int timeMax, int valMin, int valMax) {
-        List<IndexEntry> result = sourceCompare.queryBySource(timeMin, timeMax, valMin, valMax);
+        int[][] pValueIntervals = new int[1][2];
+        pValueIntervals[0][0] = valMin;
+        pValueIntervals[0][1] = valMax;
+        proIds.add(0);
+        List<IndexEntry> result = sourceEntry.queryBySource(timeMin, timeMax, proIds, pValueIntervals);
+//        List<IndexEntry> result = new ArrayList<>();
         for(int i=0; i<result.size(); i++){
             IndexEntry entry = result.get(i);
             int start,end;
@@ -235,33 +255,43 @@ public class RTreeTest {
 
         //------ utils for node(RTreeNode)---------
         private void sortNodes(List<RTreeNode> data) {
-            nodeRecursiveSort(data, 0, data.size(), 0, this.op.dimensionCount());
+            data.sort(nodeComparator( this.op ));
+//            nodeRecursiveSort(data, 0, data.size(), 0, this.op.dimensionCount());
         }
 
-        private void nodeRecursiveSort(List<RTreeNode> data, int left, int right, int corIndex, int k) {
-            data.subList(left, right).sort(nodeComparator(this.op, corIndex));
-            if(k>1) {
-                int r = right - left; // total entry count
-                int p = r / bIndex + (r % bIndex == 0 ? 0 : 1); // total block count
-                int s = (int) Math.round(Math.ceil(Math.pow(p, 1d / k))); // block count at current dimension (corIndex).
-                int groupLen = s * bIndex; // group
-                for (int i = 0; i < s; i++) {
-                    int start = i*groupLen+left;
-                    int endTmp = (i+1)*groupLen+left;
-                    int end = endTmp>right ? right : endTmp;
-                    if(start<end) nodeRecursiveSort(data, start, end, corIndex + 1, k - 1);
+//        private void nodeRecursiveSort(List<RTreeNode> data, int left, int right, int corIndex, int k) {
+//            data.subList(left, right).sort(nodeComparator(this.op, corIndex));
+//            if(k>1) {
+//                int r = right - left; // total entry count
+//                int p = r / bIndex + (r % bIndex == 0 ? 0 : 1); // total block count
+//                int s = (int) Math.round(Math.ceil(Math.pow(p, 1d / k))); // block count at current dimension (corIndex).
+//                int groupLen = s * bIndex; // group
+//                for (int i = 0; i < s; i++) {
+//                    int start = i*groupLen+left;
+//                    int endTmp = (i+1)*groupLen+left;
+//                    int end = endTmp>right ? right : endTmp;
+//                    if(start<end) nodeRecursiveSort(data, start, end, corIndex + 1, k - 1);
+//                }
+//            }
+//        }
+
+        private Comparator<RTreeNode> nodeComparator(IndexEntryOperator op) {
+            int totalDim = op.dimensionCount();
+            return ( o1, o2 ) ->
+            {
+                int dimIndex = 0;
+                int r = op.compareRange( o1.getBound(), o2.getBound(), dimIndex );
+                for(dimIndex++; r==0 && dimIndex<totalDim; dimIndex++){
+                    r = op.compareRange( o1.getBound(), o2.getBound(),  dimIndex);
                 }
-            }
-        }
-
-        private Comparator<RTreeNode> nodeComparator(IndexEntryOperator op, int dimIndex) {
-            Preconditions.checkArgument(dimIndex<op.dimensionCount());
-            return (o1, o2) -> op.compareRange(o1.getBound(), o2.getBound(), dimIndex);
+                return r;
+            };
         }
 
         //------ utils for data(IndexEntry)---------
         private void sortData(List<IndexEntry> data) {
-            dataRecursiveSort(data, 0, data.size(), 0, this.op.dimensionCount());
+            data.sort(sliceComparator( this.op ));
+//            dataRecursiveSort(data, 0, data.size(), 0, this.op.dimensionCount());
             JsonArray arr = new JsonArray();
             for(IndexEntry entry : data){
                 arr.add(entry2jsonArr(entry));
@@ -270,25 +300,33 @@ public class RTreeTest {
 //            System.out.println("LEAF DATA ORDER: "+arr);
         }
 
-        private void dataRecursiveSort(List<IndexEntry> data, int left, int right, int corIndex, int k) {
-            data.subList(left, right).sort(sliceComparator(this.op, corIndex));
-            if(k>1) {
-                int r = right - left; // total entry count
-                int p = r / bData + (r % bData == 0 ? 0 : 1); // total block count
-                int s = (int) Math.round(Math.ceil(Math.pow(p, 1d / k))); // block count at current dimension (corIndex).
-                int groupLen = s * bData; // group
-                for (int i = 0; i < s; i++) {
-                    int start = i*groupLen+left;
-                    int endTmp = (i+1)*groupLen+left;
-                    int end = endTmp>right ? right : endTmp;
-                    if(start<end) dataRecursiveSort(data, start, end, corIndex + 1, k - 1);
-                }
-            }
-        }
+//        private void dataRecursiveSort(List<IndexEntry> data, int left, int right, int corIndex, int k) {
+//            data.subList(left, right).sort(sliceComparator(this.op, corIndex));
+//            if(k>1) {
+//                int r = right - left; // total entry count
+//                int p = r / bData + (r % bData == 0 ? 0 : 1); // total block count
+//                int s = (int) Math.round(Math.ceil(Math.pow(p, 1d / k))); // block count at current dimension (corIndex).
+//                int groupLen = s * bData; // group
+//                for (int i = 0; i < s; i++) {
+//                    int start = i*groupLen+left;
+//                    int endTmp = (i+1)*groupLen+left;
+//                    int end = endTmp>right ? right : endTmp;
+//                    if(start<end) dataRecursiveSort(data, start, end, corIndex + 1, k - 1);
+//                }
+//            }
+//        }
 
-        private Comparator<IndexEntry> sliceComparator(IndexEntryOperator op, int dimIndex) {
-            Preconditions.checkArgument(dimIndex<op.dimensionCount());
-            return (o1, o2) -> op.compare(o1, o2, dimIndex);
+        private Comparator<IndexEntry> sliceComparator(IndexEntryOperator op) {
+            int totalDim = op.dimensionCount();
+            return ( o1, o2 ) ->
+            {
+                int dimIndex = 0;
+                int r = op.compare( o1, o2, dimIndex );
+                for(dimIndex++; r==0 && dimIndex<totalDim; dimIndex++){
+                    r = op.compare( o1, o2,  dimIndex);
+                }
+                return r;
+            };
         }
 
     }

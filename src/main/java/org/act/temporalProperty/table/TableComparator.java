@@ -1,6 +1,7 @@
 package org.act.temporalProperty.table;
 
 import org.act.temporalProperty.impl.InternalKey;
+import org.act.temporalProperty.query.aggr.AggregationIndexKey;
 import org.act.temporalProperty.util.Slice;
 
 import com.google.common.primitives.Longs;
@@ -9,8 +10,7 @@ public class TableComparator implements UserComparator
 {
     
     private UserComparator userComparator;
-    private static TableComparator instence;
-    
+
     private TableComparator( UserComparator c )
     {
         this.userComparator = c;
@@ -18,11 +18,12 @@ public class TableComparator implements UserComparator
     
     public static synchronized TableComparator instance()
     {
-        if( null == instence )
-        {
-            instence = new TableComparator( new FixedIdComparator() );
-        }
-        return instence;
+        return new TableComparator( new FixedIdComparator() );
+    }
+
+    public static synchronized TableComparator forAggrIndex()
+    {
+        return new TableComparator( AggregationIndexKey.sliceComparator );
     }
 
     @Override

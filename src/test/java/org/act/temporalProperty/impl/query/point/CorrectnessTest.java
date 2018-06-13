@@ -1,9 +1,7 @@
 package org.act.temporalProperty.impl.query.point;
 
 import org.act.temporalProperty.TemporalPropertyStore;
-import org.act.temporalProperty.impl.RangeQueryCallBack;
 import org.act.temporalProperty.meta.ValueContentType;
-import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.StoreBuilder;
 import org.apache.commons.lang3.SystemUtils;
 import org.junit.Test;

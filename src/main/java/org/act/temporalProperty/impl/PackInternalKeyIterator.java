@@ -1,6 +1,6 @@
 package org.act.temporalProperty.impl;
 
-import com.google.common.collect.AbstractIterator;
+import org.act.temporalProperty.helper.AbstractSearchableIterator;
 import org.act.temporalProperty.util.Slice;
 
 import java.util.Map.Entry;
@@ -8,7 +8,8 @@ import java.util.Map.Entry;
 /**
  * Created by song on 2018-03-29.
  */
-public class PackInternalKeyIterator extends AbstractIterator<InternalEntry> implements SearchableIterator {
+public class PackInternalKeyIterator extends AbstractSearchableIterator
+{
 
     private final SeekingIterator<Slice, Slice> in;
 
@@ -28,11 +29,13 @@ public class PackInternalKeyIterator extends AbstractIterator<InternalEntry> imp
 
     @Override
     public void seekToFirst() {
+        super.resetState();
         in.seekToFirst();
     }
 
     @Override
     public void seek(InternalKey targetKey) {
+        super.resetState();
         in.seek(targetKey.encode());
     }
 }
